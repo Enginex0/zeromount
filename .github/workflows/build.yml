@@ -1,0 +1,63 @@
+name: build module
+
+on:
+  push:
+    branches: master
+    paths-ignore: 
+      - '**.md'
+  workflow_dispatch:
+
+env:
+  MODULE_NAME: 'nomount'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: master
+
+      - name: grab sstrip from ELFkickers
+        run: |
+          curl -L https://www.muppetlabs.com/~breadbox/pub/software/ELFkickers-3.2.tar.gz -o sstrip.tar.gz
+          tar xf sstrip.tar.gz
+          make -C ELFkickers-3.2 sstrip
+          cp ELFkickers-3.2/sstrip/sstrip .
+
+      - name: compile via zigcc
+        run: |
+          echo "aarch64"
+          pwd
+          mkdir bin
+
+          chmod +x sstrip
+
+          cd src
+          zig cc -target aarch64-linux -Oz -static -nostdlib -ffreestanding -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-ident -flto -fmerge-all-constants -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,norelro -Wl,-s -Wl,--strip-all -Wl,--entry=_start nm.c -o ../bin/nm-arm64
+          zig cc -target arm-linux -Oz -static -nostdlib -ffreestanding -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fomit-frame-pointer -fno-ident -flto -fmerge-all-constants -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,norelro -Wl,-s -Wl,--strip-all -Wl,--entry=_start nm.c -o ../bin/nm-arm
+
+          cd ../bin
+
+          wc -c nm-*
+          
+          ../sstrip -z nm-arm64
+          ../sstrip -z nm-arm
+
+          wc -c nm-*
+          file nm-*
+          mkdir -p ../module/bin
+          mv nm-* ../module
+
+      - name: Update version code
+        run: sed -i 's/^versionCode=.*/versionCode=${{ github.run_number }}/' module/module.prop
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.MODULE_NAME }}-${{ github.run_number }}
+          path: module/
