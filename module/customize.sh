@@ -1,5 +1,3 @@
-#!/system/bin/sh
-# Welcome Message
 ui_print " "
 ui_print "======================================="
 ui_print "               NoMount                 "
@@ -7,29 +5,16 @@ ui_print "  Native Kernel Injection Metamodule   "
 ui_print "======================================="
 ui_print " "
 
-ARCH=$(busybox uname -m)
-case "$ARCH" in
-	aarch64 | arm64 )
-		ELF_BINARY="nm-arm64"
-		;;
-	armv7l | armv8l )
-		ELF_BINARY="nm-arm"
-		;;
-	*)
-		abort "[!] $ARCH not supported!"
-		;;
-esac
-
-mv "$MODPATH/$ELF_BINARY" "$MODPATH/bin/nm"
-rm -rf "$MODPATH/nm*"
-
-ui_print "- Extracting module files..."
-ui_print "- Setting permissions..."
-
-chmod 755 "$MODPATH/bien/nm_loader" || abort "! Failed to set permissions"
+ui_print "- Device Architecture: $ARCH"
+if [ ! -f "$MODPATH/nm-$ARCH" ]; then
+  abort "! Unsupported architecture: $ARCH"
+fi
+mkdir -p "$MODPATH/bin"
+cp -f "$MODPATH/nm-$ARCH" "$MODPATH/bin/nm"
+set_perm "$MODPATH/bin/nm" 0 0 0755
+rm -rf $MODPATH/nm*
 
 ui_print "- Checking Kernel support..."
-
 if [ -e "/dev/nomount" ]; then
   ui_print "  [OK] Driver /dev/nomount detected."
   ui_print "  [OK] System is ready for injection."
