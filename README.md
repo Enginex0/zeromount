@@ -1,5 +1,7 @@
 # NoMount
 
+> WARNING: This project is in beta and may contain bugs.
+
 **NoMount** is a kernel-based file injection and path redirection framework for Android kernels.
 
 Unlike traditional root solutions that rely on `mount --bind` (which pollutes `/proc/mounts`, changes mount namespaces, and is easily detected), NoMount operates **purely at the VFS (Virtual File System) layer**. It manipulates path resolution and directory iteration directly inside the kernel, making injections effective yet virtually invisible to userspace detection methods.
@@ -68,6 +70,7 @@ Control the subsystem using the `nm` binary.
 | **Delete Rule** | `nm del <virtual>` | Remove a specific injection rule. |
 | **Add UID Block** | `nm block <uid>` | Hide all injections from this UID. |
 | **Del UID Block** | `nm unblock <uid>` | Allow this UID to see injections again. |
+| **List Rules** | `nm list` | Show injected files |
 | **Clear All** | `nm clear` | Flush all rules and blocks immediately. |
 | **Version** | `nm ver` | Show the kernel subsystem version. |
 
@@ -99,7 +102,7 @@ nm block 10256
 
 ## Special thanks:
 
--  **[Hymo](https://github.com/Anatdx/hymo)**: Inspiration for this project.
+-  **[HymoFS](https://github.com/Anatdx/HymoFS)**: Inspiration for this project.
 -  **[backslashxx](https://github.com/backslashxx)**: Code optimization.
 -  **[KernelSU](https://github.com/tiann/KernelSU)**: Root solution.
 
