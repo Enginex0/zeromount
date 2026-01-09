@@ -1,0 +1,23 @@
+:root {
+    --md-sys-color-surface: #0a0a0a;
+    --md-sys-color-on-surface: #e0e0e0;
+    --md-sys-color-surface-container: #1a1a1a;
+    --md-sys-color-surface-container-high: #252525;
+    --md-sys-color-on-surface-variant: #c0c0c0;
+    --md-sys-color-primary: #82b1ff; 
+    --md-sys-color-on-primary: #002e60;
+    --md-sys-color-primary-container: #00468c;
+    --md-sys-color-on-primary-container: #d6e4ff;
+    --md-sys-color-secondary: #b0bec5;
+    --md-sys-color-on-secondary: #193038;
+    --md-sys-color-secondary-container: #223a55;
+    --md-sys-color-on-secondary-container: #cfd8dc;
+    --md-sys-color-outline: #444746;
+    --md-sys-color-outline-variant: #444746;
+    --md-sys-color-error: #f44336;
+    --md-sys-color-error-container: #880000;
+    --md-sys-color-on-error: #ffffff;
+    --md-sys-color-on-error-container: #ffdad6;
+    --top-inset: env(safe-area-inset-top, 0px);
+    --bottom-inset: env(safe-area-inset-bottom, 0px);
+}

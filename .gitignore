@@ -1,1 +1,3 @@
+module/webroot
+webui/node-modules
 *.zip

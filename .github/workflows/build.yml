@@ -53,6 +53,12 @@ jobs:
           mkdir -p ../module/bin
           mv nm-* ../module
 
+      - name: Build WebUI
+        run: |
+          cd webui
+          npm ci
+          npm run build
+
       - name: Update version code
         run: sed -i 's/^versionCode=.*/versionCode=${{ github.run_number }}/' module/module.prop
 

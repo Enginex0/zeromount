@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NoMount Dashboard</title>
+    <script src="index.js" type="module"></script>
+    <link rel="stylesheet" href="styles.css" type="text/css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    
+    <style>body { font-family: system-ui; }</style>
+</head>
+<body>
+    <div class="root_layout">
+            
+            <div id="view-home" class="view-content active">
+                
+                <div class="card status-card-compact" style="background-color: var(--md-sys-color-on-primary); margin-top: 3px;">
+                    <div class="status-icon-box">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="32" viewBox="0 -960 960 960" width="32" fill="currentColor">
+                            <path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-56-264L688-608l-56-56-208 208-112-112-56 56 168 168Z"/>
+                        </svg>
+                    </div>
+                    <div class="status-text-col">
+                        <h2>NoMount</h2>
+                        <div id="status-indicator" class="status-label">Checking...</div>
+                    </div>
+                </div>
+
+                <div class="info-list-container">
+
+                    <div class="info-row">
+                        <div class="info-icon">
+                            <md-icon>extension</md-icon>
+                        </div>
+                        <div class="info-data">
+                            <span class="info-label">NoMount Version</span>
+                            <span class="info-value" id="nomount-version">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-icon"><md-icon>layers</md-icon></div>
+                        <div class="info-data">
+                            <span class="info-label">Injection Stats</span>
+                            <span class="info-value" id="injection-stats">Calculating...</span>
+                        </div>
+                    </div>
+
+                    <h3 style="margin: 8px 0 8px 8px; font-size: 14px; opacity: 0.5;">Device info:</h3>
+
+                    <div class="info-row">
+                        <div class="info-icon"><md-icon>smartphone</md-icon></div>
+                        <div class="info-data">
+                            <span class="info-label">Device</span>
+                            <span class="info-value" id="device-model">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-icon"><md-icon>android</md-icon></div>
+                        <div class="info-data">
+                            <span class="info-label">System</span>
+                            <span class="info-value" id="android-ver">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-icon">
+                            <md-icon>memory</md-icon>
+                        </div>
+                        <div class="info-data">
+                            <span class="info-label">Kernel Version</span>
+                            <span class="info-value" id="kernel-version">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-modules" class="view-content">
+                <div class="header-title">Modules</div>
+                <div id="modules-list" class="list">
+                    <div class="inactive-banner active" id="modules-empty">No injecting modules found</div>
+                </div>
+            </div>
+
+            <div id="view-exclusions" class="view-content">
+                <div class="header-title">Exclusions</div>
+                <div id="exclusions-list" class="list"></div>
+            </div>
+
+            <div id="view-options" class="view-content">
+                <div class="header-title">Settings</div>
+                
+                <div class="card setting-item" style="margin-bottom: -9px;">
+                    <div class="setting-text">
+                        <h3>Detailed Logging</h3>
+                        <p>Write verbose output to nomount.log</p>
+                    </div>
+                    <md-switch id="setting-verbose"></md-switch>
+                </div>
+
+                <div class="card setting-item" style="margin-bottom: -9px;">
+                    <div class="setting-text">
+                        <h3>Safe Mode</h3>
+                        <p>Disable injection on next boot</p>
+                    </div>
+                    <md-switch id="setting-safemode"></md-switch>
+                </div>
+
+                 <div class="card setting-item">
+                    <md-outlined-button id="btn-clear-rules" style="width: 100%;">
+                        CLEAR ALL RULES
+                    </md-outlined-button>
+                </div>
+            </div>
+
+        </div> <div class="bottom-nav">
+            <div class="nav-item active" data-target="view-home">
+                <div class="nav-icon"><md-icon>dashboard</md-icon></div>
+                <span>Home</span>
+            </div>
+            <div class="nav-item" data-target="view-modules">
+                <div class="nav-icon"><md-icon>view_module</md-icon></div>
+                <span>Modules</span>
+            </div>
+            <div class="nav-item" data-target="view-exclusions">
+                <div class="nav-icon"><md-icon>security</md-icon></div>
+                <span>Exclusions</span>
+            </div>
+            <div class="nav-item" data-target="view-options">
+                <div class="nav-icon"><md-icon>settings</md-icon></div>
+                <span>Options</span>
+            </div>
+        </div>
+
+    <div id="fab-container">
+        <md-fab variant="primary" id="fab-add-exclusion">
+            <md-icon slot="icon">add</md-icon>
+        </md-fab>
+    </div>
+
+    <div id="app-selector-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Application</h3>
+                <md-icon-button id="btn-close-modal" style="background: var(--md-sys-color-outline); border-radius: 50px;">
+                    <md-icon>close</md-icon>
+                </md-icon-button>
+            </div>
+            
+            <div class="search-box">
+                <md-icon>search</md-icon>
+                <input type="text" id="app-search-input" placeholder="Search app or package...">
+
+                <md-icon-button id="btn-filter-toggle">
+                    <md-icon>filter_list</md-icon>
+                </md-icon-button>
+            </div>
+
+            <div id="filter-menu" class="filter-menu">
+                <div class="filter-option">
+                    <span>Show System Apps</span>
+                    <md-switch id="switch-system-apps"></md-switch>
+                </div>
+            </div>
+            
+
+            <div id="app-list-container" class="app-list">
+                <div class="loading-spinner">Loading apps...</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
