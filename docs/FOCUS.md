@@ -6,11 +6,14 @@
 
 ## CURRENT FOCUS
 
-**Phase: MVP COMPLETE** ✓
+**Phase: POST-MVP HARDENING** ✓
 
 ### Active Task
 
-None — All MVP features completed and verified.
+None — Detection bypass hardening completed.
+
+### Latest Fix (2026-01-29)
+ZeroMount kernel artifact exposure fixed. `/dev/zeromount` and `/sys/kernel/zeromount` now hidden via SUSFS sus_path_loop.
 
 ---
 
@@ -59,14 +62,15 @@ None — All MVP features completed and verified.
 | build-and-test (Build Pipeline + Testing) | 2026-01-28 | 2026-01-29 | 2 |
 | script-extraction (Injection Scripts) | 2026-01-28 | 2026-01-28 | 1 |
 | SUSFS fix investigation + deployment | 2026-01-29 | 2026-01-29 | 1 |
+| ZeroMount kernel artifact hiding (detection bypass) | 2026-01-29 | 2026-01-29 | 1 |
 
 ---
 
 ## STATS
 
-**Completed:** 9 features
+**Completed:** 10 features
 **Abandoned:** 2 (NoMount v1, kernel decode "fix")
-**Completion Rate:** 82%
+**Completion Rate:** 83%
 
 **Goal:** 80%+ completion rate ✓ **ACHIEVED**
 
@@ -74,10 +78,18 @@ None — All MVP features completed and verified.
 
 ## VERIFICATION
 
-All 4 detection apps pass:
+All 5 detection apps pass:
 - Native Detector (Reveny): ✓ "The Environment is normal"
 - Native Test (icu.nullptr): ✓ "Normal"
 - Holmes: ✓ "Normal"
 - Disclosure (milltina): ✓ "No traces were found"
+- Crackme (kikyps): ✓ Pass (after kernel artifact hiding)
 
 **ZeroMount + SUSFS integration verified working.**
+
+### Detection Vectors Closed (2026-01-29)
+| Vector | Fix |
+|--------|-----|
+| `/dev/zeromount` visible | SUSFS sus_path_loop hides from umounted apps |
+| `/sys/kernel/zeromount/` visible | SUSFS sus_path_loop hides from umounted apps |
+| Sucompat stat() side-channel | Kernel fix: `susfs_is_current_proc_umounted()` check |

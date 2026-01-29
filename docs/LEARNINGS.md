@@ -223,3 +223,51 @@ When multiple functions need the same check, verify EACH function has it. "The f
 **Files modified:**
 - `/home/claudetest/gki-build/kernelsu-next-vanilla/.github/workflows/build.yml` — Added awk-based injection step
 - Build run: 21467986635 (pending)
+
+---
+
+### 2026-01-29: ZeroMount Kernel Artifacts Expose Presence
+
+**What happened:**
+Detection app (crackme) still detected root even with sucompat fix applied and no ZeroMount rules configured.
+
+**Root cause:**
+ZeroMount kernel module creates visible artifacts:
+- `/dev/zeromount` — char device (mode 0600, but existence detectable via stat())
+- `/sys/kernel/zeromount/` — sysfs kobject (mode 0755, world-readable directory)
+
+Detection apps don't need to READ these paths — just `stat()` returning SUCCESS proves ZeroMount is loaded.
+
+**Detection vector:**
+```c
+stat("/dev/zeromount")      // Returns 0 → ZeroMount kernel present
+stat("/sys/kernel/zeromount") // Returns 0 → ZeroMount active
+```
+
+**Why this wasn't obvious:**
+1. Focused on VFS hook behavior, not kernel module registration side-effects
+2. Testing from root shell — SUSFS hiding doesn't apply to root
+3. Assumed "no rules = invisible" — wrong, presence itself is detectable
+
+**Fix:**
+Add SUSFS sus_path_loop in service.sh to hide both paths:
+```bash
+ksu_susfs add_sus_path_loop /dev/zeromount
+ksu_susfs add_sus_path_loop /sys/kernel/zeromount
+```
+
+**Why sus_path_loop (not sus_path):**
+`sus_path_loop` re-flags paths as hidden for each zygote-spawned process. Regular `sus_path` only applies once. Apps spawned after boot need the loop variant.
+
+**Verification (dmesg):**
+```
+susfs:[0][13709][susfs_run_sus_path_loop] re-flag '/dev/zeromount' as SUS_PATH for uid: 99039
+susfs:[0][13709][susfs_run_sus_path_loop] re-flag '/sys/kernel/zeromount' as SUS_PATH for uid: 99039
+```
+
+**Lesson:**
+Kernel modules have side-effects beyond their intended functionality. Device nodes, sysfs entries, procfs entries, and even kernel symbol exports can reveal presence. Always audit what artifacts a kernel module creates and hide them from detection apps.
+
+**Files modified:**
+- `module/service.sh` — Added SUSFS sus_path_loop calls
+- `releases/zeromount-v1.0.1.zip` — Updated module package

@@ -1,0 +1,110 @@
+{
+  "$schema": "./features.schema.json",
+
+  "features": [
+    {
+      "id": "kernel-patch-v2",
+      "title": "Kernel Patch v2 (Bug Fixes + Rename)",
+      "description": "Fix RCU use-after-free in UID deletion, compat getdents return value, inode collision (check dev), O(n) scans to O(1) via inode hash table, move static tables from header to .c, rename to zeromount/dev/zeromount. Add enable/disable ioctl commands.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "L",
+      "tags": ["kernel", "bugfix"],
+      "blocked_by": [],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-28",
+      "notes": "8 bugs identified in audit. Critical: RCU UAF, compat getdents, inode collision."
+    },
+    {
+      "id": "zm-binary",
+      "title": "zm Binary (Freestanding C CLI)",
+      "description": "Rebuild nm.c as zm.c with ZeroMount identity. Add enable/disable commands. Device path /dev/zeromount. Keep freestanding (no libc), aarch64+arm32.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "M",
+      "tags": ["userspace", "binary"],
+      "blocked_by": ["kernel-patch-v2"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-28",
+      "notes": "Extend with enable/disable commands. Consider batch mode for performance."
+    },
+    {
+      "id": "metamodule-scripts",
+      "title": "Metamodule Shell Scripts",
+      "description": "Rebuild metamount.sh (~60 lines), service.sh (~30 lines), customize.sh, metainstall.sh, metauninstall.sh, monitor.sh. Follow metamodule contract: notify-module-mounted, skip_mount, disable flags.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "M",
+      "tags": ["userspace", "shell"],
+      "blocked_by": ["zm-binary"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-28",
+      "notes": "metamount.sh: clear -> iterate -> inject -> notify. service.sh: UID exclusions + SUSFS."
+    },
+    {
+      "id": "susfs-integration",
+      "title": "SUSFS Integration Module",
+      "description": "Slim susfs_integration.sh (~200 lines). Init, classify paths, apply per-file SUSFS rules (sus_path, kstat_redirect, sus_map, open_redirect). Plug-and-socket with ZeroMount.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "M",
+      "tags": ["userspace", "susfs"],
+      "blocked_by": ["metamodule-scripts"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-28",
+      "notes": "Keep kstat_redirect dual-inode enhancement. Keep path classification. Discard overlay engine."
+    },
+    {
+      "id": "susfs-kernel-enhancements",
+      "title": "SUSFS Kernel Enhancements (kstat_redirect + inject script)",
+      "description": "Preserve kstat_redirect dual-inode function in susfs.c. Preserve inject-susfs-custom-handlers.sh for build automation. Rename references from nomount to zeromount.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "S",
+      "tags": ["kernel", "susfs"],
+      "blocked_by": ["kernel-patch-v2"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-29",
+      "notes": "Dual-inode kstat_redirect verified working. Both virtual and real inodes registered for correct spoofing regardless of access path."
+    },
+    {
+      "id": "build-and-test",
+      "title": "Build Pipeline + Testing",
+      "description": "GitHub Actions GKI build with ZeroMount kernel patch + SUSFS. Module ZIP packaging. Test on emulator or device.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "L",
+      "tags": ["infra", "testing"],
+      "blocked_by": ["susfs-integration"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-29",
+      "notes": "All 4 detection apps pass: Native Detector, Native Test, Holmes, Disclosure. SUSFS kstat spoofing working correctly with dual-inode registration."
+    },
+    {
+      "id": "script-extraction",
+      "title": "Extract Injection Scripts from Unified Patch",
+      "description": "Split zeromount-kernel-5.10.patch into core patch + 7 injection scripts + fixes patch. Scripts use awk/sed pattern matching for kernel version compatibility.",
+      "status": "completed",
+      "priority": "mvp",
+      "size": "M",
+      "tags": ["build", "patches"],
+      "blocked_by": ["build-and-test"],
+      "started_date": "2026-01-28",
+      "completed_date": "2026-01-28",
+      "notes": "Extracted 7 injection scripts from unified patch: init, classify, inject, stats, disable, enable, monitor. Scripts use awk/sed for kernel version compatibility. Enables multi-version kernel support."
+    },
+    {
+      "id": "detection-bypass-hardening",
+      "title": "Detection Bypass Hardening",
+      "description": "Hide ZeroMount kernel artifacts (/dev/zeromount, /sys/kernel/zeromount) from detection apps using SUSFS sus_path_loop. Fix sucompat stat() side-channel via kernel patch.",
+      "status": "completed",
+      "priority": "post-mvp",
+      "size": "S",
+      "tags": ["security", "detection-bypass"],
+      "blocked_by": ["build-and-test"],
+      "started_date": "2026-01-29",
+      "completed_date": "2026-01-29",
+      "notes": "Root cause: kernel artifacts visible even with no rules. Fix: SUSFS sus_path_loop hides paths from umounted apps. Verified with crackme detection app."
+    }
+  ]
+}
