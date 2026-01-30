@@ -103,6 +103,7 @@ export function ConfigTab() {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedQuery, setDebouncedQuery] = createSignal('');
   const [showSystemApps, setShowSystemApps] = createSignal(false);
+  const [excludedExpanded, setExcludedExpanded] = createSignal(false);
   let debounceTimer: number | undefined;
 
   onMount(() => {
@@ -186,51 +187,67 @@ export function ConfigTab() {
       </div>
 
       <Card>
-        <div class="config__section-header">
+        <div
+          class="config__section-header config__section-header--clickable"
+          onClick={() => setExcludedExpanded(!excludedExpanded())}
+        >
           <h3 class="config__section-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill={t().colorError}>
               <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
             </svg>
             Excluded Apps
           </h3>
-          <Badge variant="error" size="small">
-            {store.excludedUids().length}
-          </Badge>
+          <div class="config__section-right">
+            <Badge variant="error" size="small">
+              {store.excludedUids().length}
+            </Badge>
+            <svg
+              class={`config__chevron ${excludedExpanded() ? 'config__chevron--expanded' : ''}`}
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill={t().textTertiary}
+            >
+              <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+            </svg>
+          </div>
         </div>
 
-        <p class="config__section-desc">
-          These apps bypass spoofing and mounts are visible - caution
-        </p>
+        <Show when={excludedExpanded()}>
+          <p class="config__section-desc">
+            These apps bypass spoofing and mounts are visible - caution
+          </p>
 
-        <Show
-          when={filteredExcluded().length > 0}
-          fallback={
-            <div class="config__empty">
-              {debouncedQuery() ? 'No matches' : 'No excluded apps'}
-            </div>
-          }
-        >
-          <div class="config__apps">
-            <For each={filteredExcluded()}>
-              {(item) => (
-                <div class="config__app config__app--excluded">
-                  <AppIcon packageName={item.packageName} size={40} />
-                  <div class="config__app-info">
-                    <div class="config__app-name">{item.appName}</div>
-                    <div class="config__app-package">{item.packageName}</div>
+          <Show
+            when={filteredExcluded().length > 0}
+            fallback={
+              <div class="config__empty">
+                {debouncedQuery() ? 'No matches' : 'No excluded apps'}
+              </div>
+            }
+          >
+            <div class="config__apps">
+              <For each={filteredExcluded()}>
+                {(item) => (
+                  <div class="config__app config__app--excluded">
+                    <AppIcon packageName={item.packageName} size={40} />
+                    <div class="config__app-info">
+                      <div class="config__app-name">{item.appName}</div>
+                      <div class="config__app-package">{item.packageName}</div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); store.includeUid(item.uid); }}
+                      style={`color: ${t().colorError}; padding: 6px 10px;`}
+                    >
+                      REMOVE
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    onClick={() => store.includeUid(item.uid)}
-                    style={`color: ${t().colorError}; padding: 6px 10px;`}
-                  >
-                    REMOVE
-                  </Button>
-                </div>
-              )}
-            </For>
-          </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </Show>
       </Card>
 

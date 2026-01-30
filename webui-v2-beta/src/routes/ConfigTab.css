@@ -48,6 +48,32 @@
   margin-bottom: 12px;
 }
 
+.config__section-header--clickable {
+  cursor: pointer;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.config__section-header--clickable:active {
+  background: var(--glass-bg);
+}
+
+.config__section-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config__chevron {
+  transition: transform 0.2s ease;
+}
+
+.config__chevron--expanded {
+  transform: rotate(180deg);
+}
+
 .config__section-title {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   font-size: 14px;
