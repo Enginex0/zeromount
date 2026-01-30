@@ -213,13 +213,14 @@ export const api = {
 
     try {
       console.log('[ZM-API] getSystemInfo() fetching system info...');
-      const [verRes, kernRes, uptimeRes, modelRes, androidRes, selinuxRes] = await Promise.all([
+      const [verRes, kernRes, uptimeRes, modelRes, androidRes, selinuxRes, susfsRes] = await Promise.all([
         execCommand(`${PATHS.BINARY} ver`).catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         execCommand('uname -r').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         execCommand('cat /proc/uptime').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         execCommand('getprop ro.product.model').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         execCommand('getprop ro.build.version.release').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         execCommand('getenforce').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        execCommand('ksu_susfs show version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
       ]);
 
       if (verRes.errno === 0 && verRes.stdout) {
@@ -245,16 +246,12 @@ export const api = {
       if (selinuxRes.errno === 0 && selinuxRes.stdout.trim()) {
         info.selinuxStatus = selinuxRes.stdout.trim();
       }
-
-      // SUSFS version
-      const susfsRes = await execCommand('ksu_susfs show version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' }));
       if (susfsRes.errno === 0 && susfsRes.stdout.trim()) {
         info.susfsVersion = susfsRes.stdout.trim();
       }
       console.log('[ZM-API] getSystemInfo() returning:', info);
     } catch (e) {
       console.error('[ZM-API] getSystemInfo() error:', e);
-      // Keep defaults
     }
 
     return info;

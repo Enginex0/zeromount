@@ -164,34 +164,33 @@ function createAppStore() {
     console.log('[ZM-Store] loadInitialData() starting...');
     setLoading({ status: true, rules: true, activity: true });
     try {
-      if (settings.autoAccentColor) {
-        const systemColor = await api.fetchSystemColor();
-        if (systemColor) {
-          console.log('[ZM-Store] loadInitialData() applying system accent color:', systemColor);
-          setSettings({ accentColor: systemColor });
-        }
-      }
-
-      console.log('[ZM-Store] loadInitialData() calling all API methods in parallel...');
+      // All calls in parallel - removed redundant getStats() which re-called getRules/getExcludedUids
       const results = await Promise.allSettled([
         api.getRules(),
         api.getExcludedUids(),
         api.getActivity(),
-        api.getStats(),
         api.getSystemInfo(),
         api.getModules(),
         api.isEngineActive(),
         api.scanKsuModules(),
+        settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
       ]);
 
       const rulesData = results[0].status === 'fulfilled' ? results[0].value : [];
       const uidsData = results[1].status === 'fulfilled' ? results[1].value : [];
       const activityData = results[2].status === 'fulfilled' ? results[2].value : [];
-      const statsData = results[3].status === 'fulfilled' ? results[3].value : { activeRules: 0, excludedUids: 0, hitsToday: 0 };
-      const sysInfo = results[4].status === 'fulfilled' ? results[4].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
-      const modulesData = results[5].status === 'fulfilled' ? results[5].value : [];
-      const isActive = results[6].status === 'fulfilled' ? results[6].value : false;
-      const ksuModulesData = results[7].status === 'fulfilled' ? results[7].value : [];
+      const sysInfo = results[3].status === 'fulfilled' ? results[3].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
+      const modulesData = results[4].status === 'fulfilled' ? results[4].value : [];
+      const isActive = results[5].status === 'fulfilled' ? results[5].value : false;
+      const ksuModulesData = results[6].status === 'fulfilled' ? results[6].value : [];
+      const systemColor = results[7].status === 'fulfilled' ? results[7].value : null;
+
+      // Derive stats locally instead of redundant API call
+      const statsData = {
+        activeRules: rulesData.length,
+        excludedUids: uidsData.length,
+        hitsToday: rulesData.reduce((sum, r) => sum + r.hits, 0),
+      };
 
       const failedCount = results.filter(r => r.status === 'rejected').length;
       if (failedCount > 0) {
@@ -216,6 +215,7 @@ function createAppStore() {
       setModules(modulesData);
       setEngineActive(isActive);
       setKsuModules(ksuModulesData);
+      if (systemColor) setSettings({ accentColor: systemColor });
       console.log('[ZM-Store] loadInitialData() state updated successfully');
     } catch (err) {
       console.error('[ZM-Store] loadInitialData() error:', err);
