@@ -80,7 +80,7 @@ index 000000000..43ca3f0fa
 +    return pid == 1 || pid == 2;
 +}
 +
-+static bool zeromount_is_uid_blocked(uid_t uid) {
++bool zeromount_is_uid_blocked(uid_t uid) {
 +    struct zeromount_uid_node *entry;
 +    if (ZEROMOUNT_DISABLED()) return false;
 +
@@ -94,6 +94,7 @@ index 000000000..43ca3f0fa
 +    rcu_read_unlock();
 +    return false;
 +}
++EXPORT_SYMBOL(zeromount_is_uid_blocked);
 +
 +bool zeromount_match_path(const char *input_path, const char *rule_path) {
 +    if (!input_path || !rule_path) return false;
@@ -1054,6 +1055,7 @@ index 000000000..9e0fb1b21
 +char *zeromount_get_virtual_path_for_inode(struct inode *inode);
 +bool zeromount_is_traversal_allowed(struct inode *inode, int mask);
 +bool zeromount_is_injected_file(struct inode *inode);
++bool zeromount_is_uid_blocked(uid_t uid);
 +int zeromount_spoof_statfs(const char __user *pathname, struct kstatfs *buf);
 +ssize_t zeromount_spoof_xattr(struct dentry *dentry, const char *name,
 +			      void *value, size_t size);
@@ -1065,6 +1067,7 @@ index 000000000..9e0fb1b21
 +static inline char *zeromount_get_virtual_path_for_inode(struct inode *inode) { return NULL; }
 +static inline bool zeromount_is_traversal_allowed(struct inode *inode, int mask) { return false; }
 +static inline bool zeromount_is_injected_file(struct inode *inode) { return false; }
++static inline bool zeromount_is_uid_blocked(uid_t uid) { return false; }
 +static inline int zeromount_spoof_statfs(const char __user *p, struct kstatfs *b) { return 0; }
 +static inline ssize_t zeromount_spoof_xattr(struct dentry *d, const char *n,
 +					    void *v, size_t s) { return -EOPNOTSUPP; }
