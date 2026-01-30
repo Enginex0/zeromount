@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,918 @@
+@@ -0,0 +1,919 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -931,7 +931,7 @@ index 000000000..43ca3f0fa
 +    .minor = MISC_DYNAMIC_MINOR, .name = "zeromount", .fops = &zeromount_fops, .mode = 0600,
 +};
 +
-+static int __init zeromount_init(void) {
++static int __init __used zeromount_init(void) {
 +    int ret;
 +    spin_lock_init(&zeromount_lock);
 +    ret = misc_register(&zeromount_device);
