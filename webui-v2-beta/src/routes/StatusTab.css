@@ -1,0 +1,332 @@
+/* Status Tab - BEM Structure */
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 16px;
+}
+
+/* Hero Section */
+.status-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-hero__indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-hero__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-hero__dot--active {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+.status-hero__shield {
+  position: relative;
+  transition: transform 0.15s ease;
+}
+
+.status-hero__shield--active {
+  animation: float 3s ease-in-out infinite, heartbeat 1.5s ease-in-out infinite;
+}
+
+.status-hero__glow {
+  position: absolute;
+  inset: -20px;
+  transition: opacity 0.5s ease;
+  filter: blur(10px);
+}
+
+.status-hero__glow--active {
+  opacity: 0.5;
+}
+
+.status-hero__glow--inactive {
+  opacity: 0;
+}
+
+.status-hero__shield-svg {
+  position: relative;
+  z-index: 1;
+}
+
+
+/* Section Headers */
+.status-section__header {
+  font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 16px;
+}
+
+/* Stats Grid */
+.status-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.status-stats__card {
+  text-align: center;
+  padding: 16px 8px;
+  border-radius: var(--radius-medium, 12px);
+  border: 1px solid var(--glass-border);
+}
+
+.status-stats__value {
+  font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 32px;
+  font-weight: 800;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+.status-stats__label {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+/* Mode Statistics */
+.status-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-mode__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-mode__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-mode__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-mode__text {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+}
+
+.status-mode__value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Mount Info */
+.status-mount__cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.status-mount__card {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius-medium, 12px);
+  border: 1px solid var(--glass-border);
+}
+
+.status-mount__card-label {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.status-mount__card-value {
+  font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.status-mount__paths-label {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.status-mount__paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-mount__chip {
+  padding: 6px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+}
+
+.status-mount__empty {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 13px;
+}
+
+/* System Health */
+.status-health {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.status-health__item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.status-health__level {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-health__title {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-weight: 500;
+}
+
+.status-health__message {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  padding-left: 40px;
+}
+
+.status-health__message--warning {
+  padding-left: 56px;
+}
+
+/* Activity Section */
+.status-activity__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.status-activity__title {
+  margin: 0;
+}
+
+.status-activity__toggle {
+  background: none;
+  border: none;
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.status-activity__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-activity__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-medium, 12px);
+}
+
+.status-activity__icon {
+  flex-shrink: 0;
+}
+
+.status-activity__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-activity__message {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-activity__time {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* System Info */
+.status-info__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 13px;
+}
+
+.status-info__label {
+  margin-right: 8px;
+}
+
+/* Color utility classes */
+.color-text-secondary {
+  color: var(--text-secondary);
+}
+
+.color-text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.color-text-primary {
+  color: var(--text-primary);
+}
+
+.color-text-accent {
+  color: var(--text-accent);
+}
+
+.bg-surface {
+  background: var(--bg-surface);
+}
+
+/* Skeleton modifiers */
+.status-hero__skeleton-shield {
+  margin: 16px 0;
+}

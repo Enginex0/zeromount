@@ -1,0 +1,366 @@
+/* CSS Custom Properties Foundation */
+:root {
+  --bg-primary: linear-gradient(180deg, #0F0F1A 0%, #1A1A2E 100%);
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --bg-surface-elevated: rgba(255, 255, 255, 0.08);
+  --bg-surface-hover: rgba(255, 255, 255, 0.12);
+
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.1);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-accent: #FF8E53;
+
+  --gradient-primary: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFC107 100%);
+  --gradient-secondary: linear-gradient(180deg, #1A1A2E 0%, #0F0F1A 100%);
+
+  --color-success: #00D68F;
+  --color-success-glow: rgba(0, 214, 143, 0.4);
+  --color-warning: #FFB800;
+  --color-warning-glow: rgba(255, 184, 0, 0.4);
+  --color-error: #FF3D71;
+  --color-error-glow: rgba(255, 61, 113, 0.4);
+  --color-info: #00B4D8;
+  --color-info-glow: rgba(0, 180, 216, 0.4);
+
+  --shadow-small: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-large: 0 20px 40px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(255, 107, 107, 0.3);
+
+  --accent-rgb: 255, 107, 107;
+}
+
+/* Reset and Base Styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Input and Button Reset */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+input:focus,
+button:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+input:focus-visible,
+button:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(255, 107, 107, 0.6);
+  outline-offset: 2px;
+}
+
+@supports not selector(:focus-visible) {
+  input:focus,
+  button:focus,
+  textarea:focus,
+  select:focus {
+    outline: 2px solid rgba(255, 107, 107, 0.6);
+    outline-offset: 2px;
+  }
+}
+
+/* Placeholder Styling */
+::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Selection */
+::selection {
+  background: rgba(var(--accent-rgb), 0.3);
+  color: var(--text-primary);
+}
+
+/* Links */
+a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Heartbeat pulse animation */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.05); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.05); }
+  70% { transform: scale(1); }
+}
+
+/* Subtle glow pulse */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.3); }
+  50% { box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.5); }
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Pulsing glow for special text */
+@keyframes textGlow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5),
+                 0 0 20px rgba(var(--accent-rgb), 0.3);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(var(--accent-rgb), 0.8),
+                 0 0 40px rgba(var(--accent-rgb), 0.5);
+  }
+}
+
+.glow-text {
+  animation: textGlow 2s ease-in-out infinite;
+  color: var(--text-accent);
+}
+
+/* Gradient Text Utility */
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass Effect Utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Safe Area Padding for iOS */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent overscroll bounce on iOS */
+html {
+  overscroll-behavior: none;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+/* Touch Action for Mobile */
+* {
+  touch-action: manipulation;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure proper stacking context */
+#root {
+  isolation: isolate;
+}
+
+/* Rotating logo ring animation */
+@keyframes rotateRing {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.logo-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 24px;
+}
+
+.logo-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--text-accent),
+    #FF6B6B,
+    #FFC107,
+    #00BCD4,
+    #9C27B0,
+    var(--text-accent)
+  );
+  animation: rotateRing 8s linear infinite;
+}
+
+.logo-ring::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+
+.logo-inner {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}

@@ -1,0 +1,99 @@
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.button--full-width {
+  width: 100%;
+}
+
+.button--small {
+  padding: 8px 16px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.button--medium {
+  padding: 14px 28px;
+  font-size: 14px;
+  border-radius: 16px;
+}
+
+.button--large {
+  padding: 18px 36px;
+  font-size: 16px;
+  border-radius: 20px;
+}
+
+.button--primary {
+  background: var(--gradient-primary);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
+}
+
+.button--primary:hover:not(:disabled) {
+  box-shadow: 0 12px 32px rgba(var(--accent-rgb), 0.4);
+}
+
+.button--secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 2px solid rgba(var(--accent-rgb), 0.5);
+}
+
+.button--danger {
+  background: var(--color-error);
+  color: #FFFFFF;
+  box-shadow: 0 4px 16px var(--color-error-glow);
+}
+
+.button--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.button:hover:not(:disabled) {
+  transform: scale(1.02) translateY(-2px);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.8);
+  outline-offset: 2px;
+}
+
+.button__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

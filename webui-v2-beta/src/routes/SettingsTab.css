@@ -1,0 +1,239 @@
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 16px;
+}
+
+.settings__section-title {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings__section-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.settings__group {
+  margin-bottom: 24px;
+}
+
+.settings__group--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.settings__label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.settings__themes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.settings__theme {
+  padding: 14px 8px;
+  border: 2px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings__theme--active {
+  border-color: var(--text-accent);
+  background: var(--bg-surface-elevated);
+}
+
+.settings__theme-icon {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.settings__theme-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.settings__theme-label--active {
+  color: var(--text-accent);
+}
+
+.settings__colors {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings__color {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.settings__color--active {
+  border-color: var(--text-primary);
+}
+
+.settings__color--disabled {
+  cursor: not-allowed;
+}
+
+.settings__color:not(.settings__color--disabled):hover {
+  transform: scale(1.15);
+}
+
+.settings__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings__item + .settings__item {
+  margin-top: 20px;
+}
+
+.settings__item-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings__item-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.settings__item-desc {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings__engine-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings__about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings__about-title {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.settings__about-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--text-accent);
+}
+
+.settings__repo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.settings__repo-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--text-accent);
+}
+
+.settings__repo-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.settings__actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.settings__actions > * {
+  flex: 1;
+}
+
+.settings__footer {
+  text-align: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--glass-border);
+  width: 100%;
+}
+
+.settings__modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings__modal-text {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+.settings__modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.settings__modal-actions > * {
+  flex: 1;
+}

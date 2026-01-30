@@ -12,6 +12,10 @@ fi
 mkdir -p "$MODPATH/bin"
 cp -f "$MODPATH/zm-$ARCH" "$MODPATH/bin/zm"
 set_perm "$MODPATH/bin/zm" 0 0 0755
+set_perm "$MODPATH/bin/arm64-v8a/aapt" 0 0 0755
+set_perm "$MODPATH/bin/armeabi-v7a/aapt" 0 0 0755
+set_perm "$MODPATH/service.sh" 0 0 0755
+set_perm "$MODPATH/monitor.sh" 0 0 0755
 rm -rf $MODPATH/zm*
 
 ui_print "- Checking Kernel support..."

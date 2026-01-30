@@ -1,0 +1,212 @@
+.config {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 16px;
+}
+
+.config__toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.config__search {
+  flex: 1;
+  position: relative;
+}
+
+.config__search-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.config__system-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border-radius: 12px;
+}
+
+.config__system-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-accent);
+  text-transform: uppercase;
+}
+
+.config__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.config__section-title {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config__section-desc {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0 0 12px;
+}
+
+.config__empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.config__loading {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-tertiary);
+}
+
+.config__spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--text-tertiary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  animation: spin 0.8s linear infinite;
+}
+
+.config__apps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config__apps--scrollable {
+  gap: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.config__app {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border-radius: 12px;
+}
+
+.config__app--excluded {
+  border-left: 3px solid var(--color-error);
+}
+
+.config__app--available {
+  padding: 10px 12px;
+}
+
+.config__app-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.config__app-name {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.config__app-name--with-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.config__app-package {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.config__app-package--small {
+  font-size: 10px;
+}
+
+.config__sys-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.config__icon {
+  border-radius: 12px;
+  background: var(--bg-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.config__icon--40 {
+  width: 40px;
+  height: 40px;
+}
+
+.config__icon--36 {
+  width: 36px;
+  height: 36px;
+}
+
+.config__icon-img {
+  object-fit: contain;
+}
+
+.config__icon-fallback {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.config__app--skeleton {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+}
+
+.config__skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
