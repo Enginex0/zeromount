@@ -7,6 +7,7 @@ export const PATHS = {
   EXCLUSION_META: '/data/adb/zeromount/.exclusion_meta.json',
   ACTIVITY_LOG: '/data/adb/zeromount/activity.log',
   VERBOSE_FLAG: '/data/adb/zeromount/.verbose',
+  STATUS_CACHE: '/data/adb/zeromount/.status_cache.json',
 };
 
 export const GITHUB_URL = 'https://github.com/backslashxx/zeromount';

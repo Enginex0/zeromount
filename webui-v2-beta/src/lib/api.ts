@@ -174,7 +174,44 @@ async function logActivity(type: string, message: string): Promise<void> {
   }
 }
 
+export interface StatusCache {
+  engineActive: boolean;
+  rulesCount: number;
+  excludedCount: number;
+  driverVersion: string;
+  kernelVersion: string;
+  deviceModel: string;
+  androidVersion: string;
+  uptime: string;
+  selinuxStatus: string;
+  susfsVersion: string;
+  loadedModules: string;
+  timestamp: number;
+}
+
 export const api = {
+  // Fast path: read pre-generated cache from daemon (single file read)
+  async getStatusCache(): Promise<StatusCache | null> {
+    console.log('[ZM-API] getStatusCache() called, mock:', shouldUseMock());
+    if (shouldUseMock()) return null;
+
+    try {
+      const { errno, stdout } = await execCommand(`cat "${PATHS.STATUS_CACHE}" 2>/dev/null`, 2000);
+      if (errno === 0 && stdout.trim()) {
+        const cache = JSON.parse(stdout.trim()) as StatusCache;
+        // Cache valid if less than 30 seconds old
+        if (Date.now() - cache.timestamp < 30000) {
+          console.log('[ZM-API] getStatusCache() hit:', cache);
+          return cache;
+        }
+        console.log('[ZM-API] getStatusCache() stale, age:', Date.now() - cache.timestamp);
+      }
+    } catch (e) {
+      console.log('[ZM-API] getStatusCache() miss:', e);
+    }
+    return null;
+  },
+
   async getVersion(): Promise<string> {
     console.log('[ZM-API] getVersion() called, mock:', shouldUseMock());
     if (shouldUseMock()) {

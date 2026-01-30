@@ -163,8 +163,56 @@ function createAppStore() {
   const loadInitialData = async () => {
     console.log('[ZM-Store] loadInitialData() starting...');
     setLoading({ status: true, rules: true, activity: true });
+
     try {
-      // All calls in parallel - removed redundant getStats() which re-called getRules/getExcludedUids
+      // Fast path: try daemon-generated cache first (single file read)
+      const cache = await api.getStatusCache();
+      if (cache) {
+        console.log('[ZM-Store] loadInitialData() CACHE HIT - instant load');
+        setEngineActive(cache.engineActive);
+        setStats({ activeRules: cache.rulesCount, excludedUids: cache.excludedCount, hitsToday: 0 });
+        setSystemInfo({
+          driverVersion: cache.driverVersion,
+          kernelVersion: cache.kernelVersion,
+          susfsVersion: cache.susfsVersion,
+          uptime: cache.uptime,
+          deviceModel: cache.deviceModel,
+          androidVersion: cache.androidVersion,
+          selinuxStatus: cache.selinuxStatus,
+        });
+
+        // Parse loaded modules from cache
+        const loadedModuleNames = cache.loadedModules ? cache.loadedModules.split(',').filter(Boolean) : [];
+        setLoading({ status: false, rules: false, activity: false });
+
+        // Background refresh for full data (non-blocking)
+        Promise.allSettled([
+          api.getRules(),
+          api.getExcludedUids(),
+          api.getActivity(),
+          api.scanKsuModules(),
+          settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
+        ]).then(results => {
+          const rulesData = results[0].status === 'fulfilled' ? results[0].value : [];
+          const uidsData = results[1].status === 'fulfilled' ? results[1].value : [];
+          const activityData = results[2].status === 'fulfilled' ? results[2].value : [];
+          const ksuModulesData = results[3].status === 'fulfilled' ? results[3].value : [];
+          const systemColor = results[4].status === 'fulfilled' ? results[4].value : null;
+
+          setRules(rulesData);
+          setExcludedUids(uidsData);
+          setActivity(activityData);
+          setStats({ activeRules: rulesData.length, excludedUids: uidsData.length, hitsToday: rulesData.reduce((sum, r) => sum + r.hits, 0) });
+          setKsuModules(ksuModulesData);
+          if (systemColor) setSettings({ accentColor: systemColor });
+          console.log('[ZM-Store] loadInitialData() background refresh complete');
+        });
+
+        return;
+      }
+
+      // Slow path: no cache, do full parallel load
+      console.log('[ZM-Store] loadInitialData() CACHE MISS - full load');
       const results = await Promise.allSettled([
         api.getRules(),
         api.getExcludedUids(),
@@ -185,27 +233,11 @@ function createAppStore() {
       const ksuModulesData = results[6].status === 'fulfilled' ? results[6].value : [];
       const systemColor = results[7].status === 'fulfilled' ? results[7].value : null;
 
-      // Derive stats locally instead of redundant API call
       const statsData = {
         activeRules: rulesData.length,
         excludedUids: uidsData.length,
         hitsToday: rulesData.reduce((sum, r) => sum + r.hits, 0),
       };
-
-      const failedCount = results.filter(r => r.status === 'rejected').length;
-      if (failedCount > 0) {
-        console.warn('[ZM-Store] loadInitialData() partial failure:', failedCount, 'APIs failed');
-      }
-
-      console.log('[ZM-Store] loadInitialData() API results:', {
-        rules: rulesData.length,
-        uids: uidsData.length,
-        activity: activityData.length,
-        stats: statsData,
-        sysInfo,
-        modules: modulesData.length,
-        isActive
-      });
 
       setRules(rulesData);
       setExcludedUids(uidsData);
@@ -216,13 +248,12 @@ function createAppStore() {
       setEngineActive(isActive);
       setKsuModules(ksuModulesData);
       if (systemColor) setSettings({ accentColor: systemColor });
-      console.log('[ZM-Store] loadInitialData() state updated successfully');
+      console.log('[ZM-Store] loadInitialData() full load complete');
     } catch (err) {
       console.error('[ZM-Store] loadInitialData() error:', err);
       showToast('Failed to load data', 'error');
     } finally {
       setLoading({ status: false, rules: false, activity: false });
-      console.log('[ZM-Store] loadInitialData() complete');
     }
   };
 
