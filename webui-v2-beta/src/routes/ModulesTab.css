@@ -206,3 +206,13 @@
   flex-direction: column;
   gap: 6px;
 }
+
+.modules__chevron {
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modules__chevron--expanded {
+  transform: rotate(180deg);
+}

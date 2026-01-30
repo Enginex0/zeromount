@@ -2,7 +2,7 @@ import { createSignal, createRoot, createMemo, createEffect } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import type { Tab, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, MountedModule, InstalledApp, KsuModule } from './types';
 import { api, shouldUseMock } from './api';
-import { listPackages, getPackagesInfo } from './ksuApi';
+import { listPackages, getPackagesInfo, getAppLabelViaAapt } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, applyAccent, getAccentStyles, accentPresets } from './theme';
 
 function createAppStore() {
@@ -52,16 +52,22 @@ function createAppStore() {
     ? localStorage.getItem('zeromount-fixedNav') === 'true'
     : true;
 
-  const savedAutoAccent = typeof window !== 'undefined'
-    ? localStorage.getItem('zeromount-autoAccent') === 'true'
-    : false;
+  const savedAutoAccentRaw = typeof window !== 'undefined'
+    ? localStorage.getItem('zeromount-autoAccent')
+    : null;
+  const savedAutoAccent = savedAutoAccentRaw === null ? true : savedAutoAccentRaw === 'true';
+
+  const savedAccent = typeof window !== 'undefined'
+    ? localStorage.getItem('zeromount-accent')
+    : null;
 
   const accentColors = Object.keys(accentPresets);
   const randomAccent = accentColors[Math.floor(Math.random() * accentColors.length)];
+  const initialAccent = savedAutoAccent ? randomAccent : (savedAccent && accentPresets[savedAccent] ? savedAccent : '#FF8E53');
 
   const [settings, setSettings] = createStore<Settings>({
     theme: (savedTheme || 'amoled') as 'dark' | 'light' | 'auto' | 'amoled',
-    accentColor: randomAccent,
+    accentColor: initialAccent,
     autoAccentColor: savedAutoAccent,
     animationsEnabled: true,
     autoStartOnBoot: true,
@@ -92,6 +98,7 @@ function createAppStore() {
       ...baseTheme,
       gradientPrimary: accentStyles.gradient,
       textAccent: accentStyles.textAccent,
+      textOnAccent: accentStyles.textOnAccent,
       accentRgb: accentStyles.rgb,
       shadowGlow: `0 0 20px rgba(${accentStyles.rgb}, 0.3)`,
     };
@@ -133,6 +140,17 @@ function createAppStore() {
     }
   });
 
+  // Randomize accent when page becomes visible (for cached WebViews)
+  if (typeof window !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && settings.autoAccentColor) {
+        const colors = Object.keys(accentPresets);
+        const newRandom = colors[Math.floor(Math.random() * colors.length)];
+        setSettings({ accentColor: newRandom });
+      }
+    });
+  }
+
   // Toast notifications
   const [toast, setToast] = createSignal<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -163,6 +181,7 @@ function createAppStore() {
         api.getSystemInfo(),
         api.getModules(),
         api.isEngineActive(),
+        api.scanKsuModules(),
       ]);
 
       const rulesData = results[0].status === 'fulfilled' ? results[0].value : [];
@@ -172,6 +191,7 @@ function createAppStore() {
       const sysInfo = results[4].status === 'fulfilled' ? results[4].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
       const modulesData = results[5].status === 'fulfilled' ? results[5].value : [];
       const isActive = results[6].status === 'fulfilled' ? results[6].value : false;
+      const ksuModulesData = results[7].status === 'fulfilled' ? results[7].value : [];
 
       const failedCount = results.filter(r => r.status === 'rejected').length;
       if (failedCount > 0) {
@@ -195,6 +215,7 @@ function createAppStore() {
       setSystemInfo(sysInfo);
       setModules(modulesData);
       setEngineActive(isActive);
+      setKsuModules(ksuModulesData);
       console.log('[ZM-Store] loadInitialData() state updated successfully');
     } catch (err) {
       console.error('[ZM-Store] loadInitialData() error:', err);
@@ -352,6 +373,7 @@ function createAppStore() {
     setSettings(updates);
   };
 
+  let lastKnownPackages: Set<string> | null = null;
   let lastTriggerTimestamp: number | null = null;
   let triggerPollInterval: number | undefined;
   let pollingStarted = false;
@@ -373,9 +395,35 @@ function createAppStore() {
     return packageInfos.map(info => ({
       packageName: info.packageName,
       appName: info.appLabel || info.packageName,
-      uid: info.uid ?? -1,  // -1 means "unknown UID"
+      uid: info.uid ?? -1,
       isSystemApp: info.isSystemApp ?? systemSet.has(info.packageName),
     }));
+  };
+
+  const refreshApps = async () => {
+    if (appFetchInProgress) return;
+    appFetchInProgress = true;
+    try {
+      const freshApps = await fetchAppsViaKsuApi();
+      setInstalledApps(freshApps);
+      lastKnownPackages = new Set(freshApps.map(a => a.packageName));
+
+      // Background: fetch labels for apps where KSU cache returned null
+      const missingLabels = freshApps.filter(a => a.appName === a.packageName);
+      if (missingLabels.length > 0 && missingLabels.length < 10) {
+        for (const app of missingLabels) {
+          getAppLabelViaAapt(app.packageName).then(label => {
+            if (label && label !== app.packageName) {
+              setInstalledApps(prev =>
+                prev.map(a => a.packageName === app.packageName ? { ...a, appName: label } : a)
+              );
+            }
+          });
+        }
+      }
+    } finally {
+      appFetchInProgress = false;
+    }
   };
 
   const startTriggerPolling = () => {
@@ -387,32 +435,40 @@ function createAppStore() {
 
       try {
         const newTrigger = await api.getRefreshTrigger();
-        if (newTrigger !== null && (lastTriggerTimestamp === null || newTrigger !== lastTriggerTimestamp)) {
-          console.log('[ZM-Store] Daemon triggered refresh, timestamp:', newTrigger);
-          lastTriggerTimestamp = newTrigger;
 
-          appFetchInProgress = true;
-          try {
-            const freshApps = await fetchAppsViaKsuApi();
-
-            setInstalledApps(prev => {
-              const existingPkgs = new Set(prev.map(a => a.packageName));
-              const newApps = freshApps.filter(a => !existingPkgs.has(a.packageName));
-              const removedCount = prev.length - (freshApps.length - newApps.length);
-              if (newApps.length > 0 || removedCount > 0) {
-                console.log('[ZM-Store] Daemon update: new', newApps.length, ', removed', removedCount);
-              }
-              // Always use fresh data to pick up metadata changes (UID, appName, isSystemApp)
-              return freshApps;
-            });
-          } finally {
-            appFetchInProgress = false;
+        // Trigger file doesn't exist - fall back to package count comparison
+        if (newTrigger === null) {
+          if (lastKnownPackages !== null) {
+            const [userPkgs, systemPkgs] = await Promise.all([
+              listPackages('user'),
+              listPackages('system'),
+            ]);
+            const currentCount = new Set([...userPkgs, ...systemPkgs]).size;
+            const lastCount = lastKnownPackages.size;
+            if (currentCount !== lastCount) {
+              console.log('[ZM-Store] Package count changed, refreshing');
+              await refreshApps();
+            }
           }
+          return;
+        }
+
+        // First poll with trigger file present - record baseline
+        if (lastTriggerTimestamp === null) {
+          lastTriggerTimestamp = newTrigger;
+          return;
+        }
+
+        // Trigger changed - daemon signaled a refresh
+        if (newTrigger !== lastTriggerTimestamp) {
+          console.log('[ZM-Store] Trigger file changed, refreshing app list');
+          lastTriggerTimestamp = newTrigger;
+          await refreshApps();
         }
       } catch (e) {
-        appFetchInProgress = false;
+        console.error('[ZM-Store] Polling error:', e);
       }
-    }, 5000);
+    }, 2000);
   };
 
   const stopTriggerPolling = () => {
@@ -443,7 +499,8 @@ function createAppStore() {
       setInstalledApps(apps);
       console.log('[ZM-Store] loadInstalledApps() loaded', apps.length, 'apps via KSU API');
 
-      lastTriggerTimestamp = await api.getRefreshTrigger();
+      // Initialize lastKnownPackages for change detection polling
+      lastKnownPackages = new Set(apps.map(a => a.packageName));
       startTriggerPolling();
     } catch (err) {
       console.error('[ZM-Store] loadInstalledApps() error:', err);

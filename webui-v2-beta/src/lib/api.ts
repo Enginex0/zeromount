@@ -246,8 +246,8 @@ export const api = {
         info.selinuxStatus = selinuxRes.stdout.trim();
       }
 
-      // SUSFS version from kernel module
-      const susfsRes = await execCommand('cat /sys/kernel/susfs/version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' }));
+      // SUSFS version
+      const susfsRes = await execCommand('ksu_susfs show version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' }));
       if (susfsRes.errno === 0 && susfsRes.stdout.trim()) {
         info.susfsVersion = susfsRes.stdout.trim();
       }
@@ -627,56 +627,54 @@ export const api = {
     }
 
     try {
-      const { errno, stdout } = await execCommand('ls -1 /data/adb/modules 2>/dev/null');
-      if (errno !== 0 || !stdout.trim()) {
-        console.log('[ZM-API] scanKsuModules() no modules found');
+      // Single shell call that outputs JSON - replaces ~22 separate exec calls
+      const script = `
+# Extract unique module base paths from zm list sources (format: source->target)
+loaded_modules=$(${PATHS.BINARY} list 2>/dev/null | awk -F'->' '{print $1}' | grep -oE '/data/adb/modules/[^/]+' | sort -u || echo "")
+echo "["
+first=1
+for dir in /data/adb/modules/*/; do
+  [ -d "$dir" ] || continue
+  name=$(basename "$dir")
+  path="/data/adb/modules/$name"
+
+  has_sys=0; has_ven=0; has_prod=0
+  [ -d "$path/system" ] && has_sys=1
+  [ -d "$path/vendor" ] && has_ven=1
+  [ -d "$path/product" ] && has_prod=1
+
+  [ $has_sys -eq 0 ] && [ $has_ven -eq 0 ] && [ $has_prod -eq 0 ] && continue
+
+  count=$(find "$path" -type f \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null | wc -l)
+
+  display_name="$name"
+  if [ -f "$path/module.prop" ]; then
+    prop_name=$(grep "^name=" "$path/module.prop" 2>/dev/null | cut -d= -f2)
+    [ -n "$prop_name" ] && display_name="$prop_name"
+  fi
+
+  is_loaded=0
+  echo "$loaded_modules" | grep -qx "$path" && is_loaded=1
+
+  [ $first -eq 0 ] && echo ","
+  first=0
+  printf '{"name":"%s","path":"%s","hasSystem":%s,"hasVendor":%s,"hasProduct":%s,"isLoaded":%s,"fileCount":%d}' \\
+    "$display_name" "$path" \\
+    $([ $has_sys -eq 1 ] && echo true || echo false) \\
+    $([ $has_ven -eq 1 ] && echo true || echo false) \\
+    $([ $has_prod -eq 1 ] && echo true || echo false) \\
+    $([ $is_loaded -eq 1 ] && echo true || echo false) \\
+    "$count"
+done
+echo "]"
+`;
+      const { errno, stdout } = await execCommand(script);
+      if (errno !== 0) {
+        console.log('[ZM-API] scanKsuModules() script failed');
         return [];
       }
 
-      const moduleNames = stdout.trim().split('\n').filter(Boolean);
-      const currentRules = await this.getRules();
-      const loadedPaths = new Set(currentRules.map(r => r.source));
-
-      const modules: KsuModule[] = [];
-      for (const name of moduleNames) {
-        const modulePath = `/data/adb/modules/${name}`;
-
-        const [sysCheck, vendorCheck, productCheck] = await Promise.all([
-          execCommand(`[ -d "${modulePath}/system" ] && echo 1 || echo 0`).catch(() => ({ stdout: '0' })),
-          execCommand(`[ -d "${modulePath}/vendor" ] && echo 1 || echo 0`).catch(() => ({ stdout: '0' })),
-          execCommand(`[ -d "${modulePath}/product" ] && echo 1 || echo 0`).catch(() => ({ stdout: '0' })),
-        ]);
-
-        const hasSystem = sysCheck.stdout.trim() === '1';
-        const hasVendor = vendorCheck.stdout.trim() === '1';
-        const hasProduct = productCheck.stdout.trim() === '1';
-
-        if (!hasSystem && !hasVendor && !hasProduct) continue;
-
-        const { stdout: countOut } = await execCommand(
-          `find ${escapeShellArg(modulePath)} -type f \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null | wc -l`
-        ).catch(() => ({ stdout: '0' }));
-        const fileCount = parseInt(countOut.trim(), 10) || 0;
-
-        const isLoaded = Array.from(loadedPaths).some(p => p.startsWith(modulePath));
-
-        let moduleName = name;
-        try {
-          const { stdout: propOut } = await execCommand(`cat "${modulePath}/module.prop" 2>/dev/null | grep "^name=" | cut -d= -f2`);
-          if (propOut.trim()) moduleName = propOut.trim();
-        } catch {}
-
-        modules.push({
-          name: moduleName,
-          path: modulePath,
-          hasSystem,
-          hasVendor,
-          hasProduct,
-          isLoaded,
-          fileCount,
-        });
-      }
-
+      const modules = JSON.parse(stdout.trim()) as KsuModule[];
       console.log('[ZM-API] scanKsuModules() returning', modules.length, 'modules');
       return modules;
     } catch (e) {
