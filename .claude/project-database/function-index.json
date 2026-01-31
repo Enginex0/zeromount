@@ -1,0 +1,825 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "project": "Zero-Mount",
+    "description": "Complete function index for ZeroMount kernel, shell, and WebUI components",
+    "generatedAt": "2026-01-31",
+    "totalEntries": 125
+  },
+  "susfs_kernel": {
+    "susfs_init": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 1335,
+      "signature": "void susfs_init(void)",
+      "description": "Initialize SUSFS subsystem and data structures"
+    },
+    "susfs_add_sus_path": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 178,
+      "signature": "void susfs_add_sus_path(void __user **user_info)",
+      "description": "Hide a file path from all apps except root"
+    },
+    "susfs_add_sus_path_loop": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 215,
+      "signature": "void susfs_add_sus_path_loop(void __user **user_info)",
+      "description": "Hide a file path with loop checking for mounted filesystems"
+    },
+    "susfs_add_sus_kstat": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 310,
+      "signature": "void susfs_add_sus_kstat(void __user **user_info)",
+      "description": "Spoof file stat (metadata) for path"
+    },
+    "susfs_add_sus_kstat_statically": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 350,
+      "signature": "void susfs_add_sus_kstat_statically(void __user **user_info)",
+      "description": "Apply static file stat spoofing without redirect info"
+    },
+    "susfs_add_sus_kstat_redirect": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 360,
+      "signature": "void susfs_add_sus_kstat_redirect(void __user **user_info)",
+      "description": "Apply file stat spoofing with redirect target size info"
+    },
+    "susfs_add_sus_mount": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 420,
+      "signature": "void susfs_add_sus_mount(void __user **user_info)",
+      "description": "Hide a mount point from /proc/mounts and /proc/mountinfo"
+    },
+    "susfs_add_sus_map": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 470,
+      "signature": "void susfs_add_sus_map(void __user **user_info)",
+      "description": "Hide library/executable from /proc/maps and /proc/smaps"
+    },
+    "susfs_add_open_redirect": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 520,
+      "signature": "void susfs_add_open_redirect(void __user **user_info)",
+      "description": "Redirect file open syscall to different path (root only)"
+    },
+    "susfs_add_open_redirect_all": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 540,
+      "signature": "void susfs_add_open_redirect_all(void __user **user_info)",
+      "description": "Redirect file open for all processes (not just root)"
+    },
+    "susfs_set_uname": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 630,
+      "signature": "void susfs_set_uname(void __user **user_info)",
+      "description": "Set kernel release string returned by uname()"
+    },
+    "susfs_spoof_uname": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 650,
+      "signature": "static int susfs_spoof_uname(struct new_utsname *uts)",
+      "description": "Replace uname fields with spoofed values"
+    },
+    "susfs_set_hide_sus_mnts_for_non_su_procs": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 710,
+      "signature": "void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info)",
+      "description": "Control hiding of sus mounts in /proc/mounts for non-root"
+    },
+    "is_i_uid_not_allowed": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 360,
+      "signature": "static inline bool is_i_uid_not_allowed(uid_t uid)",
+      "description": "Check if UID should have paths/mounts hidden, with ZeroMount bypass check"
+    },
+    "is_i_uid_in_android_data_not_allowed": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 349,
+      "signature": "static inline bool is_i_uid_in_android_data_not_allowed(uid_t uid)",
+      "description": "Check if UID should have /data/data paths hidden, with ZeroMount bypass"
+    },
+    "susfs_is_uid_zeromount_excluded": {
+      "file": "kernel_patches/include/linux/susfs_def.h",
+      "line": 91,
+      "signature": "static inline bool susfs_is_uid_zeromount_excluded(uid_t uid)",
+      "description": "Check if UID is excluded via ZeroMount (calls zeromount_is_uid_blocked)"
+    },
+    "susfs_show_version": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 950,
+      "signature": "void susfs_show_version(void __user **user_info)",
+      "description": "Return SUSFS version string"
+    },
+    "susfs_show_variant": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 960,
+      "signature": "void susfs_show_variant(void __user **user_info)",
+      "description": "Return SUSFS variant info (e.g., GKI, vanilla)"
+    },
+    "susfs_get_enabled_features": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 970,
+      "signature": "void susfs_get_enabled_features(void __user **user_info)",
+      "description": "Get bitmask of enabled SUSFS features"
+    },
+    "susfs_set_i_state_on_external_dir": {
+      "file": "kernel_patches/fs/susfs.c",
+      "line": 117,
+      "signature": "void susfs_set_i_state_on_external_dir(void __user **user_info)",
+      "description": "Mark inode as android_data or sdcard root directory"
+    }
+  },
+  "zeromount_kernel": {
+    "zeromount_is_uid_blocked": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 83,
+      "signature": "bool zeromount_is_uid_blocked(uid_t uid)",
+      "description": "Check if UID is excluded from VFS redirection and path hiding",
+      "note": "EXPORTED function - called by SUSFS to check exclusion"
+    },
+    "zeromount_resolve_path": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 120,
+      "signature": "const char* zeromount_resolve_path(const char *path)",
+      "description": "Resolve virtual path to real module path via VFS hash table"
+    },
+    "zeromount_match_path": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 145,
+      "signature": "bool zeromount_match_path(const char *vpath, struct zeromount_rule *rule)",
+      "description": "Check if virtual path matches a rule pattern"
+    },
+    "zeromount_ioctl_add_rule": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 200,
+      "signature": "int zeromount_ioctl_add_rule(const char *vpath, const char *rpath)",
+      "description": "Add VFS redirection rule via ioctl (zm add)"
+    },
+    "zeromount_ioctl_del_rule": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 225,
+      "signature": "int zeromount_ioctl_del_rule(const char *vpath)",
+      "description": "Delete VFS redirection rule via ioctl (zm del)"
+    },
+    "zeromount_ioctl_clear_rules": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 240,
+      "signature": "int zeromount_ioctl_clear_rules(void)",
+      "description": "Clear all VFS rules and UID blocks via ioctl (zm clear)"
+    },
+    "zeromount_ioctl_add_uid": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 255,
+      "signature": "int zeromount_ioctl_add_uid(uid_t uid)",
+      "description": "Exclude UID from redirection via ioctl (zm blk)"
+    },
+    "zeromount_ioctl_del_uid": {
+      "file": "patches/zeromount-core.patch (fs/zeromount.c)",
+      "line": 270,
+      "signature": "int zeromount_ioctl_del_uid(uid_t uid)",
+      "description": "Include UID for redirection via ioctl (zm unb)"
+    },
+    "zeromount_inject_dents64": {
+      "file": "patches/inject-zeromount-readdir.sh",
+      "line": 45,
+      "description": "Kernel patch to hide whiteout files from directory listing"
+    },
+    "zeromount_spoof_xattr": {
+      "file": "patches/inject-zeromount-xattr.sh",
+      "line": 50,
+      "description": "Kernel patch to spoof extended attributes for redirected paths"
+    },
+    "zeromount_spoof_statfs": {
+      "file": "patches/inject-zeromount-statfs.sh",
+      "line": 60,
+      "description": "Kernel patch to spoof filesystem stats (df output)"
+    }
+  },
+  "shell_functions": {
+    "logging.sh": {
+      "log_init": {
+        "line": 67,
+        "signature": "log_init(component)",
+        "description": "Initialize logging for a component (service, monitor, susfs, etc.)"
+      },
+      "log_info": {
+        "line": 150,
+        "signature": "log_info(message)",
+        "description": "Log info-level message"
+      },
+      "log_debug": {
+        "line": 155,
+        "signature": "log_debug(message)",
+        "description": "Log debug-level message"
+      },
+      "log_err": {
+        "line": 140,
+        "signature": "log_err(message)",
+        "description": "Log error-level message (always logged)"
+      },
+      "log_warn": {
+        "line": 145,
+        "signature": "log_warn(message)",
+        "description": "Log warning-level message"
+      },
+      "log_trace": {
+        "line": 160,
+        "signature": "log_trace(message)",
+        "description": "Log trace-level message (most verbose)"
+      },
+      "log_func_enter": {
+        "line": 170,
+        "signature": "log_func_enter(func_name, arg1, arg2, ...)",
+        "description": "Log function entry with parameters"
+      },
+      "log_func_exit": {
+        "line": 185,
+        "signature": "log_func_exit(func_name, result, reason)",
+        "description": "Log function exit with return value"
+      },
+      "log_section": {
+        "line": 220,
+        "signature": "log_section(name)",
+        "description": "Log a section header"
+      },
+      "log_summary": {
+        "line": 282,
+        "signature": "log_summary(item1, item2, ...)",
+        "description": "Log execution summary with multiple items"
+      },
+      "log_error_inc": {
+        "line": 307,
+        "signature": "log_error_inc()",
+        "description": "Increment global error counter"
+      },
+      "log_error_count": {
+        "line": 312,
+        "signature": "log_error_count()",
+        "description": "Get current error count"
+      },
+      "log_collect_kernel": {
+        "line": 263,
+        "signature": "log_collect_kernel()",
+        "description": "Collect kernel logs from dmesg"
+      }
+    },
+    "susfs_integration.sh": {
+      "susfs_init": {
+        "line": 52,
+        "signature": "susfs_init()",
+        "description": "Detect SUSFS binary and capabilities"
+      },
+      "susfs_classify_path": {
+        "line": 118,
+        "signature": "susfs_classify_path(vpath)",
+        "description": "Classify file path type and determine SUSFS actions"
+      },
+      "susfs_capture_metadata": {
+        "line": 156,
+        "signature": "susfs_capture_metadata(vpath)",
+        "description": "Capture file metadata before overlays mounted (for stat spoofing)"
+      },
+      "susfs_get_cached_metadata": {
+        "line": 193,
+        "signature": "susfs_get_cached_metadata(vpath)",
+        "description": "Retrieve cached metadata for a path"
+      },
+      "susfs_apply_path": {
+        "line": 220,
+        "signature": "susfs_apply_path(vpath, use_loop, defer)",
+        "description": "Apply path hiding via sus_path or sus_path_loop"
+      },
+      "apply_deferred_sus_paths": {
+        "line": 298,
+        "signature": "apply_deferred_sus_paths()",
+        "description": "Apply deferred sus_path entries after overlays unmounted"
+      },
+      "susfs_apply_maps": {
+        "line": 329,
+        "signature": "susfs_apply_maps(vpath)",
+        "description": "Hide library/executable from /proc/maps"
+      },
+      "susfs_apply_kstat": {
+        "line": 369,
+        "signature": "susfs_apply_kstat(vpath, metadata, rpath)",
+        "description": "Apply file stat spoofing with inode and device numbers"
+      },
+      "apply_font_redirect": {
+        "line": 499,
+        "signature": "apply_font_redirect(vpath, rpath)",
+        "description": "Apply open_redirect + kstat for font files"
+      },
+      "late_kstat_pass": {
+        "line": 616,
+        "signature": "late_kstat_pass()",
+        "description": "Retry deferred kstat entries after boot settles"
+      },
+      "susfs_apply_mount_hiding": {
+        "line": 662,
+        "signature": "susfs_apply_mount_hiding(vpath)",
+        "description": "Hide overlay mount point from /proc/mounts"
+      },
+      "susfs_update_config": {
+        "line": 707,
+        "signature": "susfs_update_config(config_name, entry)",
+        "description": "Append entry to SUSFS config file"
+      },
+      "susfs_clean_zeromount_entries": {
+        "line": 729,
+        "signature": "susfs_clean_zeromount_entries()",
+        "description": "Remove all ZeroMount entries from SUSFS configs"
+      },
+      "susfs_clean_module_entries": {
+        "line": 752,
+        "signature": "susfs_clean_module_entries(mod_name, tracking_file)",
+        "description": "Remove module-specific entries from SUSFS configs"
+      },
+      "susfs_clean_module_metadata_cache": {
+        "line": 794,
+        "signature": "susfs_clean_module_metadata_cache(mod_name, tracking_file)",
+        "description": "Remove cached metadata for module files"
+      },
+      "zm_register_rule_with_susfs": {
+        "line": 822,
+        "signature": "zm_register_rule_with_susfs(vpath, rpath, loader)",
+        "description": "Main API: add VFS rule + auto-apply SUSFS protections"
+      },
+      "susfs_capture_module_metadata": {
+        "line": 881,
+        "signature": "susfs_capture_module_metadata(mod_path, partitions)",
+        "description": "Batch capture metadata for all files in module"
+      },
+      "susfs_status": {
+        "line": 907,
+        "signature": "susfs_status()",
+        "description": "Display SUSFS integration status and statistics"
+      },
+      "susfs_reset_stats": {
+        "line": 945,
+        "signature": "susfs_reset_stats()",
+        "description": "Reset SUSFS statistics counters"
+      }
+    },
+    "metamount.sh": {
+      "detect_conflicts": {
+        "line": 106,
+        "signature": "detect_conflicts()",
+        "description": "Scan for files touched by multiple modules"
+      },
+      "backup_config": {
+        "line": 35,
+        "signature": "backup_config()",
+        "description": "Backup current config before boot"
+      },
+      "restore_config": {
+        "line": 41,
+        "signature": "restore_config()",
+        "description": "Restore config from backup after bootloop"
+      },
+      "save_known_good": {
+        "line": 53,
+        "signature": "save_known_good()",
+        "description": "Save current config as known-good state"
+      },
+      "update_module_description": {
+        "line": 207,
+        "signature": "update_module_description()",
+        "description": "Update module.prop description with mounted module names"
+      }
+    },
+    "monitor.sh": {
+      "generate_status_cache": {
+        "line": 65,
+        "signature": "generate_status_cache()",
+        "description": "Generate daemon cache for instant WebUI load (every 5s)"
+      },
+      "find_zm_binary": {
+        "line": 23,
+        "signature": "find_zm_binary()",
+        "description": "Locate zm binary in standard paths"
+      },
+      "register_module": {
+        "line": 129,
+        "signature": "register_module(mod_path)",
+        "description": "Register new module with VFS rules"
+      },
+      "unregister_module": {
+        "line": 150,
+        "signature": "unregister_module(mod_name)",
+        "description": "Remove module and delete its VFS rules"
+      },
+      "sync_module": {
+        "line": 168,
+        "signature": "sync_module(mod_path)",
+        "description": "Sync module rules after file changes"
+      },
+      "handle_module_change": {
+        "line": 201,
+        "signature": "handle_module_change(mod_name)",
+        "description": "Process module add/remove/disable events"
+      },
+      "update_status": {
+        "line": 96,
+        "signature": "update_status()",
+        "description": "Update module.prop with current status"
+      },
+      "count_module_files": {
+        "line": 120,
+        "signature": "count_module_files(mod_path)",
+        "description": "Count total files in module across partitions"
+      },
+      "watch_app_changes": {
+        "line": 226,
+        "signature": "watch_app_changes()",
+        "description": "Watch app installs via inotifywait"
+      },
+      "watch_app_changes_poll": {
+        "line": 241,
+        "signature": "watch_app_changes_poll()",
+        "description": "Fallback: poll package count for app changes"
+      },
+      "watch_app_changes_logcat": {
+        "line": 257,
+        "signature": "watch_app_changes_logcat()",
+        "description": "Near-instant app detection via logcat"
+      },
+      "start_app_watcher": {
+        "line": 276,
+        "signature": "start_app_watcher()",
+        "description": "Start app change watcher (best available method)"
+      },
+      "poll_modules": {
+        "line": 290,
+        "signature": "poll_modules()",
+        "description": "Main polling loop (5s interval) for module changes"
+      }
+    }
+  },
+  "webui_typescript": {
+    "api.ts": {
+      "execCommand": {
+        "line": 23,
+        "signature": "async execCommand(cmd: string, timeoutMs = 30000): Promise<KsuExecResult>",
+        "description": "Execute KSU command with callback pattern (30s timeout default)"
+      },
+      "parseRulesOutput": {
+        "line": 55,
+        "signature": "function parseRulesOutput(stdout: string): VfsRule[]",
+        "description": "Parse zm list output into VfsRule array"
+      },
+      "parseExclusionFiles": {
+        "line": 84,
+        "signature": "async function parseExclusionFiles(): Promise<ExcludedUid[]>",
+        "description": "Read and parse exclusion list + metadata"
+      },
+      "parseActivityLog": {
+        "line": 127,
+        "signature": "async function parseActivityLog(): Promise<ActivityItem[]>",
+        "description": "Parse activity log from file"
+      },
+      "logActivity": {
+        "line": 166,
+        "signature": "async function logActivity(type: string, message: string): Promise<void>",
+        "description": "Write activity log entry"
+      },
+      "getStatusCache": {
+        "line": 194,
+        "signature": "async getStatusCache(): Promise<StatusCache | null>",
+        "description": "Fast path: read daemon-generated cache (30s validity)"
+      },
+      "getVersion": {
+        "line": 215,
+        "signature": "async getVersion(): Promise<string>",
+        "description": "Get ZeroMount driver version"
+      },
+      "getSystemInfo": {
+        "line": 235,
+        "signature": "async getSystemInfo(): Promise<SystemInfo>",
+        "description": "Get system info (kernel, device, Android version, SUSFS version)"
+      },
+      "getRules": {
+        "line": 297,
+        "signature": "async getRules(): Promise<VfsRule[]>",
+        "description": "Get all active VFS redirection rules"
+      },
+      "addRule": {
+        "line": 318,
+        "signature": "async addRule(name: string, source: string, target: string): Promise<VfsRule>",
+        "description": "Create new VFS redirection rule"
+      },
+      "deleteRule": {
+        "line": 346,
+        "signature": "async deleteRule(sourcePath: string): Promise<void>",
+        "description": "Delete VFS rule by source path"
+      },
+      "clearAllRules": {
+        "line": 363,
+        "signature": "async clearAllRules(): Promise<void>",
+        "description": "Delete all VFS rules at once"
+      },
+      "getExcludedUids": {
+        "line": 380,
+        "signature": "async getExcludedUids(): Promise<ExcludedUid[]>",
+        "description": "Get list of excluded UIDs (see real files)"
+      },
+      "excludeUid": {
+        "line": 390,
+        "signature": "async excludeUid(uid: number, packageName: string, appName: string): Promise<ExcludedUid>",
+        "description": "Exclude UID from VFS redirection and path hiding"
+      },
+      "includeUid": {
+        "line": 437,
+        "signature": "async includeUid(uid: number): Promise<void>",
+        "description": "Include UID for VFS redirection"
+      },
+      "getActivity": {
+        "line": 472,
+        "signature": "async getActivity(): Promise<ActivityItem[]>",
+        "description": "Get activity log entries"
+      },
+      "getStats": {
+        "line": 482,
+        "signature": "async getStats(): Promise<EngineStats>",
+        "description": "Get stats: rule count, excluded UID count, hits"
+      },
+      "toggleEngine": {
+        "line": 502,
+        "signature": "async toggleEngine(enable: boolean): Promise<void>",
+        "description": "Enable/disable VFS redirection engine"
+      },
+      "setVerboseLogging": {
+        "line": 519,
+        "signature": "async setVerboseLogging(enabled: boolean): Promise<void>",
+        "description": "Enable/disable verbose kernel logging"
+      },
+      "getModules": {
+        "line": 537,
+        "signature": "async getModules(): Promise<MountedModule[]>",
+        "description": "Get list of mounted modules and rule counts"
+      },
+      "isEngineActive": {
+        "line": 574,
+        "signature": "async isEngineActive(): Promise<boolean>",
+        "description": "Check if /dev/zeromount exists (engine active)"
+      },
+      "getInstalledApps": {
+        "line": 590,
+        "signature": "async getInstalledApps(): Promise<InstalledApp[]>",
+        "description": "Load app list from cache file (generated by daemon)"
+      },
+      "refreshInstalledApps": {
+        "line": 616,
+        "signature": "async refreshInstalledApps(): Promise<void>",
+        "description": "No-op: app list now managed by daemon"
+      },
+      "checkAppListStale": {
+        "line": 621,
+        "signature": "async checkAppListStale(cachedCount: number): Promise<boolean>",
+        "description": "Check if cached app list count matches current pm count"
+      },
+      "getRefreshTrigger": {
+        "line": 639,
+        "signature": "async getRefreshTrigger(): Promise<number | null>",
+        "description": "Get daemon refresh trigger timestamp"
+      },
+      "scanKsuModules": {
+        "line": 657,
+        "signature": "async scanKsuModules(): Promise<KsuModule[]>",
+        "description": "Scan /data/adb/modules for KSU modules (single shell call)"
+      },
+      "loadKsuModule": {
+        "line": 720,
+        "signature": "async loadKsuModule(moduleName: string, modulePath: string): Promise<number>",
+        "description": "Load KSU module and add its rules"
+      },
+      "unloadKsuModule": {
+        "line": 761,
+        "signature": "async unloadKsuModule(moduleName: string, modulePath: string): Promise<number>",
+        "description": "Unload KSU module and delete its rules"
+      },
+      "fetchSystemColor": {
+        "line": 787,
+        "signature": "async fetchSystemColor(): Promise<string | null>",
+        "description": "Get system accent color from settings"
+      }
+    },
+    "ksuApi.ts": {
+      "listPackages": {
+        "line": 67,
+        "signature": "async listPackages(type: 'all' | 'user' | 'system'): Promise<string[]>",
+        "description": "List installed packages (uses KSU API or pm command fallback)"
+      },
+      "getPackagesInfo": {
+        "line": 92,
+        "signature": "async getPackagesInfo(packageNames: string[]): Promise<KsuPackageInfo[]>",
+        "description": "Get app labels via KSU API or aapt fallback"
+      },
+      "getAppLabelViaAapt": {
+        "line": 128,
+        "signature": "async getAppLabelViaAapt(packageName: string): Promise<string | null>",
+        "description": "Fetch single app label via aapt for newly installed apps"
+      },
+      "getPackagesIcons": {
+        "line": 136,
+        "signature": "async getPackagesIcons(packageNames: string[], size = 100): Promise<KsuPackageIcon[]>",
+        "description": "Get app icons from KSU native API (returns base64 PNG)"
+      }
+    },
+    "store.ts": {
+      "createAppStore": {
+        "line": 8,
+        "signature": "function createAppStore()",
+        "description": "Create main application state store (Solid.js)"
+      },
+      "loadInitialData": {
+        "line": 163,
+        "signature": "async loadInitialData()",
+        "description": "Load initial data with daemon cache fast path"
+      },
+      "refreshModules": {
+        "line": 260,
+        "signature": "async refreshModules()",
+        "description": "Refresh list of mounted modules"
+      },
+      "toggleEngine": {
+        "line": 272,
+        "signature": "async toggleEngine()",
+        "description": "Toggle VFS engine on/off"
+      },
+      "addRule": {
+        "line": 291,
+        "signature": "async addRule(name: string, source: string, target: string)",
+        "description": "Create new rule and update local state"
+      },
+      "deleteRule": {
+        "line": 310,
+        "signature": "async deleteRule(sourcePath: string)",
+        "description": "Delete rule and update local state"
+      },
+      "excludeUid": {
+        "line": 327,
+        "signature": "async excludeUid(uid: number, packageName: string, appName: string)",
+        "description": "Exclude UID with dedup check"
+      },
+      "includeUid": {
+        "line": 357,
+        "signature": "async includeUid(uid: number)",
+        "description": "Include UID with dedup check"
+      },
+      "clearAllRules": {
+        "line": 385,
+        "signature": "async clearAllRules()",
+        "description": "Clear all rules and update state"
+      },
+      "updateSettings": {
+        "line": 402,
+        "signature": "updateSettings(updates: Partial<Settings>)",
+        "description": "Update UI settings (theme, accent, etc.)"
+      },
+      "fetchAppsViaKsuApi": {
+        "line": 414,
+        "signature": "async fetchAppsViaKsuApi(): Promise<InstalledApp[]>",
+        "description": "Fetch apps with labels and system detection"
+      },
+      "refreshApps": {
+        "line": 434,
+        "signature": "async refreshApps()",
+        "description": "Reload installed apps list"
+      },
+      "startTriggerPolling": {
+        "line": 460,
+        "signature": "startTriggerPolling()",
+        "description": "Start polling for refresh trigger file changes"
+      },
+      "stopTriggerPolling": {
+        "line": 505,
+        "signature": "stopTriggerPolling()",
+        "description": "Stop polling loop"
+      },
+      "loadInstalledApps": {
+        "line": 513,
+        "signature": "async loadInstalledApps()",
+        "description": "Load apps and start change detection polling"
+      },
+      "scanKsuModules": {
+        "line": 545,
+        "signature": "async scanKsuModules()",
+        "description": "Scan available KSU modules"
+      },
+      "loadKsuModule": {
+        "line": 560,
+        "signature": "async loadKsuModule(moduleName: string, modulePath: string)",
+        "description": "Load module and add its rules"
+      },
+      "unloadKsuModule": {
+        "line": 578,
+        "signature": "async unloadKsuModule(moduleName: string, modulePath: string)",
+        "description": "Unload module and remove its rules"
+      }
+    }
+  },
+  "component_architecture": {
+    "kernel_hooks": {
+      "vfs_redirection": {
+        "function": "getname_flags (hooked in fs/namei.c)",
+        "description": "Intercept path resolution at VFS layer to redirect virtual to real paths",
+        "integration": "ZeroMount core"
+      },
+      "path_hiding": {
+        "function": "d_lookup, dcache operations",
+        "description": "Hide paths from directory listing and lookups",
+        "integration": "SUSFS"
+      },
+      "stat_spoofing": {
+        "function": "vfs_stat_fstatat",
+        "description": "Return fake metadata for hidden/redirected paths",
+        "integration": "SUSFS sus_kstat"
+      },
+      "mount_hiding": {
+        "function": "show_vfsmnt, show_mountinfo, show_vfsstat",
+        "description": "Filter /proc/mounts and related files",
+        "integration": "SUSFS with ZeroMount bypass check"
+      }
+    },
+    "daemon_services": {
+      "monitor": {
+        "file": "module/monitor.sh",
+        "responsibility": "Poll for module changes, watch app installs, generate status cache",
+        "interval": "5 seconds"
+      },
+      "app_monitor": {
+        "file": "module/monitor.sh (watch_app_changes)",
+        "responsibility": "Detect app installs/uninstalls, update installed_apps.json",
+        "methods": "inotifywait, logcat fallback, or polling"
+      },
+      "status_cache": {
+        "file": "module/monitor.sh (generate_status_cache)",
+        "responsibility": "Write JSON cache for instant WebUI load",
+        "consumers": "WebUI (api.ts getStatusCache)"
+      }
+    }
+  },
+  "cross_component_flows": {
+    "rule_registration": {
+      "entry": "metamount.sh or monitor.sh (register_module)",
+      "steps": [
+        "1. Call: zm add /virtual/path /real/path (ZeroMount kernel)",
+        "2. Call: zm_register_rule_with_susfs (susfs_integration.sh)",
+        "3. Classify path type (susfs_classify_path)",
+        "4. Apply SUSFS protections: sus_path, sus_kstat, sus_maps, sus_mount",
+        "5. Log activity"
+      ]
+    },
+    "uid_exclusion": {
+      "entry": "WebUI ConfigTab (excludeUid)",
+      "steps": [
+        "1. POST api.excludeUid(uid) -> api.ts",
+        "2. Execute: zm blk <uid> (kernel ioctl)",
+        "3. Save: echo uid >> .exclusion_list",
+        "4. Save metadata: .exclusion_meta.json",
+        "5. SUSFS checks: susfs_is_uid_zeromount_excluded() -> zeromount_is_uid_blocked()",
+        "6. Excluded UID sees real files + visible artifacts"
+      ]
+    },
+    "app_install_detection": {
+      "monitor": "monitor.sh watch_app_changes",
+      "detection": "inotifywait /data/app, logcat, or polling",
+      "response": [
+        "1. Write refresh_trigger timestamp",
+        "2. store.ts polling detects change",
+        "3. Call fetchAppsViaKsuApi()",
+        "4. Update UI with new apps"
+      ]
+    },
+    "webui_data_flow": {
+      "load": [
+        "1. loadInitialData() attempts daemon cache hit",
+        "2. If miss (<30s old): read .status_cache.json (single file, ~50ms)",
+        "3. UI shows cached data instantly",
+        "4. Background: parallel fetch rules, uids, systemInfo",
+        "5. Update UI when real data arrives"
+      ]
+    }
+  },
+  "index_notes": {
+    "zeromount_semantics": {
+      "uid_exclusion": "INVERTED - 'excluded' UID sees REAL files, not module files. zm blk means bypass redirection.",
+      "root_behavior": "Root (UID 0) always sees real files by design - security hardening"
+    },
+    "susfs_integration": {
+      "export_requirement": "zeromount_is_uid_blocked() must be EXPORTED (not static) for SUSFS to call it",
+      "cross_patch": "Requires kernel rebuild with BOTH zeromount-core.patch AND SUSFS patches"
+    },
+    "performance_optimizations": {
+      "cache_hierarchy": "Daemon cache (5s) -> statusCache (30s) -> Full parallel APIs",
+      "single_shell_call": "scanKsuModules uses single awk script instead of 22+ separate calls",
+      "metadata_capture": "Early capture before overlays prevents EINVAL on kstat apply"
+    }
+  },
+  "file_paths": {
+    "zeromount": "/home/claudetest/zero-mount/nomount",
+    "susfs_kernel": "/home/claudetest/gki-build/susfs4ksu-new",
+    "webui_source": "/home/claudetest/zero-mount/nomount/webui-v2-beta/src",
+    "shell_scripts": "/home/claudetest/zero-mount/nomount/module",
+    "kernel_patches": "/home/claudetest/zero-mount/nomount/patches"
+  }
+}

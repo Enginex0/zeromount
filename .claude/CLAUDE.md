@@ -5,7 +5,7 @@
 **READ THE PROJECT DATABASE FIRST:**
 
 ```
-/home/claudetest/.claude/project-database/
+.claude/project-database/
 ├── index.md              ← START HERE (navigation, comparison, tasks)
 ├── susfs-reference.md    ← SUSFS kernel hiding mechanisms
 ├── zeromount-reference.md← ZeroMount VFS redirection
@@ -16,10 +16,10 @@
 **Quick Start:**
 ```bash
 # Navigate the database
-cat /home/claudetest/.claude/project-database/index.md
+cat .claude/project-database/index.md
 
 # Function lookup
-jq '.zeromount_kernel.zeromount_is_uid_blocked' /home/claudetest/.claude/project-database/function-index.json
+jq '.zeromount_kernel.zeromount_is_uid_blocked' .claude/project-database/function-index.json
 ```
 
 ---
@@ -70,7 +70,7 @@ Module scripts:  module/
 WebUI source:    webui-v2-beta/src/
 Kernel patches:  patches/
 SUSFS source:    /home/claudetest/gki-build/susfs4ksu-new/
-Project database:/home/claudetest/.claude/project-database/
+Project database:.claude/project-database/
 ```
 
 ---
