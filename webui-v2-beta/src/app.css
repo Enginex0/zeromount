@@ -12,6 +12,7 @@
   --text-secondary: rgba(255, 255, 255, 0.7);
   --text-tertiary: rgba(255, 255, 255, 0.5);
   --text-accent: #FF8E53;
+  --text-on-accent: #1A1A2E;
 
   --gradient-primary: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFC107 100%);
   --gradient-secondary: linear-gradient(180deg, #1A1A2E 0%, #0F0F1A 100%);

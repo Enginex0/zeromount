@@ -8,46 +8,42 @@ export function getContrastText(bgHex: string): string {
   return getLuminance(bgHex) > 0.5 ? '#1A1A2E' : '#FFFFFF';
 }
 
-export const accentPresets: Record<string, { gradient: string; textAccent: string; rgb: string }> = {
-  '#00BCD4': { // Cyan
-    gradient: 'linear-gradient(135deg, #00BCD4 0%, #00E5FF 50%, #18FFFF 100%)',
-    textAccent: '#00E5FF',
-    rgb: '0, 188, 212',
-  },
+export const accentPresets: Record<string, { gradient: string; textAccent: string; rgb: string; textOnAccent: string }> = {
   '#FF8E53': { // Orange
-    gradient: 'linear-gradient(135deg, #FF8E53 0%, #FFA040 50%, #FFD93D 100%)',
+    gradient: 'linear-gradient(135deg, #FF8E53 0%, #FF7B3D 50%, #E85D04 100%)',
     textAccent: '#FF8E53',
     rgb: '255, 142, 83',
-  },
-  '#FFC107': { // Gold
-    gradient: 'linear-gradient(135deg, #FFC107 0%, #FFD54F 50%, #FFEB3B 100%)',
-    textAccent: '#FFC107',
-    rgb: '255, 193, 7',
+    textOnAccent: '#1A1A2E',
   },
   '#00D68F': { // Emerald
     gradient: 'linear-gradient(135deg, #00D68F 0%, #00E5A0 50%, #69F0AE 100%)',
     textAccent: '#00D68F',
     rgb: '0, 214, 143',
+    textOnAccent: '#1A1A2E',
   },
   '#00B4D8': { // Azure
     gradient: 'linear-gradient(135deg, #00B4D8 0%, #48CAE4 50%, #90E0EF 100%)',
     textAccent: '#00B4D8',
     rgb: '0, 180, 216',
-  },
-  '#764BA2': { // Purple
-    gradient: 'linear-gradient(135deg, #764BA2 0%, #9B59B6 50%, #C084FC 100%)',
-    textAccent: '#9B59B6',
-    rgb: '118, 75, 162',
-  },
-  '#FFFFFF': { // White/Silver
-    gradient: 'linear-gradient(135deg, #E0E0E0 0%, #BDBDBD 50%, #9E9E9E 100%)',
-    textAccent: '#BDBDBD',
-    rgb: '189, 189, 189',
+    textOnAccent: '#1A1A2E',
   },
   '#64748B': { // Slate
     gradient: 'linear-gradient(135deg, #64748B 0%, #94A3B8 50%, #CBD5E1 100%)',
     textAccent: '#94A3B8',
     rgb: '100, 116, 139',
+    textOnAccent: '#1A1A2E',
+  },
+  '#6366F1': { // Indigo
+    gradient: 'linear-gradient(135deg, #6366F1 0%, #818CF8 50%, #A5B4FC 100%)',
+    textAccent: '#818CF8',
+    rgb: '99, 102, 241',
+    textOnAccent: '#FFFFFF',
+  },
+  '#FF6B6B': { // Coral
+    gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8A80 50%, #FFAB91 100%)',
+    textAccent: '#FF6B6B',
+    rgb: '255, 107, 107',
+    textOnAccent: '#1A1A2E',
   },
 };
 
@@ -59,11 +55,11 @@ export function needsDarkText(accentColor: string): boolean {
 }
 
 export function getAccentStyles(accentColor: string) {
-  return accentPresets[accentColor] || accentPresets['#00BCD4'];
+  return accentPresets[accentColor] || accentPresets['#FF8E53'];
 }
 
 export const darkTheme = {
-  gradientPrimary: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFC107 100%)',
+  gradientPrimary: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #E85D04 100%)',
   gradientSecondary: 'linear-gradient(180deg, #1A1A2E 0%, #0F0F1A 100%)',
 
   colorSuccess: '#00D68F',
@@ -177,6 +173,7 @@ export function applyTheme(themeObj: typeof darkTheme, accentColor?: string) {
   root.style.setProperty('--gradient-primary', accentStyles.gradient);
   root.style.setProperty('--text-accent', accentStyles.textAccent);
   root.style.setProperty('--accent-rgb', accentStyles.rgb);
+  root.style.setProperty('--text-on-accent', accentStyles.textOnAccent);
   root.style.setProperty('--shadow-glow', `0 0 20px rgba(${accentStyles.rgb}, 0.3)`);
 }
 
@@ -187,6 +184,7 @@ export function applyAccent(accentColor: string) {
   root.style.setProperty('--gradient-primary', accentStyles.gradient);
   root.style.setProperty('--text-accent', accentStyles.textAccent);
   root.style.setProperty('--accent-rgb', accentStyles.rgb);
+  root.style.setProperty('--text-on-accent', accentStyles.textOnAccent);
   root.style.setProperty('--shadow-glow', `0 0 20px rgba(${accentStyles.rgb}, 0.3)`);
 }
 

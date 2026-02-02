@@ -34,7 +34,7 @@ cmd_status() {
     local mod_count=$(ls -1 "$ZEROMOUNT_DATA/module_paths" 2>/dev/null | wc -l)
     echo "Modules tracked: $mod_count"
 
-    if pgrep -f "monitor.sh" >/dev/null 2>&1; then
+    if ps 2>/dev/null | grep -q "[m]onitor.sh"; then
         echo "Monitor: ✓ running"
     else
         echo "Monitor: ✗ not running"
@@ -61,7 +61,8 @@ cmd_modules() {
 cmd_conflicts() {
     echo "=== File Conflicts ==="
 
-    local conflict_map=$(mktemp)
+    local conflict_map="$ZEROMOUNT_DATA/.conflict_tmp_$$"
+    : > "$conflict_map"
     local found=0
 
     for mod_path in "$MODULES_DIR"/*; do

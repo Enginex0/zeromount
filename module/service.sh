@@ -10,9 +10,33 @@ log_init "service"
 
 log_section "ZeroMount Service Start"
 
+[ ! -x "$SUSFS_BIN" ] && SUSFS_BIN=$(command -v ksu_susfs 2>/dev/null)
+
+reapply_hidden_paths() {
+    local tracking_dir="$ZEROMOUNT_DATA/module_paths"
+    local count=0
+
+    [ ! -d "$tracking_dir" ] && return
+
+    for tracking_file in "$tracking_dir"/*; do
+        [ -f "$tracking_file" ] || continue
+
+        while IFS='|' read -r vpath type extra; do
+            case "$type" in
+                whiteout|aufs_whiteout|opaque_dir)
+                    "$SUSFS_BIN" add_sus_path "$vpath" 2>/dev/null && count=$((count + 1))
+                    ;;
+            esac
+        done < "$tracking_file"
+    done
+
+    [ "$count" -gt 0 ] && log_info "Reapplied $count hidden paths"
+}
+
 if [ -x "$SUSFS_BIN" ]; then
     [ -e "/dev/zeromount" ] && "$SUSFS_BIN" add_sus_path_loop /dev/zeromount 2>/dev/null && log_info "Hidden: /dev/zeromount"
     [ -e "/sys/kernel/zeromount" ] && "$SUSFS_BIN" add_sus_path_loop /sys/kernel/zeromount 2>/dev/null && log_info "Hidden: /sys/kernel/zeromount"
+    reapply_hidden_paths
 else
     log_warn "SUSFS binary not found at $SUSFS_BIN"
 fi

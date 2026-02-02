@@ -1,7 +1,7 @@
 id=zeromount
 metamodule=1
-name=ZeroMount
-version=v0.1.0
-versionCode=1
+name=Zero-Mount
+version=v3.4.0
+versionCode=7
 author=Enginex0
-description=ZeroMount: VFS-level path redirection without mounts.\nRequires kernel integration.
+description=Mountless VFS-level Redirection which Replaces Magic mount & Overlayfs. GHOST👻

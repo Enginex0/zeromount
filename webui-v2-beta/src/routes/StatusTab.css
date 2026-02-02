@@ -84,8 +84,13 @@
 }
 
 .status-stats__card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   text-align: center;
   padding: 16px 8px;
+  min-height: 80px;
   border-radius: var(--radius-medium, 12px);
   border: 1px solid var(--glass-border);
 }
@@ -99,6 +104,11 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1;
+}
+
+.status-stats__value--small {
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .status-stats__label {

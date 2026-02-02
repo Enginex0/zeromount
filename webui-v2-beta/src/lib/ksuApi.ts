@@ -106,26 +106,31 @@ export async function getPackagesInfo(packageNames: string[]): Promise<KsuPackag
     } catch { /* fallback */ }
   }
 
-  // Shell fallback: use aapt to get app labels
+  // Full shell fallback only when KSU API unavailable
   const results: KsuPackageInfo[] = [];
-
   for (const packageName of packageNames) {
     if (!isValidPackageName(packageName)) {
       results.push({ packageName, appLabel: packageName });
       continue;
     }
-
     const { stdout, errno } = await ksuExec(
       `pm path ${packageName} 2>/dev/null | head -1 | sed 's/package://' | xargs -I{} aapt dump badging {} 2>/dev/null | grep "application-label:" | head -1 | sed "s/application-label:'\\(.*\\)'/\\1/"`
     );
-
     results.push({
       packageName,
       appLabel: errno === 0 && stdout.trim() ? stdout.trim() : packageName,
     });
   }
-
   return results;
+}
+
+// Fetch label for a single app via aapt (used for newly installed apps)
+export async function getAppLabelViaAapt(packageName: string): Promise<string | null> {
+  if (!isValidPackageName(packageName)) return null;
+  const { stdout, errno } = await ksuExec(
+    `pm path ${packageName} 2>/dev/null | head -1 | sed 's/package://' | xargs -I{} aapt dump badging {} 2>/dev/null | grep "application-label:" | head -1 | sed "s/application-label:'\\(.*\\)'/\\1/"`
+  );
+  return errno === 0 && stdout.trim() ? stdout.trim() : null;
 }
 
 export async function getPackagesIcons(

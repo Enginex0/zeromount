@@ -61,13 +61,23 @@ STATUS_CACHE="$ZEROMOUNT_DATA/.status_cache.json"
 
 log_info "Monitor started (PID: $$)"
 
-# Generate status cache for instant WebUI load
+count_hidden_paths() {
+    local count=0
+    for tracking_file in "$TRACKING_DIR"/*; do
+        [ -f "$tracking_file" ] || continue
+        local hidden=$(grep -cE '\|(whiteout|aufs_whiteout|opaque_dir)$' "$tracking_file" 2>/dev/null || echo 0)
+        count=$((count + hidden))
+    done
+    echo "$count"
+}
+
 generate_status_cache() {
     local engine=false
     [ -e "/dev/zeromount" ] && engine=true
 
     local rules_count=$("$LOADER" list 2>/dev/null | wc -l)
     local excluded_count=$(wc -l < "$ZEROMOUNT_DATA/.exclusion_list" 2>/dev/null || echo 0)
+    local hidden_count=$(count_hidden_paths)
     local driver_ver=$("$LOADER" ver 2>/dev/null || echo "1")
     local kernel_ver=$(uname -r)
     local device_model=$(getprop ro.product.model 2>/dev/null)
@@ -79,11 +89,10 @@ generate_status_cache() {
     local susfs_ver=$(ksu_susfs show version 2>/dev/null || echo "")
     local timestamp=$(date +%s)000
 
-    # Get loaded modules
     local loaded_modules=$("$LOADER" list 2>/dev/null | awk -F'->' '{print $1}' | grep -oE '/data/adb/modules/[^/]+' | sort -u | while read p; do basename "$p"; done | tr '\n' ',' | sed 's/,$//')
 
     cat > "$STATUS_CACHE" <<EOF
-{"engineActive":$engine,"rulesCount":$rules_count,"excludedCount":$excluded_count,"driverVersion":"$driver_ver","kernelVersion":"$kernel_ver","deviceModel":"$device_model","androidVersion":"$android_ver","uptime":"${uptime_h}h ${uptime_m}m","selinuxStatus":"$selinux","susfsVersion":"$susfs_ver","loadedModules":"$loaded_modules","timestamp":$timestamp}
+{"engineActive":$engine,"rulesCount":$rules_count,"excludedCount":$excluded_count,"hiddenPathsCount":$hidden_count,"driverVersion":"$driver_ver","kernelVersion":"$kernel_ver","deviceModel":"$device_model","androidVersion":"$android_ver","uptime":"${uptime_h}h ${uptime_m}m","selinuxStatus":"$selinux","susfsVersion":"$susfs_ver","loadedModules":"$loaded_modules","timestamp":$timestamp}
 EOF
 }
 
@@ -108,7 +117,7 @@ update_status() {
     if [ "$module_count" -gt 0 ]; then
         local label="Modules"
         [ "$module_count" -eq 1 ] && label="Module"
-        desc="GHOST⚡ | $module_count $label | $module_names"
+        desc="[✅ GHOST ⚡️ | $module_count $label | $module_names"
     else
         desc="😴 Idle — No Module Mounted\nMountless VFS-level Redirection which Replaces Magic mount & Overlayfs. GHOST👻"
     fi
@@ -139,7 +148,7 @@ register_module() {
             local vpath="/${rel#$mod_path/}"
             local rpath="$mod_path/$rel"
             "$LOADER" add "$vpath" "$rpath" </dev/null 2>/dev/null
-            echo "$vpath" >> "$tracking_file"
+            echo "$vpath|file" >> "$tracking_file"
         done
     done
 
@@ -153,7 +162,7 @@ unregister_module() {
     [ ! -f "$tracking_file" ] && return
 
     local count=0
-    while IFS= read -r vpath; do
+    while IFS='|' read -r vpath _type _extra; do
         [ -z "$vpath" ] && continue
         "$LOADER" del "$vpath" </dev/null 2>/dev/null && count=$((count + 1))
     done < "$tracking_file"

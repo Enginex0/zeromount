@@ -20,6 +20,7 @@
 
 .badge--default {
   background: var(--gradient-primary);
+  color: var(--text-on-accent);
   box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
 }
 

@@ -101,7 +101,7 @@ export function StatusTab() {
     return Array.from(prefixes).sort();
   });
 
-  const loadedModulesCount = createMemo(() => store.rules().length > 0 ? 1 : 0);
+  const loadedModulesCount = createMemo(() => store.ksuModules().filter(m => m.isLoaded).length);
 
   const isInitialLoad = () => store.loading.status && !store.systemInfo.driverVersion;
 
@@ -126,15 +126,15 @@ export function StatusTab() {
               class="status-hero__indicator"
               style={{
                 color: store.engineActive()
-                  ? (needsDarkText(store.settings.accentColor) ? '#1A1A2E' : store.currentTheme().colorSuccess)
+                  ? store.currentTheme().textOnAccent
                   : store.currentTheme().textTertiary
               }}
             >
               <span
                 class={`status-hero__dot ${store.engineActive() ? 'status-hero__dot--active' : ''}`}
                 style={{
-                  background: store.engineActive() ? store.currentTheme().colorSuccess : store.currentTheme().textTertiary,
-                  'box-shadow': store.engineActive() ? `0 0 12px ${store.currentTheme().colorSuccessGlow}` : 'none'
+                  background: store.engineActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary,
+                  'box-shadow': store.engineActive() ? `0 0 12px rgba(${store.currentTheme().accentRgb}, 0.5)` : 'none'
                 }}
               />
               {store.engineActive() ? 'Engine Active' : 'Engine Inactive'}
@@ -162,15 +162,9 @@ export function StatusTab() {
                   filter: store.engineActive() ? `drop-shadow(0 0 20px ${store.currentTheme().colorSuccessGlow})` : 'none'
                 }}
               >
-                <defs>
-                  <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={`stop-color: ${store.engineActive() ? '#E8B4A0' : store.currentTheme().textTertiary}`} />
-                    <stop offset="50%" style={`stop-color: ${store.engineActive() ? '#D4A574' : store.currentTheme().textTertiary}`} />
-                    <stop offset="100%" style={`stop-color: ${store.engineActive() ? '#C9B896' : store.currentTheme().textTertiary}`} />
-                  </linearGradient>
-                </defs>
                 <path
-                  fill="url(#shieldGradient)"
+                  fill={store.engineActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary}
+                  opacity={store.engineActive() ? 0.9 : 0.5}
                   d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
                 />
               </svg>
@@ -233,11 +227,11 @@ export function StatusTab() {
             </div>
 
             <div class="status-stats__card bg-surface">
-              <div class="status-stats__value">
-                {animatedHitsToday()}
+              <div class="status-stats__value status-stats__value--small">
+                {store.systemInfo.uptime || '—'}
               </div>
               <div class="status-stats__label color-text-tertiary">
-                Hits Today
+                Uptime
               </div>
             </div>
           </div>
@@ -454,8 +448,8 @@ export function StatusTab() {
               <span class="color-text-accent">{store.systemInfo.susfsVersion}</span>
             </div>
             <div>
-              <span class="status-info__label color-text-tertiary">Uptime:</span>
-              <span class="color-text-primary">{store.systemInfo.uptime}</span>
+              <span class="status-info__label color-text-tertiary">misc:</span>
+              <span class="color-text-primary">/dev/zeromount</span>
             </div>
           </div>
         </Show>

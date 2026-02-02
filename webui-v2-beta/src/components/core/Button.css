@@ -38,6 +38,7 @@
 
 .button--primary {
   background: var(--gradient-primary);
+  color: var(--text-on-accent);
   box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
 }
 

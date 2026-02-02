@@ -171,7 +171,8 @@ susfs_capture_metadata() {
 
         if [ -n "$stat_data" ]; then
             local fstype
-            fstype=$(stat -f -c '%T' "$vpath" 2>/dev/null || echo "unknown")
+            fstype=$(awk -v path="$vpath" '$2 == path || index(path, $2) == 1 {print $3; exit}' /proc/mounts 2>/dev/null)
+            [ -z "$fstype" ] && fstype="ext4"
             echo "${stat_data}|${fstype}" > "$cache_file"
             log_debug "Captured: ino=$(echo "$stat_data" | cut -d'|' -f1) fstype=$fstype"
             log_func_exit "susfs_capture_metadata" "0" "captured"
@@ -202,7 +203,7 @@ susfs_get_cached_metadata() {
     if [ -f "$cache_file" ]; then
         local metadata
         metadata=$(cat "$cache_file")
-        log_debug "Cache hit: $vpath -> ${metadata:0:50}..."
+        log_debug "Cache hit: $vpath -> $(printf '%.50s' "$metadata")..."
         log_func_exit "susfs_get_cached_metadata" "found"
         echo "$metadata"
     else
@@ -293,6 +294,43 @@ susfs_apply_path() {
     return 1
 }
 
+susfs_hide_path() {
+    local path="$1"
+    log_func_enter "susfs_hide_path" "$path"
+
+    [ -z "$path" ] && { log_warn "susfs_hide_path: empty path"; return 1; }
+
+    if [ "$HAS_SUSFS" != "1" ] || [ -z "$SUSFS_BIN" ]; then
+        log_debug "SUSFS not available, skipping hide"
+        log_func_exit "susfs_hide_path" "0" "no susfs"
+        return 0
+    fi
+
+    if [ "$HAS_SUS_PATH" != "1" ]; then
+        log_debug "add_sus_path not supported"
+        log_func_exit "susfs_hide_path" "0" "not supported"
+        return 0
+    fi
+
+    log_susfs_cmd "add_sus_path" "$path"
+    local result rc
+    result=$("$SUSFS_BIN" add_sus_path "$path" 2>&1)
+    rc=$?
+    log_susfs_result "$rc" "add_sus_path" "$path"
+
+    if [ $rc -eq 0 ]; then
+        SUSFS_STATS_PATH=$((SUSFS_STATS_PATH + 1))
+        log_info "Hidden path: $path"
+        log_func_exit "susfs_hide_path" "0"
+        return 0
+    else
+        log_warn "Failed to hide path: $path ($result)"
+        SUSFS_STATS_ERRORS=$((SUSFS_STATS_ERRORS + 1))
+        log_func_exit "susfs_hide_path" "1"
+        return 1
+    fi
+}
+
 # Apply all deferred sus_path entries (call AFTER overlays unmounted)
 apply_deferred_sus_paths() {
     log_func_enter "apply_deferred_sus_paths"
@@ -309,7 +347,8 @@ apply_deferred_sus_paths() {
     local count=0
     local failed=0
 
-    printf '%s' "$SUSFS_DEFERRED_PATHS" | while IFS='|' read -r vpath use_loop; do
+    # Here-doc avoids subshell from pipe - counters persist
+    while IFS='|' read -r vpath use_loop; do
         [ -z "$vpath" ] && continue
 
         if susfs_apply_path "$vpath" "$use_loop" 0; then
@@ -317,7 +356,9 @@ apply_deferred_sus_paths() {
         else
             failed=$((failed + 1))
         fi
-    done
+    done <<EOF
+$SUSFS_DEFERRED_PATHS
+EOF
 
     log_info "Deferred sus_paths applied: $count success, $failed failed"
     SUSFS_DEFERRED_PATHS=""
@@ -414,7 +455,7 @@ EOF
             atime=$(echo "$parent_stat" | cut -d'|' -f2)
             mtime=$(echo "$parent_stat" | cut -d'|' -f3)
             ctime=$(echo "$parent_stat" | cut -d'|' -f4)
-            ino=$(($(date +%s) + ${RANDOM:-$$}))
+            ino=$(( ($(date +%s) + $$) % 2147483647 ))
             nlink=1
             if [ -n "$rpath" ] && [ -f "$rpath" ]; then
                 local rpath_stat=$(stat -c '%s|%b|%B' "$rpath" 2>/dev/null)
@@ -575,7 +616,7 @@ apply_font_redirect() {
             atime=$(echo "$parent_stat" | cut -d'|' -f2)
             mtime=$(echo "$parent_stat" | cut -d'|' -f3)
             ctime=$(echo "$parent_stat" | cut -d'|' -f4)
-            ino=$(($(date +%s) + ${RANDOM:-$$}))
+            ino=$(( ($(date +%s) + $$) % 2147483647 ))
             nlink=1
             log_debug "Using parent-derived metadata: ino=$ino dev=$dev"
         else
@@ -765,8 +806,8 @@ susfs_clean_module_entries() {
         [ ! -f "$config_path" ] && continue
 
         local before=$(wc -l < "$config_path")
-        local temp_file
-        temp_file=$(mktemp "${config_path}.XXXXXX") || return 1
+        local temp_file="${config_path}.tmp.$$"
+        : > "$temp_file" || return 1
 
         while IFS= read -r line; do
             local skip=0
@@ -817,12 +858,10 @@ susfs_clean_module_metadata_cache() {
     return 0
 }
 
-# Main API: Register rule with automatic SUSFS integration
+# Apply SUSFS protections for a VFS rule (called after zm add)
 zm_register_rule_with_susfs() {
     local vpath="$1"
     local rpath="$2"
-    local loader="${3:-$LOADER}"
-    [ -z "$loader" ] && { log_err "No loader specified"; return 1; }
     log_func_enter "zm_register_rule_with_susfs" "$vpath" "$rpath"
 
     [ -z "$vpath" ] && { log_warn "zm_register_rule_with_susfs: empty vpath"; return 1; }
@@ -834,31 +873,16 @@ zm_register_rule_with_susfs() {
         */../*|*/./*|../*|./*) log_warn "zm_register_rule_with_susfs: path contains traversal sequence"; return 1 ;;
     esac
 
-    log_info "Registering: $vpath"
+    log_info "Applying SUSFS protections: $vpath"
 
-    log_debug "Step 1: VFS redirect"
-    log_trace "Executing: $loader add '$vpath' '$rpath'"
-
-    local vfs_result vfs_rc
-    vfs_result=$("$loader" add "$vpath" "$rpath" </dev/null 2>&1)
-    vfs_rc=$?
-
-    if [ $vfs_rc -ne 0 ]; then
-        log_err "VFS redirect failed: $vpath -> $rpath (rc=$vfs_rc, output=$vfs_result)"
-        log_func_exit "zm_register_rule_with_susfs" "1" "vfs failed"
-        return 1
-    fi
-    log_debug "VFS redirect OK"
-
-    log_debug "Step 2: Classification"
     local actions
     actions=$(susfs_classify_path "$vpath")
-    log_debug "Actions: $actions"
+    log_debug "Classification: $actions"
 
     local metadata
     metadata=$(susfs_get_cached_metadata "$vpath")
 
-    log_debug "Step 3: SUSFS protections"
+    log_debug "Applying SUSFS actions"
     if [ "$HAS_SUSFS" = "1" ]; then
         case "$actions" in
             *sus_path_loop*) log_trace "Applying sus_path_loop"; susfs_apply_path "$vpath" 1 ;;

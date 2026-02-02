@@ -105,6 +105,45 @@
       "started_date": "2026-01-29",
       "completed_date": "2026-01-29",
       "notes": "Root cause: kernel artifacts visible even with no rules. Fix: SUSFS sus_path_loop hides paths from umounted apps. Verified with crackme detection app."
+    },
+    {
+      "id": "webui-v2-competition",
+      "title": "WebUI v2 Competition (Solid.js + TypeScript)",
+      "description": "Complete WebUI rewrite using Solid.js + TypeScript + Material Web. 3-way competition: Alpha (Minimalist), Beta (Bold Expressionist), Gamma (Futurist). Winner: Beta.",
+      "status": "completed",
+      "priority": "post-mvp",
+      "size": "XL",
+      "tags": ["frontend", "webui", "solid-js"],
+      "blocked_by": ["detection-bypass-hardening"],
+      "started_date": "2026-01-29",
+      "completed_date": "2026-01-29",
+      "notes": "3 competing designs built in parallel. Beta won with Electric Sunrise gradients, spring physics, shield icon. Next: cherry-pick Gamma features (glassmorphism)."
+    },
+    {
+      "id": "webui-v2-iteration",
+      "title": "WebUI v2 Iteration (Beta + Visual Polish)",
+      "description": "QA audit (3 agents), critical fixes (theme, accessibility, modals), visual enhancements (animations, new cards), Hybrid Mount reference features (rotating logo, fix nav, mode stats, health).",
+      "status": "completed",
+      "priority": "post-mvp",
+      "size": "L",
+      "tags": ["frontend", "webui", "polish"],
+      "blocked_by": ["webui-v2-competition"],
+      "started_date": "2026-01-29",
+      "completed_date": "2026-01-29",
+      "notes": "QA: 94.5% functional, 8.5/10 visual, 8/10 code. Full theme refactor with CSS custom properties. Added: rotating logo, fix nav toggle, mode stats, active modules, partitions, health cards."
+    },
+    {
+      "id": "frontend-backend-integration",
+      "title": "Frontend-Backend Integration (KSU Bridge)",
+      "description": "Replace all mock API with real ksu.exec() calls. 7 phases: foundation, engine control, rules, UIDs, stats, activity, settings. GitHub placeholder for future repo.",
+      "status": "completed",
+      "priority": "post-mvp",
+      "size": "L",
+      "tags": ["frontend", "backend", "integration"],
+      "blocked_by": ["webui-v2-iteration"],
+      "started_date": "2026-01-29",
+      "completed_date": "2026-01-29",
+      "notes": "All 7 phases complete. 13 API functions implemented with KSU bridge + mock fallback. Shell injection protection via escapeShellArg(). Edit rule, export config, verbose logging API all wired. Build: 106KB bundle."
     }
   ]
 }

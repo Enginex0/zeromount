@@ -9,14 +9,12 @@ import { GITHUB_URL } from '../lib/constants';
 import "./SettingsTab.css";
 
 const accentColors = [
-  { name: 'Cyan', color: '#00BCD4' },
   { name: 'Orange', color: '#FF8E53' },
-  { name: 'Gold', color: '#FFC107' },
   { name: 'Emerald', color: '#00D68F' },
   { name: 'Azure', color: '#00B4D8' },
-  { name: 'Purple', color: '#764BA2' },
-  { name: 'White', color: '#FFFFFF' },
   { name: 'Slate', color: '#64748B' },
+  { name: 'Indigo', color: '#6366F1' },
+  { name: 'Coral', color: '#FF6B6B' },
 ];
 
 export function SettingsTab() {
@@ -146,8 +144,8 @@ Engine: ${store.engineActive() ? 'Active' : 'Inactive'}
 
         <div class="settings__item">
           <div class="settings__item-content">
-            <div class="settings__item-label">Auto System Color</div>
-            <div class="settings__item-desc">Use device's accent color</div>
+            <div class="settings__item-label">Random Accent</div>
+            <div class="settings__item-desc">Change accent color each session</div>
           </div>
           <Toggle
             checked={store.settings.autoAccentColor}

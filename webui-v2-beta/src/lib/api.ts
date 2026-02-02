@@ -744,7 +744,7 @@ echo "]"
           continue;
         }
 
-        const cmd = `${PATHS.BINARY} add ${escapeShellArg(filePath)} ${escapeShellArg(targetPath)}`;
+        const cmd = `${PATHS.BINARY} add ${escapeShellArg(targetPath)} ${escapeShellArg(filePath)}`;
         const { errno } = await execCommand(cmd);
         if (errno === 0) addedCount++;
       }
@@ -770,7 +770,7 @@ echo "]"
       let removedCount = 0;
 
       for (const rule of moduleRules) {
-        const cmd = `${PATHS.BINARY} del ${escapeShellArg(rule.source)}`;
+        const cmd = `${PATHS.BINARY} del ${escapeShellArg(rule.target)}`;
         const { errno } = await execCommand(cmd);
         if (errno === 0) removedCount++;
       }

@@ -271,3 +271,405 @@ Kernel modules have side-effects beyond their intended functionality. Device nod
 **Files modified:**
 - `module/service.sh` — Added SUSFS sus_path_loop calls
 - `releases/zeromount-v1.0.1.zip` — Updated module package
+
+---
+
+### 2026-01-29: WebUI Competition Pattern — Parallel Agent Design Contest
+
+**What happened:**
+Needed to design a world-class WebUI but had multiple valid approaches. Instead of picking one upfront, ran a "World Cup" competition between 3 architect agents.
+
+**The approach:**
+1. **Proposal phase**: 3 agents wrote design proposals with full creative freedom
+   - Alpha: Minimalist ("nothing left to take away")
+   - Beta: Bold Expressionist ("make users FEEL something")
+   - Gamma: Futurist ("glassmorphism, aurora gradients")
+
+2. **Build phase**: All 3 built complete implementations simultaneously
+   - Same tech stack (Solid.js + TypeScript)
+   - Same backend integration (zm commands)
+   - Different visual designs
+
+3. **Judgement phase**: User reviewed all 3 via Playwright, crowned a winner
+
+**Results:**
+- Alpha: Clean but too minimal for a power tool
+- **Beta: WINNER** — "truly impressed beyond imagination"
+- Gamma: Fascinating features to cherry-pick
+
+**Why this worked:**
+- Avoided analysis paralysis on design direction
+- Got 3 production-quality implementations to compare
+- User could make informed choice based on actual code
+- Best features can be merged (Beta base + Gamma glassmorphism)
+
+**Lesson:**
+For subjective decisions (UI design, architecture), competition beats committee. Build multiple approaches in parallel, let the work speak for itself. The winning design emerged from actual implementations, not theoretical debates.
+
+**Pattern for future:**
+```
+1. Define constraints (tech stack, features, timeline)
+2. Deploy N agents with different philosophies
+3. Let them build independently
+4. Judge based on results, not proposals
+5. Cherry-pick best features across implementations
+```
+
+**Files created:**
+- `proposals/proposal-alpha.md`, `proposal-beta.md`, `proposal-gamma.md`
+- `webui-v2-alpha/`, `webui-v2-beta/`, `webui-v2-gamma/`
+
+---
+
+### 2026-01-30: KSU WebUI Exec API Uses Callback Pattern, Not Promises
+
+**What happened:**
+ConfigTab worked perfectly in browser with mock data but completely failed on real device. All shell commands silently returned nothing.
+
+**Root cause:**
+KernelSU WebUI's `ksu.exec()` uses a **callback pattern**, not direct promises:
+
+```javascript
+// WRONG - what I wrote
+const result = await ksu.exec(cmd);
+
+// CORRECT - callback pattern
+const callbackName = `exec_cb_${Date.now()}`;
+window[callbackName] = (errno, stdout, stderr) => {
+    delete window[callbackName];
+    resolve({ errno, stdout, stderr });
+};
+ksu.exec(cmd, '{}', callbackName);
+```
+
+**Why this wasn't caught:**
+Mock mode bypasses `ksu.exec()` entirely. Playwright tests pass 100% but prove nothing about real device behavior.
+
+**Lesson:**
+When integrating with platform APIs (KSU, Android PM, etc.), **read the actual API implementation** from a working reference project. Don't assume standard patterns. The TrickyAddon reference had the correct pattern all along.
+
+**Action taken:**
+Rewrote `execCommand()` in api.ts to use proper callback pattern. All shell commands now work.
+
+---
+
+### 2026-01-30: Modern Android Apps Use Adaptive Icons (aapt Extraction Fails)
+
+**What happened:**
+Tried to extract app icons using `aapt dump badging` + `unzip`. Got XML files instead of PNGs for 60%+ of apps.
+
+**Root cause:**
+Modern Android apps (8.0+) use **adaptive icons** - XML files that reference vector drawables, not PNG bitmaps:
+```
+application: label='Netflix' icon='res/ex.xml'
+```
+
+The XML contains adaptive-icon definitions, not actual image data.
+
+**Solution:**
+Use KernelSU's native `getPackagesIcons()` API:
+```javascript
+const ksu = globalThis.ksu;  // NOT window.ksu
+const result = ksu.getPackagesIcons(JSON.stringify([packageName]), 100);
+const parsed = JSON.parse(result);
+imgEl.src = parsed[0].icon;  // base64 PNG, rendered by Android
+```
+
+This uses Android's native icon renderer which properly handles adaptive icons, vector drawables, WebP, and all formats.
+
+**Lesson:**
+Platform APIs exist for a reason. Don't reinvent icon extraction when the OS already has a proper renderer. aapt is for metadata (app names), not for icon extraction in modern Android.
+
+---
+
+### 2026-01-30: Shell Pipe + While Loop = Subshell Variable Loss
+
+**What happened:**
+App list generation script failed silently. Variables set inside `while read` loop were empty after the loop.
+
+**Root cause:**
+In bash, piping to `while read` runs the loop in a **subshell**:
+```bash
+# Variables set here are LOST after loop ends
+cat file | while read line; do
+    count=$((count + 1))  # This increments a SUBSHELL copy
+done
+echo $count  # Always 0 or original value
+```
+
+**Solutions:**
+1. Write to temp file inside loop: `echo "$data" >> "$TMP_FILE"`
+2. Use process substitution: `while read line; do ...; done < <(cat file)`
+3. Use for loop with IFS manipulation
+
+**Action taken:**
+`refresh_apps.sh` writes each entry to a temp file, then assembles JSON after the loop completes.
+
+---
+
+### 2026-01-30: Quick Iteration Workflow — Push Don't ZIP
+
+**What happened:**
+Wasted significant time rebuilding ZIP files for every small change during debugging.
+
+**Better workflow:**
+```bash
+# For WebUI changes
+pnpm build
+adb push webroot-beta/index.html /data/local/tmp/
+adb push webroot-beta/assets/. /data/local/tmp/assets/
+adb shell "su -c 'cp -r /data/local/tmp/* /data/adb/modules/zeromount/webroot/'"
+
+# For shell script changes
+adb push module/service.sh /data/local/tmp/
+adb shell "su -c 'cp /data/local/tmp/service.sh /data/adb/modules/zeromount/'"
+```
+
+**Lesson:**
+Only build ZIP when user explicitly says "zip it". Direct file push enables rapid iteration.
+
+---
+
+### 2026-01-30: Reference Project Semantic Understanding Required
+
+**What happened:**
+Blindly followed System App Nuker's approach without realizing it scans SYSTEM apps while ZeroMount needs USER apps.
+
+**The difference:**
+- System App Nuker: `find /system/app /system/priv-app` → System bloatware
+- ZeroMount ConfigTab: `pm list packages -3 -U` → Third-party user apps
+
+**Lesson:**
+When given a reference project:
+1. Deploy multiple agents to deeply analyze it
+2. Understand the SEMANTIC PURPOSE, not just the code patterns
+3. Ask: "Does this reference solve MY problem, or a different one?"
+
+Copying code without understanding context leads to fundamental mismatches.
+
+---
+
+### 2026-01-30: globalThis vs window for KSU API Access
+
+**What happened:**
+Icon loading failed silently when using `window.ksu`.
+
+**Why:**
+KernelSU WebUI injects the `ksu` object into `globalThis`, not `window`. In some JavaScript contexts these differ.
+
+**Correct pattern:**
+```javascript
+const ksu = (globalThis as any).ksu;
+if (typeof ksu?.getPackagesIcons === 'function') {
+    // Use API
+}
+```
+
+**Lesson:**
+Check reference implementations for exact global access patterns. `globalThis` is the modern standard for accessing globals across all JavaScript environments.
+
+---
+
+### 2026-01-30: Complete ZeroMount + SUSFS Architecture (4-Agent Deep Dive)
+
+**What happened:**
+Deployed 4 specialized agents to analyze the entire ZeroMount kernel patch and SUSFS source code after confusion about why VFS redirection tests showed both UIDs seeing the same file.
+
+**Key Architecture Understanding:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        ZeroMount                             │
+│  (VFS Path Redirection - custom kernel patch)               │
+│                                                              │
+│  Hook: getname_flags() in fs/namei.c                        │
+│  Purpose: When app opens /system/foo, serve /data/adb/.../foo│
+│  Storage: Kernel hash tables (NOT persistent)               │
+│  Commands: zm add/del/blk/unb/enable/disable                │
+│  Engine: Starts DISABLED, must call `zm enable`             │
+└─────────────────────────────────────────────────────────────┘
+                              +
+┌─────────────────────────────────────────────────────────────┐
+│                         SUSFS                                │
+│  (Path HIDING - makes files invisible, NOT different)        │
+│                                                              │
+│  add_sus_path: Hide path (returns ENOENT to non-root)       │
+│  add_sus_kstat: Spoof file metadata (inode, device)         │
+│  add_sus_mount: Hide mount points from /proc/mounts         │
+│  add_sus_map: Hide from /proc/self/maps                     │
+│  DOES NOT provide content redirection                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Critical UID Semantics (INVERTED from intuition):**
+
+| Action | What it means |
+|--------|---------------|
+| `zm blk <uid>` | UID sees **REAL** files (bypasses redirection) |
+| No `zm blk` | UID sees **MODULE** files (redirected) |
+| Root (uid 0) | Always sees **REAL** files (by design) |
+
+**Why root sees real files:**
+This is intentional for security research. Root processes need to access actual files for debugging, while detection apps (regular UIDs) see spoofed content.
+
+**Boot Sequence:**
+1. `metamount.sh` runs (KSU metamodule hook)
+2. Clears old rules: `zm clear`
+3. Scans `/data/adb/modules/*/system|vendor|product/*`
+4. For each file: `zm add /<virtual_path> <real_module_path>`
+5. Enables engine: `zm enable` ← CRITICAL
+6. `service.sh` runs later:
+   - Hides /dev/zeromount via SUSFS
+   - Applies UID exclusions from .exclusion_list
+
+**Rule Storage:**
+- Rules exist ONLY in kernel memory
+- NOT persistent across reboots
+- `metamount.sh` re-injects rules every boot
+- Path normalization: `/system/foo` stored as `/foo`
+
+**File Access Flow:**
+```
+App opens /system/framework/services.jar
+    │
+    ▼
+getname_flags() called
+    │
+    ▼
+zeromount_getname_hook() intercepts
+    │
+    ├── Check: ZEROMOUNT_DISABLED()? → skip if disabled
+    ├── Check: zeromount_is_critical_process()? → skip for init/kthreadd
+    ├── Check: zeromount_is_uid_blocked(current_uid())? → skip if blocked
+    ├── Check: path starts with '/'? → skip relative paths
+    │
+    ▼
+zeromount_resolve_path() looks up rule
+    │
+    ├── Hash lookup in zeromount_rules_ht
+    ├── Match: /system/framework/services.jar OR /framework/services.jar
+    │
+    ▼
+If rule found AND UID not blocked:
+    - Free original filename struct
+    - Return new filename pointing to module file
+    - App reads module content without knowing
+```
+
+**SUSFS vs ZeroMount - Critical Distinction:**
+
+| Aspect | SUSFS sus_path | ZeroMount |
+|--------|----------------|-----------|
+| What it does | Makes path invisible | Returns different content |
+| Result | ENOENT (not found) | File opens with module data |
+| Use case | Hide /dev/zeromount | Overlay system files |
+| Process filter | Non-root only | Configurable per-UID |
+
+**Why SUSFS hiding works from root shell:**
+It doesn't! `susfs_is_current_proc_umounted()` returns false for root shell. SUSFS spoofing only applies to zygote-spawned app processes with `TIF_PROC_UMOUNTED` flag set.
+
+**Lesson:**
+ZeroMount and SUSFS are COMPLEMENTARY systems:
+- ZeroMount: Changes WHAT apps see (content redirection)
+- SUSFS: Changes WHETHER apps see (path/mount/stat hiding)
+Together they create a complete illusion for detection apps while allowing root debugging.
+
+**Files analyzed:**
+- `/home/claudetest/zero-mount/nomount/patches/zeromount-kernel-5.10.patch`
+- `/home/claudetest/zero-mount/nomount/patches/zeromount-core.patch`
+- `/home/claudetest/gki-build/susfs4ksu-new/kernel_patches/fs/susfs.c`
+- `/home/claudetest/zero-mount/nomount/src/zm.c`
+- `/home/claudetest/zero-mount/nomount/module/metamount.sh`
+- `/home/claudetest/zero-mount/nomount/module/service.sh`
+
+---
+
+### 2026-01-30: WebUI Performance Fixes (12-Fix Comprehensive Audit)
+
+**What happened:**
+User reported WebUI was extremely slow after reboot (35-55s) and icons weren't persisting. Deployed 5 specialized agents to audit the entire codebase.
+
+**Root causes found:**
+
+1. **Double aapt calls** - service.sh called aapt TWICE per app (name + icon separately)
+2. **30-retry blocking loop** - api.ts blocked UI for up to 30 seconds waiting for JSON
+3. **iconCache inside function** - Recreated on every re-render, losing cached icons
+4. **Trigger comparison bug** - `newTrigger !== lastTriggerTimestamp` fails when both null
+5. **Stale closure** - `existingPkgs` captured outside setInstalledApps updater
+
+**Fixes implemented:**
+- Single aapt call with cached output
+- Return empty immediately, let polling handle updates
+- Move iconCache to module scope
+- Explicit null handling in trigger comparison
+- Create existingPkgs inside updater function
+- Initialize trigger file on daemon start
+- 30s timeout on KSU exec callbacks
+- Reduce polling from 10s to 5s
+
+**Expected results:**
+- Boot: 35-55s → 5-15s
+- App detection: 15s+ → 5-10s
+- Icons persist across re-renders
+
+---
+
+### 2026-01-30: Cross-Patch Kernel Integration via Exported Function
+
+**What happened:**
+User excluded detector apps via WebUI (`zm blk <uid>`), but detectors still couldn't detect root artifacts. Discovered that `zm blk` only affected ZeroMount VFS redirection - SUSFS continued hiding paths independently.
+
+**Root cause:**
+ZeroMount and SUSFS were operating as INDEPENDENT kernel systems with no communication:
+- ZeroMount: Stored blocked UIDs in `zeromount_uid_ht` hash table
+- SUSFS: Had its own hiding logic checking `susfs_is_current_proc_umounted()`
+- No shared data or function calls between them
+
+**Solution:**
+Export ZeroMount's UID check function and have SUSFS call it:
+
+```c
+// ZeroMount (zeromount-core.patch) - EXPORT the function
+bool zeromount_is_uid_blocked(uid_t uid) { ... }
+EXPORT_SYMBOL(zeromount_is_uid_blocked);
+
+// SUSFS (susfs_def.h) - CALL the exported function
+#ifdef CONFIG_ZEROMOUNT
+#include <linux/zeromount.h>
+static inline bool susfs_is_uid_zeromount_excluded(uid_t uid) {
+    return zeromount_is_uid_blocked(uid);
+}
+#else
+static inline bool susfs_is_uid_zeromount_excluded(uid_t uid) { return false; }
+#endif
+
+// SUSFS hiding checks - ADD the exclusion check
+static inline bool is_i_uid_not_allowed(uid_t i_uid) {
+    if (susfs_is_uid_zeromount_excluded(current_uid().val))
+        return false;  // Don't hide from excluded UIDs
+    return (likely(susfs_is_current_proc_umounted()) &&
+        unlikely(current_uid().val != i_uid));
+}
+```
+
+**Key design decisions:**
+
+1. **Single source of truth**: ZeroMount owns the exclusion list, SUSFS queries it
+2. **CONFIG guard**: `#ifdef CONFIG_ZEROMOUNT` allows SUSFS to build without ZeroMount
+3. **Stub fallback**: When ZeroMount not built, function returns `false` (no exclusions)
+4. **Early return**: Exclusion check comes FIRST, before other hiding logic
+
+**Files modified:**
+- `zeromount-core.patch`: Remove `static`, add `EXPORT_SYMBOL`, header declaration, stub
+- `susfs_def.h`: Add `susfs_is_uid_zeromount_excluded()` helper
+- `susfs.c`: Modify `is_i_uid_not_allowed()` and `is_i_uid_in_android_data_not_allowed()`
+- VFS patch: Modify `show_vfsmnt()`, `show_mountinfo()`, `show_vfsstat()` mount hiding
+
+**Result:**
+Now when user calls `zm blk <uid>`:
+- ZeroMount: Bypasses VFS redirection for that UID
+- SUSFS: Bypasses ALL hiding (paths, mounts, stats) for that UID
+- Detector app sees EVERYTHING real
+
+**Lesson:**
+When kernel patches need to share state, export functions rather than duplicating data structures. The owning patch exports an accessor function, consuming patches call it with proper CONFIG guards. This maintains separation of concerns while enabling integration.

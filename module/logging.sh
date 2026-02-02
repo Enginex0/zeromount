@@ -112,7 +112,7 @@ log_rotate_if_needed() {
         local archive_name="${LOG_FILE##*/}.$(date '+%Y%m%d_%H%M%S')"
         mv "$LOG_FILE" "$LOG_DIR_ARCHIVE/$archive_name" 2>/dev/null
         # Keep only last 5 archived logs per component
-        ls -t "$LOG_DIR_ARCHIVE/${LOG_COMPONENT}."* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null
+        ls -t "$LOG_DIR_ARCHIVE/${LOG_COMPONENT}."* 2>/dev/null | awk 'NR>5' | xargs rm -f 2>/dev/null
     fi
 }
 

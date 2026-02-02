@@ -51,7 +51,7 @@ sync_single_module() {
     if [ ! -d "$mod_path" ] || [ -f "$mod_path/disable" ] || [ -f "$mod_path/remove" ]; then
         if [ -f "$tracking_file" ]; then
             local removed=0
-            while IFS= read -r virtual_path; do
+            while IFS='|' read -r virtual_path _type _extra; do
                 [ -z "$virtual_path" ] && continue
                 "$LOADER" del "$virtual_path" < /dev/null 2>/dev/null && removed=$((removed + 1)) || log_err "Failed to remove: $virtual_path"
             done < "$tracking_file"
@@ -72,7 +72,7 @@ sync_single_module() {
 
     local removed=0 added=0
 
-    while IFS= read -r tracked_path; do
+    while IFS='|' read -r tracked_path _type _extra; do
         [ -z "$tracked_path" ] && continue
         if ! grep -qxF "$tracked_path" "$current_files"; then
             "$LOADER" del "$tracked_path" < /dev/null 2>/dev/null && removed=$((removed + 1)) || log_err "Failed to remove: $tracked_path"
@@ -81,7 +81,7 @@ sync_single_module() {
 
     while IFS= read -r current_path; do
         [ -z "$current_path" ] && continue
-        if ! grep -qxF "$current_path" "$tracking_file"; then
+        if ! grep -q "^${current_path}|" "$tracking_file"; then
             local real_path="$mod_path$current_path"
             if [ -c "$real_path" ]; then
                 "$LOADER" add "$current_path" "/nonexistent" < /dev/null 2>/dev/null && added=$((added + 1)) || log_err "Failed to add: $current_path"
@@ -92,7 +92,16 @@ sync_single_module() {
     done < "$current_files"
 
     if [ "$removed" -gt 0 ] || [ "$added" -gt 0 ]; then
-        cp "$current_files" "$tracking_file"
+        : > "$tracking_file.new"
+        while IFS= read -r path; do
+            old_entry=$(grep "^${path}|" "$tracking_file" 2>/dev/null | head -1)
+            if [ -n "$old_entry" ]; then
+                echo "$old_entry" >> "$tracking_file.new"
+            else
+                echo "${path}|file" >> "$tracking_file.new"
+            fi
+        done < "$current_files"
+        mv "$tracking_file.new" "$tracking_file"
         log_info "Synced $mod_name: +$added -$removed"
     fi
 

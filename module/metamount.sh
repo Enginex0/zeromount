@@ -10,7 +10,8 @@ ZEROMOUNT_DATA="/data/adb/zeromount"
 [ -f "$MODDIR/susfs_integration.sh" ] && . "$MODDIR/susfs_integration.sh"
 
 VERBOSE_FLAG="$ZEROMOUNT_DATA/.verbose"
-TARGET_PARTITIONS="system vendor product system_ext odm oem"
+# Note: /apex requires special handling due to APEX mount namespace (planned for future)
+TARGET_PARTITIONS="system vendor product system_ext odm oem my_bigball my_carrier my_company my_engineering my_heytap my_manifest my_preload my_product my_region my_stock mi_ext cust optics prism"
 ACTIVE_MODULES_COUNT=0
 BOOT_COUNTER_FILE="$ZEROMOUNT_DATA/boot_counter"
 
@@ -122,27 +123,105 @@ detect_conflicts() {
         done
     done
 
-    sort "$conflict_map" | awk -F'|' '
+    # Let awk count conflicts - avoids subshell variable clobbering from pipe
+    conflict_output=$(sort "$conflict_map" | awk -F'|' '
         { paths[$1] = paths[$1] ? paths[$1] "," $2 : $2 }
         END {
+            count = 0
             for (p in paths) {
                 n = split(paths[p], mods, ",")
-                if (n > 1) print "CONFLICT: " p " -> " paths[p]
+                if (n > 1) {
+                    print "CONFLICT: " p " -> " paths[p]
+                    count++
+                }
             }
+            print "COUNT:" count
         }
-    ' | while read -r line; do
+    ')
+
+    echo "$conflict_output" | grep "^CONFLICT:" | while read -r line; do
         log_warn "$line"
-        conflict_count=$((conflict_count + 1))
     done
+
+    conflict_count=$(echo "$conflict_output" | grep "^COUNT:" | cut -d: -f2)
+    conflict_count=${conflict_count:-0}
 
     rm -f "$conflict_map"
     [ "$conflict_count" -gt 0 ] && log_warn "Found $conflict_count file conflicts"
 }
 
+# getfattr wrapper - multiple fallbacks for Android compatibility
+HAS_GETFATTR=0
+if /system/bin/getfattr -d /system/bin > /dev/null 2>&1; then
+    getfattr() { /system/bin/getfattr "$@"; }
+    HAS_GETFATTR=1
+elif /system/bin/toybox getfattr -d /system/bin > /dev/null 2>&1; then
+    getfattr() { /system/bin/toybox getfattr "$@"; }
+    HAS_GETFATTR=1
+elif busybox getfattr -d /system/bin > /dev/null 2>&1; then
+    getfattr() { busybox getfattr "$@"; }
+    HAS_GETFATTR=1
+elif command -v getfattr > /dev/null 2>&1; then
+    HAS_GETFATTR=1
+else
+    getfattr() { return 1; }
+    log_warn "getfattr not available - overlay xattr detection disabled"
+fi
+
+is_whiteout() {
+    local path="$1"
+    [ -z "$path" ] && return 1
+
+    # Format 1: Character device with major=0, minor=0
+    if [ -c "$path" ]; then
+        local major minor
+        major=$(busybox stat -c '%t' "$path" 2>/dev/null)
+        minor=$(busybox stat -c '%T' "$path" 2>/dev/null)
+        [ "$major" = "0" ] && [ "$minor" = "0" ] && return 0
+    fi
+
+    # Format 2: Zero-size file with xattr (only if getfattr available)
+    if [ "$HAS_GETFATTR" = "1" ] && [ -f "$path" ] && [ ! -s "$path" ]; then
+        getfattr -n trusted.overlay.whiteout "$path" 2>/dev/null | grep -q "y" && return 0
+    fi
+
+    return 1
+}
+
+is_opaque_dir() {
+    local path="$1"
+    [ -z "$path" ] && return 1
+    [ ! -d "$path" ] && return 1
+    [ "$HAS_GETFATTR" = "0" ] && return 1
+    getfattr -n trusted.overlay.opaque "$path" 2>/dev/null | grep -q "y"
+}
+
+is_aufs_whiteout() {
+    local path="$1"
+    [ -z "$path" ] && return 1
+    local basename="${path##*/}"
+    case "$basename" in
+        .wh.*) return 0 ;;
+    esac
+    return 1
+}
+
+get_redirect_path() {
+    local path="$1"
+    [ -z "$path" ] && return
+    [ "$HAS_GETFATTR" = "0" ] && return
+    getfattr -n trusted.overlay.redirect "$path" 2>/dev/null | \
+        sed -n 's/^trusted\.overlay\.redirect="\(.*\)"$/\1/p'
+}
+
+
 log_section "Conflict Detection"
 detect_conflicts
 
 log_section "Module Injection"
+
+TRACKING_DIR="$ZEROMOUNT_DATA/module_paths"
+mkdir -p "$TRACKING_DIR" 2>/dev/null
 
 for mod_path in "$MODULES_DIR"/*; do
     [ -d "$mod_path" ] || continue
@@ -156,27 +235,100 @@ for mod_path in "$MODULES_DIR"/*; do
     fi
 
     MODULE_INJECTED="false"
+    TRACKING_FILE="$TRACKING_DIR/$mod_name"
+    : > "$TRACKING_FILE"
+
     for partition in $TARGET_PARTITIONS; do
         if [ -d "$mod_path/$partition" ]; then
             MODULE_INJECTED="true"
             log_info "Processing: $mod_name (/$partition)"
             (
                 cd "$mod_path" || exit
-                find "$partition" -type f | while read -r relative_path; do
+
+                # Scan all overlay-relevant types: files, dirs, symlinks, char devices
+                find "$partition" \( -type f -o -type d -o -type l -o -type c \) 2>/dev/null | while read -r relative_path; do
                     real_path="$mod_path/$relative_path"
                     virtual_path="/$relative_path"
 
-                    if $VERBOSE; then
-                        log_debug "  Inject: $virtual_path"
+                    # Skip partition root
+                    [ "$relative_path" = "$partition" ] && continue
+
+                    # Character device (0,0) = overlay whiteout
+                    if [ -c "$real_path" ]; then
+                        if is_whiteout "$real_path"; then
+                            log_info "  Whiteout: $virtual_path"
+                            susfs_hide_path "$virtual_path"
+                            echo "$virtual_path|whiteout" >> "$TRACKING_FILE"
+                            continue
+                        fi
                     fi
 
-                    OUTPUT=$("$LOADER" add "$virtual_path" "$real_path" 2>&1)
-                    RET_CODE=$?
+                    # Regular file - check for overlay markers
+                    if [ -f "$real_path" ]; then
+                        # Zero-byte whiteout with xattr
+                        if is_whiteout "$real_path"; then
+                            log_info "  Whiteout (xattr): $virtual_path"
+                            susfs_hide_path "$virtual_path"
+                            echo "$virtual_path|whiteout" >> "$TRACKING_FILE"
+                            continue
+                        fi
 
-                    zm_register_rule_with_susfs "$virtual_path" "$real_path" 2>/dev/null || true
+                        # AUFS-style whiteout (.wh.filename)
+                        if is_aufs_whiteout "$real_path"; then
+                            target_name=$(basename "$real_path" | sed 's/^\.wh\.//')
+                            target_path="$(dirname "$virtual_path")/$target_name"
+                            log_info "  AUFS Whiteout: $target_path"
+                            susfs_hide_path "$target_path"
+                            echo "$target_path|aufs_whiteout" >> "$TRACKING_FILE"
+                            continue
+                        fi
 
-                    if [ $RET_CODE -ne 0 ]; then
-                        log_err "Failed: $virtual_path ($OUTPUT)"
+                        # Redirect xattr (renamed/moved file)
+                        redirect=$(get_redirect_path "$real_path")
+                        if [ -n "$redirect" ]; then
+                            log_info "  Redirect: $redirect -> $real_path"
+                            OUTPUT=$("$LOADER" add "$redirect" "$real_path" 2>&1)
+                            RET_CODE=$?
+                            echo "$redirect|redirect|$virtual_path" >> "$TRACKING_FILE"
+                            zm_register_rule_with_susfs "$redirect" "$real_path" 2>/dev/null || true
+                            [ $RET_CODE -ne 0 ] && log_err "Failed redirect: $redirect ($OUTPUT)"
+                            continue
+                        fi
+
+                        # Standard file injection
+                        $VERBOSE && log_debug "  Inject: $virtual_path"
+                        OUTPUT=$("$LOADER" add "$virtual_path" "$real_path" 2>&1)
+                        RET_CODE=$?
+                        echo "$virtual_path|file" >> "$TRACKING_FILE"
+                        zm_register_rule_with_susfs "$virtual_path" "$real_path" 2>/dev/null || true
+                        [ $RET_CODE -ne 0 ] && log_err "Failed: $virtual_path ($OUTPUT)"
+                        continue
+                    fi
+
+                    # Directory - check for opaque marker
+                    if [ -d "$real_path" ]; then
+                        if is_opaque_dir "$real_path"; then
+                            log_info "  Opaque dir: $virtual_path"
+                            susfs_hide_path "$virtual_path"
+                            echo "$virtual_path|opaque_dir" >> "$TRACKING_FILE"
+                        fi
+                        continue
+                    fi
+
+                    # Symlink - resolve and redirect
+                    if [ -L "$real_path" ]; then
+                        link_target=$(busybox readlink -f "$real_path" 2>/dev/null)
+                        if [ -e "$link_target" ]; then
+                            $VERBOSE && log_debug "  Symlink: $virtual_path -> $link_target"
+                            OUTPUT=$("$LOADER" add "$virtual_path" "$link_target" 2>&1)
+                            RET_CODE=$?
+                            echo "$virtual_path|symlink|$link_target" >> "$TRACKING_FILE"
+                            zm_register_rule_with_susfs "$virtual_path" "$link_target" 2>/dev/null || true
+                            [ $RET_CODE -ne 0 ] && log_err "Failed symlink: $virtual_path ($OUTPUT)"
+                        else
+                            log_warn "  Dangling symlink: $virtual_path -> $link_target"
+                        fi
+                        continue
                     fi
                 done
             )
@@ -185,20 +337,43 @@ for mod_path in "$MODULES_DIR"/*; do
 
     if [ "$MODULE_INJECTED" = "true" ]; then
         ACTIVE_MODULES_COUNT=$((ACTIVE_MODULES_COUNT + 1))
+        log_info "Registered $mod_name ($(wc -l < "$TRACKING_FILE" 2>/dev/null || echo 0) rules)"
+    else
+        rm -f "$TRACKING_FILE"
     fi
 done
 
 log_section "Finalization"
 log_info "Modules processed: $ACTIVE_MODULES_COUNT"
 
-# Update module description
+# Update module description with module names
 update_module_description() {
-    local count="$1"
     local prop_file="$MODDIR/module.prop"
-    local new_desc="✓ Active | Modules: $count"
-    sed -i "s/^description=.*/description=$new_desc/" "$prop_file"
+    local module_names="" module_count=0
+
+    for tracking_file in "$TRACKING_DIR"/*; do
+        [ -f "$tracking_file" ] || continue
+        local name=$(basename "$tracking_file")
+        [ -n "$module_names" ] && module_names="$module_names, "
+        module_names="$module_names$name"
+        module_count=$((module_count + 1))
+    done
+
+    local desc
+    if [ "$module_count" -gt 0 ]; then
+        local label="Modules"
+        [ "$module_count" -eq 1 ] && label="Module"
+        desc="GHOST👻 | $module_count $label | $module_names"
+    else
+        desc="😴 Idle — No Module Mounted
+Mountless VFS-level Redirection which Replaces Magic mount & Overlayfs. GHOST👻"
+    fi
+    grep -v "^description=" "$prop_file" > "${prop_file}.tmp"
+    printf 'description=%s\n' "$desc" >> "${prop_file}.tmp"
+    mv "${prop_file}.tmp" "$prop_file"
 }
-update_module_description "$ACTIVE_MODULES_COUNT"
+
+update_module_description
 
 # Enable ZeroMount
 if "$LOADER" enable 2>/dev/null; then

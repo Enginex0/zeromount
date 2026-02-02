@@ -22,3 +22,15 @@
   color: var(--text-tertiary);
   letter-spacing: 0.1em;
 }
+
+.header__sun {
+  display: inline-block;
+  font-size: 1.4em;
+  filter: brightness(1.3);
+  animation: spin-slow 8s linear infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
