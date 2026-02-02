@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,919 @@
+@@ -0,0 +1,954 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -50,7 +50,8 @@ index 000000000..43ca3f0fa
 +#include <linux/sysfs.h>
 +#include <linux/statfs.h>
 +
-+static DEFINE_PER_CPU(int, zeromount_recursion_depth);
++DEFINE_PER_CPU(int, zeromount_recursion_depth);
++EXPORT_PER_CPU_SYMBOL(zeromount_recursion_depth);
 +
 +int zeromount_debug_level = 0;
 +
@@ -144,6 +145,39 @@ index 000000000..43ca3f0fa
 +    kfree(rule);
 +}
 +
++static void zeromount_flush_parent(const char *full_path) {
++    char *path_copy, *last_slash, *parent_str, *child_name;
++    struct path parent;
++
++    path_copy = kstrdup(full_path, GFP_KERNEL);
++    if (!path_copy) return;
++
++    last_slash = strrchr(path_copy, '/');
++    if (!last_slash || last_slash == path_copy) {
++        kfree(path_copy);
++        return;
++    }
++
++    *last_slash = '\0';
++    parent_str = path_copy;
++    child_name = last_slash + 1;
++
++    if (kern_path(parent_str, LOOKUP_FOLLOW, &parent) == 0) {
++        struct dentry *child;
++        inode_lock(parent.dentry->d_inode);
++        child = lookup_one_len(child_name, parent.dentry, strlen(child_name));
++        if (!IS_ERR(child)) {
++            d_invalidate(child);
++            d_drop(child);
++            dput(child);
++        }
++        inode_unlock(parent.dentry->d_inode);
++        path_put(&parent);
++    }
++
++    kfree(path_copy);
++}
++
 +static void zeromount_flush_dcache(const char *path_name) {
 +    struct path path;
 +    int err;
@@ -176,7 +210,7 @@ index 000000000..43ca3f0fa
 +    hash_for_each_possible_rcu(zeromount_ino_ht, rule, ino_node, key) {
 +        if (rule->real_ino == inode->i_ino &&
 +            rule->real_dev == inode->i_sb->s_dev) {
-+            if (rule->is_new)
++            if (READ_ONCE(rule->is_new))
 +                found_path = kstrdup(rule->virtual_path, GFP_ATOMIC);
 +            break;
 +        }
@@ -200,19 +234,24 @@ index 000000000..43ca3f0fa
 +}
 +
 +static void zeromount_refresh_critical_inodes(void) {
-+    if (zm_ino_adb == 0)
-+        zm_ino_adb = zeromount_get_inode_by_path("/data/adb");
-+
-+    if (zm_ino_modules == 0)
-+        zm_ino_modules = zeromount_get_inode_by_path("/data/adb/modules");
++    if (READ_ONCE(zm_ino_adb) == 0) {
++        unsigned long ino = zeromount_get_inode_by_path("/data/adb");
++        if (ino != 0)
++            WRITE_ONCE(zm_ino_adb, ino);
++    }
++    if (READ_ONCE(zm_ino_modules) == 0) {
++        unsigned long ino = zeromount_get_inode_by_path("/data/adb/modules");
++        if (ino != 0)
++            WRITE_ONCE(zm_ino_modules, ino);
++    }
 +}
 +
 +bool zeromount_is_traversal_allowed(struct inode *inode, int mask) {
 +    if (!inode || ZEROMOUNT_DISABLED() || zeromount_is_uid_blocked(current_uid().val)) return false;
 +    if (!(mask & MAY_EXEC)) return false;
 +
-+    if ((zm_ino_adb != 0 && inode->i_ino == zm_ino_adb) ||
-+        (zm_ino_modules != 0 && inode->i_ino == zm_ino_modules)) {
++    if ((READ_ONCE(zm_ino_adb) != 0 && inode->i_ino == READ_ONCE(zm_ino_adb)) ||
++        (READ_ONCE(zm_ino_modules) != 0 && inode->i_ino == READ_ONCE(zm_ino_modules))) {
 +        return true;
 +    }
 +    return false;
@@ -276,15 +315,11 @@ index 000000000..43ca3f0fa
 +    if (ZEROMOUNT_DISABLED() || zeromount_is_uid_blocked(current_uid().val) || !name || name->name[0] != '/')
 +        return name;
 +
-+    // Per-CPU recursion guard: getname_kernel can trigger re-entry
-+    if (this_cpu_inc_return(zeromount_recursion_depth) > 1) {
-+        this_cpu_dec(zeromount_recursion_depth);
-+        return name;
-+    }
++    zm_enter();
 +
 +    target_path = zeromount_resolve_path(name->name);
 +    if (!target_path) {
-+        this_cpu_dec(zeromount_recursion_depth);
++        zm_exit();
 +        return name;
 +    }
 +
@@ -292,12 +327,12 @@ index 000000000..43ca3f0fa
 +    kfree(target_path);
 +
 +    if (IS_ERR(new_name)) {
-+        this_cpu_dec(zeromount_recursion_depth);
++        zm_exit();
 +        return name;
 +    }
 +
 +    putname(name);
-+    this_cpu_dec(zeromount_recursion_depth);
++    zm_exit();
 +    return new_name;
 +}
 +
@@ -691,7 +726,7 @@ index 000000000..43ca3f0fa
 +        path_put(&path);
 +    } else {
 +        zeromount_auto_inject_parent(rule->virtual_path, type);
-+        rule->is_new = true;
++        WRITE_ONCE(rule->is_new, true);
 +    }
 +    zeromount_flush_dcache(rule->virtual_path);
 +    return 0;
@@ -953,7 +988,7 @@ new file mode 100644
 index 000000000..9e0fb1b21
 --- /dev/null
 +++ b/include/linux/zeromount.h
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,140 @@
 +#ifndef _LINUX_ZEROMOUNT_H
 +#define _LINUX_ZEROMOUNT_H
 +
@@ -968,6 +1003,26 @@ index 000000000..9e0fb1b21
 +#include <linux/ioctl.h>
 +#include <linux/rcupdate.h>
 +#include <linux/printk.h>
++#include <linux/percpu.h>
++#include <linux/preempt.h>
++
++DECLARE_PER_CPU(int, zeromount_recursion_depth);
++
++static inline void zm_enter(void) {
++    preempt_disable();
++    __this_cpu_inc(zeromount_recursion_depth);
++    preempt_enable();
++}
++
++static inline void zm_exit(void) {
++    preempt_disable();
++    __this_cpu_dec(zeromount_recursion_depth);
++    preempt_enable();
++}
++
++static inline bool zm_is_recursive(void) {
++    return __this_cpu_read(zeromount_recursion_depth) > 0;
++}
 +
 +extern int zeromount_debug_level;
 +
