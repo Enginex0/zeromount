@@ -49,6 +49,9 @@ index 000000000..43ca3f0fa
 +#include <linux/kobject.h>
 +#include <linux/sysfs.h>
 +#include <linux/statfs.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs.h>
++#endif
 +
 +int zeromount_debug_level = 0;
 +
@@ -94,6 +97,10 @@ index 000000000..43ca3f0fa
 +		return true;
 +	if (zeromount_is_critical_process())
 +		return true;
++#ifdef CONFIG_KSU_SUSFS
++	if (susfs_is_current_proc_umounted())
++		return true;
++#endif
 +	return false;
 +}
 +EXPORT_SYMBOL(zeromount_should_skip);
