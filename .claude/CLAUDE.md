@@ -155,7 +155,7 @@ zm blk <uid>
 ### Completed (Phase A)
 | Task | What Changed |
 |------|-------------|
-| #1 Fix recursion guard | `zm_enter()`/`zm_exit()`/`zm_is_recursive()` in zeromount.h, EXPORT_PER_CPU_SYMBOL, replaced racy this_cpu_inc_return in getname_hook |
+| #1 Fix recursion guard | `zm_enter()`/`zm_exit()`/`zm_is_recursive()` in zeromount.h. **Upgraded to per-task** using `android_oem_data1` bit 0 (with `journal_info` fallback). Removed all per-CPU recursion infrastructure. |
 | #3 flush_parent() | New function: inode_lock + lookup_one_len + d_invalidate + d_drop for targeted parent dentry invalidation |
 | #5 WRITE_ONCE/READ_ONCE | zm_ino_adb/zm_ino_modules, rule->is_new data race fix |
 
@@ -188,3 +188,6 @@ zm blk <uid>
 - SUSFS kstat_redirect timing: verify redirected inode gets kstat coverage on-device
 - SUSFS sus_map timing: verify redirected library mmaps are hidden
 - Missing do_proc_readlink hook (upstream has it, we rely on d_path hook)
+
+### Known Limitations
+- ~~Per-CPU recursion guard migration risk~~ **FIXED:** Replaced per-CPU counter with per-task recursion flag using `android_oem_data1` bit 0 (with `journal_info` fallback for non-GKI kernels). Migration-proof, zero overhead, no sleeping restrictions.

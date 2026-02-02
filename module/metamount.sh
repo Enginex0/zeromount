@@ -378,6 +378,8 @@ update_module_description
 # Enable ZeroMount
 if "$LOADER" enable 2>/dev/null; then
     log_info "ZeroMount enabled"
+    "$LOADER" refresh >/dev/null 2>&1 &
+    log_debug "Refresh dispatched"
     EXIT_CODE=0
 else
     log_err "Failed to enable ZeroMount"
