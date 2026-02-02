@@ -137,5 +137,54 @@ zm blk <uid>
 - `.claude/progress.json` — Current phase
 - `.claude/features.json` — Feature status
 - `.claude/session-roundup.md` — Session summaries
+- `.claude/plans/iridescent-sniffing-cook.md` — Active cherry-pick plan
 
-**Current State:** v3.2.0 shipped, WebUI instant load via daemon cache.
+**Current State:** v3.2.0 + upstream cherry-pick in progress (Phase A complete, Phase B pending).
+
+---
+
+## Upstream Cherry-Pick Status (IN PROGRESS)
+
+**Upstream remote:** `upstream` → `https://github.com/maxsteeel/nomount.git`
+- `upstream/master` — 3 commits since fork (refresh ioctl, wildcard CLI, CI)
+- `upstream/experimental` — 10 commits (stat/statfs spoofing, workqueue, nm_enter/nm_exit, mega update c82104c)
+
+**Checkpoint commit:** `22ba297` (pre-cherry-pick state)
+**Phase A commit:** `01d55a0` (foundation safety improvements)
+
+### Completed (Phase A)
+| Task | What Changed |
+|------|-------------|
+| #1 Fix recursion guard | `zm_enter()`/`zm_exit()`/`zm_is_recursive()` in zeromount.h, EXPORT_PER_CPU_SYMBOL, replaced racy this_cpu_inc_return in getname_hook |
+| #3 flush_parent() | New function: inode_lock + lookup_one_len + d_invalidate + d_drop for targeted parent dentry invalidation |
+| #5 WRITE_ONCE/READ_ONCE | zm_ino_adb/zm_ino_modules, rule->is_new data race fix |
+
+### Pending (Phase B — next session)
+| Task | What To Do |
+|------|-----------|
+| #2 zeromount_should_skip() | Unified safety check replacing ZEROMOUNT_DISABLED(). **DO NOT use in is_uid_blocked** (SUSFS API contract). Adds: PF_KTHREAD, PF_EXITING, !current->mm, !nsproxy, PF_MEMALLOC_NOFS, in_interrupt/nmi, oops_in_progress |
+| #4 Enhance flush_dcache | Add d_drop before d_invalidate, ENOENT fallback via flush_parent, zm_enter/zm_exit wrapping (fixes latent bug: kern_path redirects and flushes wrong dentry) |
+| #6 force_refresh_all() | Safe copy-paths-then-flush pattern. **NOT upstream's list_cut_position** (has concurrency bug) |
+| #7 IOC_REFRESH ioctl | `_IO(ZEROMOUNT_IOC_MAGIC, 10)` — number 10 because 8=ENABLE, 9=DISABLE |
+| #8 metamount.sh refresh | `"$LOADER" refresh >/dev/null 2>&1 &` after zm enable |
+| #9 Validation | 2 parallel review agents (safety + correctness) |
+
+### Upstream Bugs — DO NOT IMPORT
+1. `nomount_ioctl_del_uid`: `kfree()` instead of `kfree_rcu()` (use-after-free)
+2. `nomount_resolve_path`: Returns interior RCU pointer (use-after-free)
+3. Missing `capable(CAP_SYS_ADMIN)` in ioctl dispatcher (security regression)
+4. `nomount_force_refresh_all`: `list_cut_position` removes rules from live list (breaks concurrent access)
+
+### Not Cherry-Picked (Intentional)
+- stat spoofing → SUSFS kstat_redirect covers (passes both vpath+rpath)
+- mmap metadata → SUSFS sus_map hides entries entirely
+- nm_enter/nm_exit everywhere → Only getname_hook + flush_dcache have reentry risk
+- Delayed workqueue → Our explicit zm enable is more deterministic
+- Named critical process list → PF_KTHREAD + !current->mm covers reliably
+- static_vpath no-alloc → Premature optimization without stat hooks
+
+### Detection Gaps to Investigate (Future)
+- `/proc/misc` leaks "zeromount" device entry
+- SUSFS kstat_redirect timing: verify redirected inode gets kstat coverage on-device
+- SUSFS sus_map timing: verify redirected library mmaps are hidden
+- Missing do_proc_readlink hook (upstream has it, we rely on d_path hook)
