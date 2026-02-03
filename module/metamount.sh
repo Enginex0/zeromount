@@ -182,7 +182,7 @@ is_whiteout() {
 
     # Format 2: Zero-size file with xattr (only if getfattr available)
     if [ "$HAS_GETFATTR" = "1" ] && [ -f "$path" ] && [ ! -s "$path" ]; then
-        getfattr -n trusted.overlay.whiteout "$path" 2>/dev/null | grep -q "y" && return 0
+        getfattr -n trusted.overlay.whiteout "$path" 2>/dev/null | grep -q 'trusted\.overlay\.whiteout="y"' && return 0
     fi
 
     return 1
@@ -193,7 +193,7 @@ is_opaque_dir() {
     [ -z "$path" ] && return 1
     [ ! -d "$path" ] && return 1
     [ "$HAS_GETFATTR" = "0" ] && return 1
-    getfattr -n trusted.overlay.opaque "$path" 2>/dev/null | grep -q "y"
+    getfattr -n trusted.overlay.opaque "$path" 2>/dev/null | grep -q 'trusted\.overlay\.opaque="y"'
 }
 
 is_aufs_whiteout() {
@@ -311,6 +311,13 @@ for mod_path in "$MODULES_DIR"/*; do
                             log_info "  Opaque dir: $virtual_path"
                             susfs_hide_path "$virtual_path"
                             echo "$virtual_path|opaque_dir" >> "$TRACKING_FILE"
+                        # Register new dirs so getdents injects them into parent listings (PMS discovery)
+                        elif [ ! -d "$virtual_path" ]; then
+                            $VERBOSE && log_debug "  Dir: $virtual_path"
+                            OUTPUT=$("$LOADER" add "$virtual_path" "$real_path" 2>&1)
+                            RET_CODE=$?
+                            echo "$virtual_path|dir" >> "$TRACKING_FILE"
+                            [ $RET_CODE -ne 0 ] && log_warn "Failed dir: $virtual_path ($OUTPUT)"
                         fi
                         continue
                     fi

@@ -5,7 +5,7 @@ index c34b9d4e0..8ec1f2b07 100644
 @@ -351,4 +351,11 @@ source "fs/unicode/Kconfig"
  config IO_WQ
  	bool
-
+ 
 +config ZEROMOUNT
 +	bool "ZeroMount Path Redirection Subsystem"
 +	default y
@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1044 @@
+@@ -0,0 +1,1067 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -700,6 +700,29 @@ index 000000000..43ca3f0fa
 +    *last_slash = '\0';
 +    parent_path = path_copy;
 +    name = last_slash + 1;
++
++    // Skip injection if parent dir is VFS-redirected — real readdir already covers children
++    {
++        u32 parent_hash = full_name_hash(NULL, parent_path, strlen(parent_path));
++        struct zeromount_rule *parent_rule;
++        bool parent_redirected = false;
++
++        rcu_read_lock();
++        hash_for_each_possible_rcu(zeromount_rules_ht, parent_rule, node, parent_hash) {
++            if (strcmp(parent_rule->virtual_path, parent_path) == 0 &&
++                READ_ONCE(parent_rule->is_new)) {
++                parent_redirected = true;
++                break;
++            }
++        }
++        rcu_read_unlock();
++
++        if (parent_redirected) {
++            kfree(path_copy);
++            return;
++        }
++    }
++
 +    hash = full_name_hash(NULL, parent_path, strlen(parent_path));
 +
 +    spin_lock(&zeromount_lock);
