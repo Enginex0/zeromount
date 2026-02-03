@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1067 @@
+@@ -0,0 +1,1069 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -722,6 +722,8 @@ index 000000000..43ca3f0fa
 +            return;
 +        }
 +    }
++
++    zeromount_auto_inject_parent(parent_path, DT_DIR);
 +
 +    hash = full_name_hash(NULL, parent_path, strlen(parent_path));
 +
