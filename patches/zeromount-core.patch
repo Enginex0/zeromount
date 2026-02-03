@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1069 @@
+@@ -0,0 +1,1136 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -383,6 +383,73 @@ index 000000000..43ca3f0fa
 +    return target;
 +}
 +EXPORT_SYMBOL(zeromount_resolve_path);
++
++// Resolve directory fd to absolute path for newfstatat() relative path support
++static char *zeromount_resolve_dirfd_path(int dfd, char *buf, int buflen)
++{
++    struct fd f;
++    char *path;
++
++    if (dfd == AT_FDCWD) {
++        struct path pwd;
++        if (unlikely(!current->fs))
++            return ERR_PTR(-ENOENT);
++        get_fs_pwd(current->fs, &pwd);
++        path = d_path(&pwd, buf, buflen);
++        path_put(&pwd);
++        return path;
++    }
++
++    f = fdget(dfd);
++    if (!f.file)
++        return ERR_PTR(-EBADF);
++
++    path = d_path(&f.file->f_path, buf, buflen);
++    fdput(f);
++    return path;
++}
++
++char *zeromount_build_absolute_path(int dfd, const char *name)
++{
++    char *page_buf, *dir_path, *abs_path;
++    size_t dir_len, name_len;
++
++    if (!name || name[0] == '/' || *name == '\0')
++        return NULL;
++
++    if (zeromount_should_skip() || zeromount_is_uid_blocked(current_uid().val))
++        return NULL;
++
++    page_buf = __getname();
++    if (!page_buf)
++        return NULL;
++
++    dir_path = zeromount_resolve_dirfd_path(dfd, page_buf, PATH_MAX);
++    if (IS_ERR(dir_path)) {
++        __putname(page_buf);
++        return NULL;
++    }
++
++    dir_len = strlen(dir_path);
++    name_len = strlen(name);
++
++    if (dir_len > PATH_MAX || name_len > NAME_MAX ||
++        dir_len + name_len + 2 > PATH_MAX) {
++        __putname(page_buf);
++        return NULL;
++    }
++
++    abs_path = kmalloc(dir_len + 1 + name_len + 1, GFP_KERNEL);
++    if (abs_path) {
++        memcpy(abs_path, dir_path, dir_len);
++        abs_path[dir_len] = '/';
++        memcpy(abs_path + dir_len + 1, name, name_len + 1);
++    }
++
++    __putname(page_buf);
++    return abs_path;
++}
++EXPORT_SYMBOL(zeromount_build_absolute_path);
 +
 +struct filename *zeromount_getname_hook(struct filename *name)
 +{
@@ -1103,7 +1170,7 @@ new file mode 100644
 index 000000000..9e0fb1b21
 --- /dev/null
 +++ b/include/linux/zeromount.h
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,160 @@
 +#ifndef _LINUX_ZEROMOUNT_H
 +#define _LINUX_ZEROMOUNT_H
 +
@@ -1236,6 +1303,7 @@ index 000000000..9e0fb1b21
 +
 +bool zeromount_should_skip(void);
 +char *zeromount_resolve_path(const char *pathname);
++char *zeromount_build_absolute_path(int dfd, const char *name);
 +struct filename *zeromount_getname_hook(struct filename *name);
 +void zeromount_inject_dents64(struct file *file, void __user **dirent, int *count, loff_t *pos);
 +void zeromount_inject_dents(struct file *file, void __user **dirent, int *count, loff_t *pos);
@@ -1249,6 +1317,7 @@ index 000000000..9e0fb1b21
 +#else
 +static inline bool zeromount_should_skip(void) { return true; }
 +static inline char *zeromount_resolve_path(const char *p) { return NULL; }
++static inline char *zeromount_build_absolute_path(int dfd, const char *name) { return NULL; }
 +static inline struct filename *zeromount_getname_hook(struct filename *name) { return name; }
 +static inline void zeromount_inject_dents64(struct file *f, void __user **d, int *c, loff_t *p) {}
 +static inline void zeromount_inject_dents(struct file *f, void __user **d, int *c, loff_t *p) {}
