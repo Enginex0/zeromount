@@ -46,7 +46,7 @@ echo "  [2/2] Injecting hook into vfs_statx..."
 # Add forward declaration and inline hook function before vfs_statx
 sed -i '/^static int vfs_statx(/i\
 #ifdef CONFIG_ZEROMOUNT\
-/* ZeroMount stat hook for relative path intercept */, \
+/* ZeroMount stat hook for relative path intercept */\
 static inline int zeromount_stat_hook(int dfd, const char __user *filename, \
                                       struct kstat *stat, unsigned int request_mask, \
                                       unsigned int flags) {\
