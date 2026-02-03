@@ -144,13 +144,8 @@ jobs:
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         echo "=== Aligning KernelSU-Next SUSFS API with custom fork ==="
-        SUPERCALLS_FILE="$KERNEL_ROOT/KernelSU-Next/kernel/supercalls.c"
-        if [ -f "$SUPERCALLS_FILE" ]; then
-          sed -i 's/CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS/CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS/g' "$SUPERCALLS_FILE"
-          echo "CMD constant alignment applied to supercalls.c"
-        else
-          echo "WARNING: supercalls.c not found at $SUPERCALLS_FILE"
-        fi
+        # KernelSU-Next uses CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS which is already defined in susfs_def.h
+        echo "SUSFS API constants already aligned"
 
         KSUD_FILE="$KERNEL_ROOT/KernelSU-Next/kernel/ksud.c"
         if [ -f "$KSUD_FILE" ]; then
