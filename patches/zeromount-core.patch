@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1136 @@
+@@ -0,0 +1,1138 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -49,6 +49,8 @@ index 000000000..43ca3f0fa
 +#include <linux/kobject.h>
 +#include <linux/sysfs.h>
 +#include <linux/statfs.h>
++#include <linux/file.h>
++#include <linux/fs_struct.h>
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/susfs.h>
 +#endif
