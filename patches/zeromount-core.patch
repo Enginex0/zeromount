@@ -536,6 +536,16 @@ index 000000000..43ca3f0fa
 +        return;
 +    }
 +
++    // Skip injection if this directory is itself redirected (real readdir has all files)
++    {
++        char *resolved = zeromount_resolve_path(dir_path);
++        if (resolved) {
++            kfree(resolved);
++            __putname(page_buf);
++            return;
++        }
++    }
++
 +    if (*pos >= ZEROMOUNT_MAGIC_POS) {
 +        v_index = *pos - ZEROMOUNT_MAGIC_POS;
 +    } else {
@@ -592,6 +602,16 @@ index 000000000..43ca3f0fa
 +    if (IS_ERR(dir_path)) {
 +        __putname(page_buf);
 +        return;
++    }
++
++    // Skip injection if this directory is itself redirected (real readdir has all files)
++    {
++        char *resolved = zeromount_resolve_path(dir_path);
++        if (resolved) {
++            kfree(resolved);
++            __putname(page_buf);
++            return;
++        }
 +    }
 +
 +    if (*pos >= ZEROMOUNT_MAGIC_POS) {
