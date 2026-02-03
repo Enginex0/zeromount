@@ -5,7 +5,7 @@ index c34b9d4e0..8ec1f2b07 100644
 @@ -351,4 +351,11 @@ source "fs/unicode/Kconfig"
  config IO_WQ
  	bool
-
+ 
 +config ZEROMOUNT
 +	bool "ZeroMount Path Redirection Subsystem"
 +	default y
@@ -23,121 +23,12 @@ index c7851875b..0376a2a25 100644
  obj-$(CONFIG_VBOXSF_FS)		+= vboxsf/
  obj-$(CONFIG_ZONEFS_FS)		+= zonefs/
 +obj-$(CONFIG_ZEROMOUNT) += zeromount.o
-diff --git a/fs/d_path.c b/fs/d_path.c
-index a69e2cd36..8d52e7b00 100644
---- a/fs/d_path.c
-+++ b/fs/d_path.c
-@@ -8,6 +8,10 @@
- #include <linux/prefetch.h>
- #include "mount.h"
-
-+#ifdef CONFIG_ZEROMOUNT
-+#include <linux/zeromount.h>
-+#endif
-+
- static int prepend(char **buffer, int *buflen, const char *str, int namelen)
- {
- 	*buflen -= namelen;
-@@ -265,6 +269,26 @@ char *d_path(const struct path *path, char *buf, int buflen)
- 	struct path root;
- 	int error;
-
-+#ifdef CONFIG_ZEROMOUNT
-+    if (path->dentry && d_backing_inode(path->dentry)) {
-+        char *v_path = zeromount_get_virtual_path_for_inode(d_backing_inode(path->dentry));
-+
-+        if (v_path) {
-+            int len = strlen(v_path);
-+            if (buflen < len + 1) {
-+                kfree(v_path);
-+                return ERR_PTR(-ENAMETOOLONG);
-+            }
-+            *--res = '\0';
-+            res -= len;
-+            memcpy(res, v_path, len);
-+
-+            kfree(v_path);
-+            return res;
-+        }
-+    }
-+#endif
-+
- 	/*
- 	 * We have various synthetic filesystems that never get mounted.  On
- 	 * these filesystems dentries are never used for lookup purposes, and
-diff --git a/fs/namei.c b/fs/namei.c
-index 40e10b159..37b6954fc 100644
---- a/fs/namei.c
-+++ b/fs/namei.c
-@@ -43,6 +43,10 @@
- #include "internal.h"
- #include "mount.h"
-
-+#ifdef CONFIG_ZEROMOUNT
-+#include <linux/zeromount.h>
-+#endif
-+
- #define CREATE_TRACE_POINTS
- #include <trace/events/namei.h>
-
-@@ -203,6 +207,13 @@ getname_flags(const char __user *filename, int flags, int *empty)
- 	result->uptr = filename;
- 	result->aname = NULL;
- 	audit_getname(result);
-+
-+#ifdef CONFIG_ZEROMOUNT
-+	if (!IS_ERR(result)) {
-+		result = zeromount_getname_hook(result);
-+	}
-+#endif
-+
- 	return result;
- }
-
-@@ -350,6 +361,18 @@ int generic_permission(struct inode *inode, int mask)
- {
- 	int ret;
-
-+#ifdef CONFIG_ZEROMOUNT
-+    if (zeromount_is_injected_file(inode)) {
-+        if (mask & MAY_WRITE)
-+            return -EACCES;
-+        return 0;
-+    }
-+
-+    if (S_ISDIR(inode->i_mode) && zeromount_is_traversal_allowed(inode, mask)) {
-+        return 0;
-+    }
-+#endif
-+
- 	/*
- 	 * Do the basic permission checks.
- 	 */
-@@ -443,6 +464,18 @@ int inode_permission(struct inode *inode, int mask)
- {
- 	int retval;
-
-+#ifdef CONFIG_ZEROMOUNT
-+    if (zeromount_is_injected_file(inode)) {
-+        if (mask & MAY_WRITE)
-+            return -EACCES;
-+        return 0;
-+    }
-+
-+    if (S_ISDIR(inode->i_mode) && zeromount_is_traversal_allowed(inode, mask)) {
-+        return 0;
-+    }
-+#endif
-+
- 	retval = sb_permission(inode->i_sb, inode, mask);
- 	if (retval)
- 		return retval;
 diff --git a/fs/zeromount.c b/fs/zeromount.c
 new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1013 @@
+@@ -0,0 +1,1067 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -157,6 +48,7 @@ index 000000000..43ca3f0fa
 +#include <linux/zeromount.h>
 +#include <linux/kobject.h>
 +#include <linux/sysfs.h>
++#include <linux/statfs.h>
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/susfs.h>
 +#endif
@@ -464,16 +356,22 @@ index 000000000..43ca3f0fa
 +{
 +    struct zeromount_rule *rule;
 +    char *target = NULL;
++    char *normalized;
 +    u32 hash;
 +
 +    if (zeromount_is_critical_process())
 +        return NULL;
 +    if (ZEROMOUNT_DISABLED() || zeromount_is_uid_blocked(current_uid().val) || !pathname) return NULL;
-+    hash = full_name_hash(NULL, pathname, strlen(pathname));
++
++    // Must normalize before hashing — rules are stored under normalized keys
++    normalized = zeromount_normalize_path(pathname);
++    if (!normalized) return NULL;
++
++    hash = full_name_hash(NULL, normalized, strlen(normalized));
 +
 +    rcu_read_lock();
 +    hash_for_each_possible_rcu(zeromount_rules_ht, rule, node, hash) {
-+        if (zeromount_match_path(pathname, rule->virtual_path)) {
++        if (zeromount_match_path(normalized, rule->virtual_path)) {
 +            if (rule->flags & ZM_FLAG_ACTIVE) {
 +                target = kstrdup(rule->real_path, GFP_ATOMIC);
 +                break;
@@ -481,6 +379,7 @@ index 000000000..43ca3f0fa
 +        }
 +    }
 +    rcu_read_unlock();
++    kfree(normalized);
 +    return target;
 +}
 +EXPORT_SYMBOL(zeromount_resolve_path);
@@ -518,12 +417,17 @@ index 000000000..43ca3f0fa
 +{
 +    struct zeromount_dir_node *node;
 +    struct zeromount_child_name *child;
++    char *normalized;
 +    bool found = false;
 +    int bkt;
 +
++    // d_path() returns canonical paths; stored dir_paths are normalized
++    normalized = zeromount_normalize_path(dir_path);
++    if (!normalized) return false;
++
 +    rcu_read_lock();
 +    hash_for_each_rcu(zeromount_dirs_ht, bkt, node, node) {
-+        if (strcmp(dir_path, node->dir_path) == 0) {
++        if (strcmp(normalized, node->dir_path) == 0) {
 +            unsigned long current_idx = 0;
 +            list_for_each_entry_rcu(child, &node->children_names, list) {
 +                if (current_idx == v_index) {
@@ -538,6 +442,7 @@ index 000000000..43ca3f0fa
 +        if (found) break;
 +    }
 +    rcu_read_unlock();
++    kfree(normalized);
 +    return found;
 +}
 +
@@ -699,20 +604,21 @@ index 000000000..43ca3f0fa
 +	if (!vpath)
 +		return NULL;
 +
-+	if (strncmp(vpath, "/system/lib", 11) == 0 ||
-+	    strncmp(vpath, "/system/lib64", 13) == 0)
++	// Paths are normalized: /system/lib -> /lib, /system/bin -> /bin, etc.
++	if (strncmp(vpath, "/lib64", 6) == 0 ||
++	    strncmp(vpath, "/lib", 4) == 0)
 +		return "u:object_r:system_lib_file:s0";
 +
-+	if (strncmp(vpath, "/system/bin", 11) == 0)
++	if (strncmp(vpath, "/bin", 4) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/fonts", 13) == 0)
++	if (strncmp(vpath, "/fonts", 6) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/framework", 17) == 0)
++	if (strncmp(vpath, "/framework", 10) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/etc", 11) == 0)
++	if (strncmp(vpath, "/etc", 4) == 0)
 +		return "u:object_r:system_file:s0";
 +
 +	if (strncmp(vpath, "/vendor", 7) == 0)
@@ -721,7 +627,8 @@ index 000000000..43ca3f0fa
 +	if (strncmp(vpath, "/product", 8) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system", 7) == 0)
++	// Catch-all for other normalized system paths (/app, /priv-app, etc.)
++	if (vpath[0] == '/')
 +		return "u:object_r:system_file:s0";
 +
 +	return NULL;
@@ -793,6 +700,29 @@ index 000000000..43ca3f0fa
 +    *last_slash = '\0';
 +    parent_path = path_copy;
 +    name = last_slash + 1;
++
++    // Skip injection if parent dir is VFS-redirected — real readdir already covers children
++    {
++        u32 parent_hash = full_name_hash(NULL, parent_path, strlen(parent_path));
++        struct zeromount_rule *parent_rule;
++        bool parent_redirected = false;
++
++        rcu_read_lock();
++        hash_for_each_possible_rcu(zeromount_rules_ht, parent_rule, node, parent_hash) {
++            if (strcmp(parent_rule->virtual_path, parent_path) == 0 &&
++                READ_ONCE(parent_rule->is_new)) {
++                parent_redirected = true;
++                break;
++            }
++        }
++        rcu_read_unlock();
++
++        if (parent_redirected) {
++            kfree(path_copy);
++            return;
++        }
++    }
++
 +    hash = full_name_hash(NULL, parent_path, strlen(parent_path));
 +
 +    spin_lock(&zeromount_lock);
@@ -915,15 +845,19 @@ index 000000000..43ca3f0fa
 +    struct zeromount_ioctl_data data;
 +    struct zeromount_rule *rule = NULL;
 +    struct hlist_node *tmp;
-+    char *v_path;
++    char *v_path_raw, *v_path;
 +    int bkt;
 +    bool found = false;
 +
 +    if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
 +        return -EFAULT;
 +
-+    v_path = strndup_user(data.virtual_path, PATH_MAX);
-+    if (IS_ERR(v_path)) return PTR_ERR(v_path);
++    v_path_raw = strndup_user(data.virtual_path, PATH_MAX);
++    if (IS_ERR(v_path_raw)) return PTR_ERR(v_path_raw);
++
++    v_path = zeromount_normalize_path(v_path_raw);
++    kfree(v_path_raw);
++    if (!v_path) return -ENOMEM;
 +
 +    spin_lock(&zeromount_lock);
 +    hash_for_each_safe(zeromount_rules_ht, bkt, tmp, rule, node) {
@@ -1124,7 +1058,7 @@ index 000000000..43ca3f0fa
 +static struct attribute_group zeromount_attr_group = {
 +    .attrs = zeromount_attrs,
 +};
-
++
 +static int zeromount_dev_open(struct inode *inode, struct file *file)
 +{
 +    if (!uid_eq(current_euid(), GLOBAL_ROOT_UID))
@@ -1145,194 +1079,23 @@ index 000000000..43ca3f0fa
 +    .minor = MISC_DYNAMIC_MINOR, .name = "zeromount", .fops = &zeromount_fops, .mode = 0600,
 +};
 +
-+static int __init zeromount_init(void) {
++static int __init __used zeromount_init(void) {
 +    int ret;
 +    spin_lock_init(&zeromount_lock);
 +    ret = misc_register(&zeromount_device);
 +    if (ret) return ret;
 +
 +    zeromount_kobj = kobject_create_and_add("zeromount", kernel_kobj);
-+    if (zeromount_kobj)
-+        sysfs_create_group(zeromount_kobj, &zeromount_attr_group);
++    if (zeromount_kobj) {
++        ret = sysfs_create_group(zeromount_kobj, &zeromount_attr_group);
++        if (ret)
++            pr_warn("ZeroMount: sysfs group creation failed: %d\n", ret);
++    }
 +
 +    ZM_INFO("Loaded (debug=%d)\n", zeromount_debug_level);
 +    return 0;
 +}
 +fs_initcall(zeromount_init);
-diff --git a/fs/readdir.c b/fs/readdir.c
-index 09e8ed7d4..dd3c6869c 100644
---- a/fs/readdir.c
-+++ b/fs/readdir.c
-@@ -21,6 +21,9 @@
- #include <linux/unistd.h>
- #include <linux/compat.h>
- #include <linux/uaccess.h>
-+#ifdef CONFIG_ZEROMOUNT
-+#include <linux/zeromount.h>
-+#endif
-
- #include <asm/unaligned.h>
-
-@@ -278,14 +281,33 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
- 		.current_dir = dirent
- 	};
- 	int error;
-+#ifdef CONFIG_ZEROMOUNT
-+	int initial_count = count;
-+#endif
-
- 	f = fdget_pos(fd);
- 	if (!f.file)
- 		return -EBADF;
-
-+#ifdef CONFIG_ZEROMOUNT
-+	if (f.file->f_pos >= ZEROMOUNT_MAGIC_POS) {
-+		error = 0;
-+		goto skip_real_iterate;
-+	}
-+#endif
-+
- 	error = iterate_dir(f.file, &buf.ctx);
- 	if (error >= 0)
- 		error = buf.error;
-+
-+#ifdef CONFIG_ZEROMOUNT
-+skip_real_iterate:
-+	if (error >= 0 && !signal_pending(current)) {
-+		zeromount_inject_dents64(f.file, (void __user **)&dirent, &count, &f.file->f_pos);
-+		error = initial_count - count;
-+	}
-+#endif
-+
- 	if (buf.prev_reclen) {
- 		struct linux_dirent __user * lastdirent;
- 		lastdirent = (void __user *)buf.current_dir - buf.prev_reclen;
-@@ -361,14 +383,33 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
- 		.current_dir = dirent
- 	};
- 	int error;
-+#ifdef CONFIG_ZEROMOUNT
-+	int initial_count = count;
-+#endif
-
- 	f = fdget_pos(fd);
- 	if (!f.file)
- 		return -EBADF;
-
-+#ifdef CONFIG_ZEROMOUNT
-+	if (f.file->f_pos >= ZEROMOUNT_MAGIC_POS) {
-+		error = 0;
-+		goto skip_real_iterate;
-+	}
-+#endif
-+
- 	error = iterate_dir(f.file, &buf.ctx);
- 	if (error >= 0)
- 		error = buf.error;
-+
-+#ifdef CONFIG_ZEROMOUNT
-+skip_real_iterate:
-+	if (error >= 0 && !signal_pending(current)) {
-+		zeromount_inject_dents64(f.file, (void __user **)&dirent, &count, &f.file->f_pos);
-+		error = initial_count - count;
-+	}
-+#endif
-+
- 	if (buf.prev_reclen) {
- 		struct linux_dirent64 __user * lastdirent;
- 		typeof(lastdirent->d_off) d_off = buf.ctx.pos;
-@@ -529,14 +570,33 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
- 		.count = count
- 	};
- 	int error;
-+#ifdef CONFIG_ZEROMOUNT
-+	int initial_count = count;
-+#endif
-
- 	f = fdget_pos(fd);
- 	if (!f.file)
- 		return -EBADF;
-
-+#ifdef CONFIG_ZEROMOUNT
-+	if (f.file->f_pos >= ZEROMOUNT_MAGIC_POS) {
-+		error = 0;
-+		goto skip_real_iterate;
-+	}
-+#endif
-+
- 	error = iterate_dir(f.file, &buf.ctx);
- 	if (error >= 0)
- 		error = buf.error;
-+
-+#ifdef CONFIG_ZEROMOUNT
-+skip_real_iterate:
-+	if (error >= 0 && !signal_pending(current)) {
-+		zeromount_inject_dents(f.file, (void __user **)&dirent, &count, &f.file->f_pos);
-+		error = initial_count - count;
-+	}
-+#endif
-+
- 	if (buf.prev_reclen) {
- 		struct compat_linux_dirent __user * lastdirent;
- 		lastdirent = (void __user *)buf.current_dir - buf.prev_reclen;
-diff --git a/fs/statfs.c b/fs/statfs.c
-index 3b51042793..f8c92a1b87 100644
---- a/fs/statfs.c
-+++ b/fs/statfs.c
-@@ -12,6 +12,10 @@
- #include <linux/compat.h>
- #include "internal.h"
-
-+#ifdef CONFIG_ZEROMOUNT
-+#include <linux/zeromount.h>
-+#endif
-+
- static int flags_by_mnt(int mnt_flags)
- {
- 	int flags = 0;
-@@ -89,6 +93,14 @@ int user_statfs(const char __user *pathname, struct kstatfs *st)
- retry:
- 	error = user_path_at(AT_FDCWD, pathname, lookup_flags, &path);
- 	if (!error) {
-+#ifdef CONFIG_ZEROMOUNT
-+		int spoofed;
-+#endif
- 		error = vfs_statfs(&path, st);
-+#ifdef CONFIG_ZEROMOUNT
-+		spoofed = zeromount_spoof_statfs(pathname, st);
-+		(void)spoofed;
-+#endif
- 		path_put(&path);
- 		if (retry_estale(error, lookup_flags)) {
- 			lookup_flags |= LOOKUP_REVAL;
-diff --git a/fs/xattr.c b/fs/xattr.c
-index 5c8c5765db..e2b7f8c9a1 100644
---- a/fs/xattr.c
-+++ b/fs/xattr.c
-@@ -21,6 +21,10 @@
-
- #include <linux/uaccess.h>
-
-+#ifdef CONFIG_ZEROMOUNT
-+#include <linux/zeromount.h>
-+#endif
-+
- static const char *
- strcmp_prefix(const char *a, const char *a_prefix)
- {
-@@ -403,6 +407,12 @@ EXPORT_SYMBOL_GPL(vfs_removexattr);
- ssize_t
- vfs_getxattr(struct dentry *dentry, const char *name, void *value, size_t size)
- {
-+#ifdef CONFIG_ZEROMOUNT
-+	ssize_t zm_ret;
-+	zm_ret = zeromount_spoof_xattr(dentry, name, value, size);
-+	if (zm_ret != -EOPNOTSUPP)
-+		return zm_ret;
-+#endif
- 	return __vfs_getxattr(dentry, dentry->d_inode, name, value, size, 0);
- }
- EXPORT_SYMBOL_NS_GPL(vfs_getxattr, ANDROID_GKI_VFS_EXPORT_ONLY);
 diff --git a/include/linux/zeromount.h b/include/linux/zeromount.h
 new file mode 100644
 index 000000000..9e0fb1b21
