@@ -43,42 +43,58 @@ sed -i '/#include <linux\/uaccess.h>/a\
 
 echo "  [2/2] Injecting hook into vfs_statx..."
 
-# Use awk to inject the hook after the opening brace and variable declarations of vfs_statx
+# Add forward declaration and inline hook function before vfs_statx
+sed -i '/^static int vfs_statx(/i\
+#ifdef CONFIG_ZEROMOUNT\
+/* ZeroMount stat hook for relative path intercept */, \
+static inline int zeromount_stat_hook(int dfd, const char __user *filename, \
+                                      struct kstat *stat, unsigned int request_mask, \
+                                      unsigned int flags) {\
+    if (filename) {\
+        char kname[NAME_MAX + 1];\
+        long copied = strncpy_from_user(kname, filename, sizeof(kname));\
+        if (copied > 0 && kname[0] != '"'"'/'"'"') {\
+            char *abs_path = zeromount_build_absolute_path(dfd, kname);\
+            if (abs_path) {\
+                char *resolved = zeromount_resolve_path(abs_path);\
+                if (resolved) {\
+                    struct path zm_path;\
+                    int zm_ret = kern_path(resolved, (flags & AT_SYMLINK_NOFOLLOW) ? 0 : LOOKUP_FOLLOW, &zm_path);\
+                    kfree(resolved);\
+                    kfree(abs_path);\
+                    if (zm_ret == 0) {\
+                        zm_ret = vfs_getattr(&zm_path, stat, request_mask,\
+                                             (flags & AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0);\
+                        path_put(&zm_path);\
+                        return zm_ret;\
+                    }\
+                } else {\
+                    kfree(abs_path);\
+                }\
+            }\
+        }\
+    }\
+    return -ENOENT;\
+}\
+#endif' "$STAT_FILE"
+
+# Also inject the call into vfs_statx after variable declarations
 awk '
 BEGIN { state = 0; injected = 0 }
 
 # Match start of vfs_statx function
 /^static int vfs_statx\(/ { state = 1 }
 
-# Once inside vfs_statx, look for "int error;" line to inject after declarations
+# Once inside vfs_statx, look for "int error;" line to inject call
 state == 1 && /^[[:space:]]*int error;/ && !injected {
     print
     print ""
     print "#ifdef CONFIG_ZEROMOUNT"
-    print "\t/* ZeroMount: Intercept relative paths for injected directories */"
-    print "\tif (filename) {"
-    print "\t\tchar kname[NAME_MAX + 1];"
-    print "\t\tlong copied = strncpy_from_user(kname, filename, sizeof(kname));"
-    print "\t\tif (copied > 0 && kname[0] != '"'"'/'"'"') {"
-    print "\t\t\tchar *abs_path = zeromount_build_absolute_path(dfd, kname);"
-    print "\t\t\tif (abs_path) {"
-    print "\t\t\t\tchar *resolved = zeromount_resolve_path(abs_path);"
-    print "\t\t\t\tif (resolved) {"
-    print "\t\t\t\t\tstruct path zm_path;"
-    print "\t\t\t\t\tint zm_ret = kern_path(resolved, (flags & AT_SYMLINK_NOFOLLOW) ? 0 : LOOKUP_FOLLOW, &zm_path);"
-    print "\t\t\t\t\tkfree(resolved);"
-    print "\t\t\t\t\tkfree(abs_path);"
-    print "\t\t\t\t\tif (zm_ret == 0) {"
-    print "\t\t\t\t\t\tzm_ret = vfs_getattr(&zm_path, stat, request_mask,"
-    print "\t\t\t\t\t\t\t\t(flags & AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0);"
-    print "\t\t\t\t\t\tpath_put(&zm_path);"
-    print "\t\t\t\t\t\treturn zm_ret;"
-    print "\t\t\t\t\t}"
-    print "\t\t\t\t} else {"
-    print "\t\t\t\t\tkfree(abs_path);"
-    print "\t\t\t\t}"
-    print "\t\t\t}"
-    print "\t\t}"
+    print "\t/* Try ZeroMount hook for relative paths */"
+    print "\tif (filename && dfd != AT_FDCWD) {"
+    print "\t\tint zm_ret = zeromount_stat_hook(dfd, filename, stat, request_mask, flags);"
+    print "\t\tif (zm_ret != -ENOENT)"
+    print "\t\t\treturn zm_ret;"
     print "\t}"
     print "#endif"
     print ""
@@ -119,6 +135,13 @@ else
     echo "  [OK] zeromount.h include"
 fi
 
+if ! grep -q 'zeromount_stat_hook' "$STAT_FILE"; then
+    echo "  [FAIL] zeromount_stat_hook function not found"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  [OK] zeromount_stat_hook function"
+fi
+
 if ! grep -q 'zeromount_build_absolute_path' "$STAT_FILE"; then
     echo "  [FAIL] zeromount_build_absolute_path call not found"
     ERRORS=$((ERRORS + 1))
@@ -131,13 +154,6 @@ if ! grep -q 'zeromount_resolve_path' "$STAT_FILE"; then
     ERRORS=$((ERRORS + 1))
 else
     echo "  [OK] zeromount_resolve_path call"
-fi
-
-if ! grep -q 'zm_path' "$STAT_FILE"; then
-    echo "  [FAIL] zm_path variable not found"
-    ERRORS=$((ERRORS + 1))
-else
-    echo "  [OK] zm_path variable"
 fi
 
 echo ""
