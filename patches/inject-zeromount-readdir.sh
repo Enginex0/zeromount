@@ -77,11 +77,22 @@ state == 1 && /error = buf\.error;/ && !inject_done {
     print "#ifdef CONFIG_ZEROMOUNT"
     print "skip_real_iterate:"
     print "\tif (error >= 0 && !signal_pending(current)) {"
-    print "\t\tzeromount_inject_dents64(f.file, (void __user **)&dirent, &count, &f.file->f_pos);"
+    print "\t\tzeromount_inject_dents(f.file, (void __user **)&dirent, &count, &f.file->f_pos);"
     print "\t\terror = initial_count - count;"
+    print "\t\tgoto zm_out;"
     print "\t}"
     print "#endif"
     inject_done = 1
+    next
+}
+
+# Place label before fdput_pos so zeromount can skip the original epilogue
+state == 1 && /fdput_pos\(f\);/ && !out_done {
+    print "#ifdef CONFIG_ZEROMOUNT"
+    print "zm_out:"
+    print "#endif"
+    print
+    out_done = 1
     next
 }
 
@@ -126,9 +137,19 @@ state == 1 && /error = buf\.error;/ && !inject_done {
     print "\tif (error >= 0 && !signal_pending(current)) {"
     print "\t\tzeromount_inject_dents64(f.file, (void __user **)&dirent, &count, &f.file->f_pos);"
     print "\t\terror = initial_count - count;"
+    print "\t\tgoto zm_out;"
     print "\t}"
     print "#endif"
     inject_done = 1
+    next
+}
+
+state == 1 && /fdput_pos\(f\);/ && !out_done {
+    print "#ifdef CONFIG_ZEROMOUNT"
+    print "zm_out:"
+    print "#endif"
+    print
+    out_done = 1
     next
 }
 
@@ -172,9 +193,19 @@ state == 1 && /error = buf\.error;/ && !inject_done {
     print "\tif (error >= 0 && !signal_pending(current)) {"
     print "\t\tzeromount_inject_dents(f.file, (void __user **)&dirent, &count, &f.file->f_pos);"
     print "\t\terror = initial_count - count;"
+    print "\t\tgoto zm_out;"
     print "\t}"
     print "#endif"
     inject_done = 1
+    next
+}
+
+state == 1 && /fdput_pos\(f\);/ && !out_done {
+    print "#ifdef CONFIG_ZEROMOUNT"
+    print "zm_out:"
+    print "#endif"
+    print
+    out_done = 1
     next
 }
 
@@ -210,19 +241,19 @@ else
 fi
 
 INJECT64=$(grep -c 'zeromount_inject_dents64' "$READDIR_FILE" || true)
-if [ "$INJECT64" -ne 2 ]; then
-    echo "  [FAIL] Expected 2 zeromount_inject_dents64 calls, found $INJECT64"
+if [ "$INJECT64" -ne 1 ]; then
+    echo "  [FAIL] Expected 1 zeromount_inject_dents64 call, found $INJECT64"
     ERRORS=$((ERRORS + 1))
 else
-    echo "  [OK] 2 zeromount_inject_dents64 calls"
+    echo "  [OK] 1 zeromount_inject_dents64 call"
 fi
 
 INJECT32=$(grep -c 'zeromount_inject_dents(' "$READDIR_FILE" || true)
-if [ "$INJECT32" -ne 1 ]; then
-    echo "  [FAIL] Expected 1 zeromount_inject_dents call, found $INJECT32"
+if [ "$INJECT32" -ne 2 ]; then
+    echo "  [FAIL] Expected 2 zeromount_inject_dents calls, found $INJECT32"
     ERRORS=$((ERRORS + 1))
 else
-    echo "  [OK] 1 zeromount_inject_dents call"
+    echo "  [OK] 2 zeromount_inject_dents calls"
 fi
 
 MAGIC_POS=$(grep -c 'ZEROMOUNT_MAGIC_POS' "$READDIR_FILE" || true)
@@ -231,6 +262,14 @@ if [ "$MAGIC_POS" -ne 3 ]; then
     ERRORS=$((ERRORS + 1))
 else
     echo "  [OK] 3 ZEROMOUNT_MAGIC_POS checks"
+fi
+
+ZM_OUT_LABELS=$(grep -c '^zm_out:' "$READDIR_FILE" || true)
+if [ "$ZM_OUT_LABELS" -ne 3 ]; then
+    echo "  [FAIL] Expected 3 zm_out labels, found $ZM_OUT_LABELS"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  [OK] 3 zm_out labels"
 fi
 
 echo ""

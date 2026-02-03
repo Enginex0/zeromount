@@ -28,7 +28,7 @@ new file mode 100644
 index 000000000..43ca3f0fa
 --- /dev/null
 +++ b/fs/zeromount.c
-@@ -0,0 +1,1018 @@
+@@ -0,0 +1,1044 @@
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/init.h>
@@ -356,16 +356,22 @@ index 000000000..43ca3f0fa
 +{
 +    struct zeromount_rule *rule;
 +    char *target = NULL;
++    char *normalized;
 +    u32 hash;
 +
 +    if (zeromount_is_critical_process())
 +        return NULL;
 +    if (ZEROMOUNT_DISABLED() || zeromount_is_uid_blocked(current_uid().val) || !pathname) return NULL;
-+    hash = full_name_hash(NULL, pathname, strlen(pathname));
++
++    // Must normalize before hashing — rules are stored under normalized keys
++    normalized = zeromount_normalize_path(pathname);
++    if (!normalized) return NULL;
++
++    hash = full_name_hash(NULL, normalized, strlen(normalized));
 +
 +    rcu_read_lock();
 +    hash_for_each_possible_rcu(zeromount_rules_ht, rule, node, hash) {
-+        if (zeromount_match_path(pathname, rule->virtual_path)) {
++        if (zeromount_match_path(normalized, rule->virtual_path)) {
 +            if (rule->flags & ZM_FLAG_ACTIVE) {
 +                target = kstrdup(rule->real_path, GFP_ATOMIC);
 +                break;
@@ -373,6 +379,7 @@ index 000000000..43ca3f0fa
 +        }
 +    }
 +    rcu_read_unlock();
++    kfree(normalized);
 +    return target;
 +}
 +EXPORT_SYMBOL(zeromount_resolve_path);
@@ -410,12 +417,17 @@ index 000000000..43ca3f0fa
 +{
 +    struct zeromount_dir_node *node;
 +    struct zeromount_child_name *child;
++    char *normalized;
 +    bool found = false;
 +    int bkt;
 +
++    // d_path() returns canonical paths; stored dir_paths are normalized
++    normalized = zeromount_normalize_path(dir_path);
++    if (!normalized) return false;
++
 +    rcu_read_lock();
 +    hash_for_each_rcu(zeromount_dirs_ht, bkt, node, node) {
-+        if (strcmp(dir_path, node->dir_path) == 0) {
++        if (strcmp(normalized, node->dir_path) == 0) {
 +            unsigned long current_idx = 0;
 +            list_for_each_entry_rcu(child, &node->children_names, list) {
 +                if (current_idx == v_index) {
@@ -430,6 +442,7 @@ index 000000000..43ca3f0fa
 +        if (found) break;
 +    }
 +    rcu_read_unlock();
++    kfree(normalized);
 +    return found;
 +}
 +
@@ -591,20 +604,21 @@ index 000000000..43ca3f0fa
 +	if (!vpath)
 +		return NULL;
 +
-+	if (strncmp(vpath, "/system/lib", 11) == 0 ||
-+	    strncmp(vpath, "/system/lib64", 13) == 0)
++	// Paths are normalized: /system/lib -> /lib, /system/bin -> /bin, etc.
++	if (strncmp(vpath, "/lib64", 6) == 0 ||
++	    strncmp(vpath, "/lib", 4) == 0)
 +		return "u:object_r:system_lib_file:s0";
 +
-+	if (strncmp(vpath, "/system/bin", 11) == 0)
++	if (strncmp(vpath, "/bin", 4) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/fonts", 13) == 0)
++	if (strncmp(vpath, "/fonts", 6) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/framework", 17) == 0)
++	if (strncmp(vpath, "/framework", 10) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system/etc", 11) == 0)
++	if (strncmp(vpath, "/etc", 4) == 0)
 +		return "u:object_r:system_file:s0";
 +
 +	if (strncmp(vpath, "/vendor", 7) == 0)
@@ -613,7 +627,8 @@ index 000000000..43ca3f0fa
 +	if (strncmp(vpath, "/product", 8) == 0)
 +		return "u:object_r:system_file:s0";
 +
-+	if (strncmp(vpath, "/system", 7) == 0)
++	// Catch-all for other normalized system paths (/app, /priv-app, etc.)
++	if (vpath[0] == '/')
 +		return "u:object_r:system_file:s0";
 +
 +	return NULL;
@@ -807,15 +822,19 @@ index 000000000..43ca3f0fa
 +    struct zeromount_ioctl_data data;
 +    struct zeromount_rule *rule = NULL;
 +    struct hlist_node *tmp;
-+    char *v_path;
++    char *v_path_raw, *v_path;
 +    int bkt;
 +    bool found = false;
 +
 +    if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
 +        return -EFAULT;
 +
-+    v_path = strndup_user(data.virtual_path, PATH_MAX);
-+    if (IS_ERR(v_path)) return PTR_ERR(v_path);
++    v_path_raw = strndup_user(data.virtual_path, PATH_MAX);
++    if (IS_ERR(v_path_raw)) return PTR_ERR(v_path_raw);
++
++    v_path = zeromount_normalize_path(v_path_raw);
++    kfree(v_path_raw);
++    if (!v_path) return -ENOMEM;
 +
 +    spin_lock(&zeromount_lock);
 +    hash_for_each_safe(zeromount_rules_ht, bkt, tmp, rule, node) {
