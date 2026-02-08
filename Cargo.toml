@@ -1,0 +1,23 @@
+[package]
+name = "zeromount"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+rayon = "1.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+thiserror = "2"
+libc = "0.2"
+nix = { version = "0.29", features = ["ioctl", "signal", "process"] }
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "s"
+codegen-units = 1

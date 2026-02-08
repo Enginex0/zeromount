@@ -35,3 +35,13 @@ node_modules/
 .idea/
 .vscode/
 *.iml
+
+# Rust build artifacts
+target/
+
+# Tool/analysis data
+.audit/
+.mcp-vector-search/
+
+# Reference repos (not part of this project)
+susfs4ksu-new/
