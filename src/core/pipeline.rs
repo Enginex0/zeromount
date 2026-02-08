@@ -1,0 +1,676 @@
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use anyhow::{Context, Result};
+use tracing::{debug, info, warn};
+
+use super::config::ZeroMountConfig;
+use super::types::{
+    CapabilityFlags, DetectionResult, ModuleStatus, MountPlan, MountResult, MountStrategy,
+    RootManager, RuntimeState, ScannedModule, Scenario,
+};
+use crate::mount::umount;
+
+const MODULES_DIR: &str = "/data/adb/modules";
+const STATUS_JSON_PATH: &str = "/data/adb/zeromount/.status.json";
+
+pub struct MountController<S> {
+    state: S,
+}
+
+// -- Typestate structs with embedded data --
+
+pub struct Init {
+    config: ZeroMountConfig,
+    root_mgr: Box<dyn RootManager>,
+}
+
+pub struct Detected {
+    config: ZeroMountConfig,
+    root_mgr: Box<dyn RootManager>,
+    detection: DetectionResult,
+}
+
+pub struct Planned {
+    config: ZeroMountConfig,
+    root_mgr: Box<dyn RootManager>,
+    detection: DetectionResult,
+    plan: MountPlan,
+    modules: Vec<ScannedModule>,
+}
+
+pub struct Mounted {
+    config: ZeroMountConfig,
+    root_mgr: Box<dyn RootManager>,
+    detection: DetectionResult,
+    results: Vec<MountResult>,
+}
+
+pub struct Finalized {
+    pub state: RuntimeState,
+}
+
+// -- Init --
+
+impl MountController<Init> {
+    pub fn new(config: ZeroMountConfig) -> Result<Self> {
+        let root_mgr = crate::utils::platform::detect_root_manager()
+            .context("root manager detection failed")?;
+        Ok(MountController {
+            state: Init { config, root_mgr },
+        })
+    }
+
+    /// Probe kernel capabilities and determine scenario.
+    /// Persists detection result to disk for later phases.
+    pub fn detect(self) -> Result<MountController<Detected>> {
+        info!("pipeline: detect phase");
+
+        let result = crate::detect::detect_and_persist()
+            .context("detection phase failed")?;
+
+        info!(
+            scenario = ?result.scenario,
+            driver_version = ?result.driver_version,
+            "detection complete"
+        );
+
+        Ok(MountController {
+            state: Detected {
+                config: self.state.config,
+                root_mgr: self.state.root_mgr,
+                detection: result,
+            },
+        })
+    }
+}
+
+// -- Detected -> Planned (scan + plan in one transition) --
+
+#[allow(dead_code)] // Typestate API surface for pipeline consumers
+impl MountController<Detected> {
+    pub fn detection(&self) -> &DetectionResult {
+        &self.state.detection
+    }
+
+    pub fn scenario(&self) -> Scenario {
+        self.state.detection.scenario
+    }
+
+    /// Scan modules directory and build mount plan in a single transition.
+    /// Merges two logical operations because plan depends entirely on scan output.
+    pub fn scan_and_plan(self) -> Result<MountController<Planned>> {
+        info!("pipeline: scan + plan phase");
+
+        // Scan
+        let modules_dir = Path::new(MODULES_DIR);
+        let modules = if modules_dir.exists() {
+            crate::modules::scanner::scan_modules(modules_dir)
+                .context("module scan failed")?
+        } else {
+            warn!("modules directory missing: {MODULES_DIR}");
+            Vec::new()
+        };
+
+        info!(count = modules.len(), "modules scanned");
+
+        // Plan
+        let plan = crate::mount::planner::plan_mounts(
+            &modules,
+            self.state.detection.scenario,
+            &self.state.detection.capabilities,
+        )
+        .context("mount planning failed")?;
+
+        info!(
+            modules = plan.modules.len(),
+            partitions = plan.partition_mounts.len(),
+            "mount plan built"
+        );
+
+        Ok(MountController {
+            state: Planned {
+                config: self.state.config,
+                root_mgr: self.state.root_mgr,
+                detection: self.state.detection,
+                plan,
+                modules,
+            },
+        })
+    }
+
+    /// Consume into detection result without continuing the pipeline.
+    pub fn into_detection(self) -> DetectionResult {
+        self.state.detection
+    }
+}
+
+// -- Planned -> Mounted --
+
+#[allow(dead_code)] // Typestate API surface for pipeline consumers
+impl MountController<Planned> {
+    pub fn plan(&self) -> &MountPlan {
+        &self.state.plan
+    }
+
+    pub fn modules(&self) -> &[ScannedModule] {
+        &self.state.modules
+    }
+
+    /// Execute mount operations: dispatch to VFS, overlay, or magic mount.
+    ///
+    /// Strategy selection based on scenario:
+    ///   Full / KernelOnly -> VFS (primary), overlay/magic fallback
+    ///   SusfsFrontend     -> overlay preferred, magic fallback
+    ///   None              -> magic mount only
+    pub fn execute(self) -> Result<MountController<Mounted>> {
+        info!("pipeline: execute phase");
+
+        // Clean up previous mounts before re-mounting (hot-reload safety)
+        cleanup_previous_mounts();
+
+        // Backup config before destructive mount operations
+        ZeroMountConfig::backup().unwrap_or_else(|e| {
+            warn!("config backup failed (non-fatal): {e}");
+        });
+
+        let scenario = self.state.detection.scenario;
+        let capabilities = &self.state.detection.capabilities;
+        let config = &self.state.config;
+
+        let results = match scenario {
+            Scenario::Full | Scenario::KernelOnly => {
+                self.execute_vfs(&self.state.modules, &self.state.plan, capabilities, config)
+            }
+            Scenario::SusfsFrontend => {
+                self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
+            }
+            Scenario::None => {
+                self.execute_magic(&self.state.modules, &self.state.plan, config)
+            }
+        }
+        .context("mount execution failed")?;
+
+        let succeeded = results.iter().filter(|r| r.success).count();
+        let failed = results.iter().filter(|r| !r.success).count();
+        info!(succeeded, failed, "execution complete");
+
+        Ok(MountController {
+            state: Mounted {
+                config: self.state.config,
+                root_mgr: self.state.root_mgr,
+                detection: self.state.detection,
+                results,
+            },
+        })
+    }
+
+    // VFS driver path: inject rules, SUSFS protections, enable engine
+    fn execute_vfs(
+        &self,
+        modules: &[ScannedModule],
+        plan: &MountPlan,
+        _capabilities: &CapabilityFlags,
+        config: &ZeroMountConfig,
+    ) -> Result<Vec<MountResult>> {
+        info!("executing via VFS driver");
+
+        // Open driver
+        let driver = match crate::vfs::VfsDriver::open() {
+            Ok(d) => d,
+            Err(e) => {
+                warn!("VFS driver open failed, falling back: {e}");
+                return self.execute_overlay_or_magic(modules, plan, config);
+            }
+        };
+
+        // Probe SUSFS if enabled
+        let susfs = if config.susfs.enabled {
+            crate::susfs::SusfsClient::probe().ok()
+        } else {
+            None
+        };
+
+        let executor = crate::vfs::VfsExecutor::new(driver, susfs);
+        executor.execute(plan, modules)
+    }
+
+    // Overlay path with magic mount fallback
+    fn execute_overlay_or_magic(
+        &self,
+        modules: &[ScannedModule],
+        plan: &MountPlan,
+        config: &ZeroMountConfig,
+    ) -> Result<Vec<MountResult>> {
+        let caps = &self.state.detection.capabilities;
+        if config.mount.overlay_preferred {
+            info!("executing via overlay (preferred)");
+            let results = crate::mount::executor::execute_plan(
+                plan, modules, MountStrategy::Overlay, caps,
+            )?;
+            if results.iter().all(|r| r.success) || !config.mount.magic_mount_fallback {
+                return Ok(results);
+            }
+            warn!("overlay had failures, falling back to magic mount");
+        }
+
+        self.execute_magic(modules, plan, config)
+    }
+
+    // Magic mount fallback
+    fn execute_magic(
+        &self,
+        modules: &[ScannedModule],
+        plan: &MountPlan,
+        _config: &ZeroMountConfig,
+    ) -> Result<Vec<MountResult>> {
+        let caps = &self.state.detection.capabilities;
+        info!("executing via magic mount (fallback)");
+        crate::mount::executor::execute_plan(
+            plan, modules, MountStrategy::MagicMount, caps,
+        )
+    }
+}
+
+// -- Mounted -> Finalized --
+
+#[allow(dead_code)] // Typestate API surface for pipeline consumers
+impl MountController<Mounted> {
+    pub fn results(&self) -> &[MountResult] {
+        &self.state.results
+    }
+
+    /// Apply SUSFS protections, notify root manager, write status JSON.
+    ///
+    /// KSU09 ordering: BRENE -> description update -> status JSON -> notify-module-mounted (LAST).
+    /// notify-module-mounted signals that all mounts are stable and ready for app launch.
+    pub fn finalize(self) -> Result<MountController<Finalized>> {
+        info!("pipeline: finalize phase");
+
+        // 1. SUSFS protections (BRENE)
+        let hidden_paths = self.apply_susfs_protections();
+
+        // 2. Update module description with status summary
+        let summary = self.build_description_summary();
+        if let Err(e) = self.state.root_mgr.update_description(&summary) {
+            debug!("update_description failed (non-fatal): {e}");
+        }
+
+        // 3. Build RuntimeState and persist atomically (ME07: write tmp then rename)
+        let mut runtime_state = self.build_runtime_state();
+        runtime_state.hidden_path_count = hidden_paths;
+        write_status_json_atomic(&runtime_state);
+
+        // 4. Reset bootcount on successful pipeline completion (ME15)
+        ZeroMountConfig::reset_bootcount().unwrap_or_else(|e| {
+            warn!("bootcount reset failed: {e}");
+        });
+
+        // 5. KSU09: notify-module-mounted LAST -- after all rules, SUSFS, description
+        if let Err(e) = self.state.root_mgr.notify_module_mounted() {
+            warn!("notify-module-mounted failed (non-fatal): {e}");
+        }
+
+        info!("pipeline complete");
+
+        Ok(MountController {
+            state: Finalized {
+                state: runtime_state,
+            },
+        })
+    }
+
+    fn apply_susfs_protections(&self) -> u32 {
+        if !self.state.config.susfs.enabled {
+            debug!("SUSFS disabled in config, skipping protections");
+            return 0;
+        }
+
+        match crate::susfs::SusfsClient::probe() {
+            Ok(client) => {
+                match crate::susfs::brene::apply_brene(&client, &self.state.config) {
+                    Ok(brene) => {
+                        debug!(
+                            paths = brene.paths_hidden,
+                            maps = brene.maps_hidden,
+                            fonts = brene.font_modules_processed,
+                            "BRENE applied"
+                        );
+                        brene.paths_hidden
+                    }
+                    Err(e) => {
+                        warn!("BRENE application failed (non-fatal): {e}");
+                        0
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("SUSFS probe failed, skipping protections: {e}");
+                0
+            }
+        }
+    }
+
+    fn build_description_summary(&self) -> String {
+        let succeeded = self.state.results.iter().filter(|r| r.success).count();
+        let total = self.state.results.len();
+        let scenario = self.state.detection.scenario;
+        format!(
+            "ZeroMount [{scenario:?}] {succeeded}/{total} modules mounted",
+        )
+    }
+
+    fn build_runtime_state(&self) -> RuntimeState {
+        let det = &self.state.detection;
+        let total_rules: u32 = self.state.results.iter().map(|r| r.rules_applied).sum();
+        let total_failed: u32 = self.state.results.iter().map(|r| r.rules_failed).sum();
+
+        let modules: Vec<ModuleStatus> = self
+            .state
+            .results
+            .iter()
+            .map(|r| ModuleStatus {
+                id: r.module_id.clone(),
+                strategy: r.strategy_used,
+                rules_applied: r.rules_applied,
+                rules_failed: r.rules_failed,
+                errors: r.error.iter().cloned().collect(),
+                mount_paths: r.mount_paths.clone(),
+            })
+            .collect();
+
+        let degraded = total_failed > 0 || det.scenario == Scenario::None;
+        let degradation_reason = if det.scenario == Scenario::None {
+            Some("no VFS driver detected".to_string())
+        } else if total_failed > 0 {
+            Some(format!("{total_failed} rules failed to apply"))
+        } else {
+            None
+        };
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        RuntimeState {
+            scenario: det.scenario,
+            capabilities: det.capabilities.clone(),
+            engine_active: Some(det.scenario != Scenario::None),
+            driver_version: det.driver_version,
+            rule_count: total_rules,
+            excluded_uid_count: 0,
+            hidden_path_count: 0,
+            susfs_version: det.capabilities.susfs_version.clone(),
+            modules,
+            timestamp,
+            degraded,
+            degradation_reason,
+        }
+    }
+}
+
+/// Tear down mounts from a previous pipeline run before re-mounting.
+/// Reads .status.json for module list; missing file means first boot (no-op).
+/// VFS modules use CLEAR_ALL so they don't need individual umount.
+fn cleanup_previous_mounts() {
+    let status_path = Path::new(STATUS_JSON_PATH);
+    let prev_state = match RuntimeState::read_status_file(status_path) {
+        Ok(s) => s,
+        Err(_) => {
+            debug!("no previous status file, skipping mount cleanup");
+            return;
+        }
+    };
+
+    for module in &prev_state.modules {
+        match module.strategy {
+            MountStrategy::Overlay => {
+                for path in &module.mount_paths {
+                    if let Err(e) = umount::umount_overlay(Path::new(path)) {
+                        debug!(path = %path, error = %e, "previous overlay umount failed (may already be gone)");
+                    }
+                }
+            }
+            MountStrategy::MagicMount => {
+                if let Err(e) = umount::umount_magic(&module.mount_paths) {
+                    debug!(module = %module.id, error = %e, "previous magic umount failed");
+                }
+            }
+            MountStrategy::Vfs => {
+                // VFS uses CLEAR_ALL; no per-mount teardown needed
+            }
+        }
+    }
+
+    info!(modules = prev_state.modules.len(), "previous mounts cleaned up");
+}
+
+// ME07: Atomic write -- write to .tmp then rename to avoid partial reads
+fn write_status_json_atomic(state: &RuntimeState) {
+    let status_path = Path::new(STATUS_JSON_PATH);
+    let tmp_path = status_path.with_extension("json.tmp");
+
+    if let Some(parent) = status_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    match state.write_status_file(&tmp_path) {
+        Ok(()) => {
+            if let Err(e) = std::fs::rename(&tmp_path, status_path) {
+                warn!("atomic rename failed, trying direct write: {e}");
+                let _ = state.write_status_file(status_path);
+            }
+        }
+        Err(e) => {
+            warn!("failed to write status JSON: {e}");
+        }
+    }
+}
+
+// -- Finalized accessors --
+
+#[allow(dead_code)] // Typestate API surface for pipeline consumers
+impl MountController<Finalized> {
+    pub fn state(&self) -> &RuntimeState {
+        &self.state.state
+    }
+
+    pub fn into_state(self) -> RuntimeState {
+        self.state.state
+    }
+}
+
+// -- Convenience functions --
+
+/// Run the entire mount pipeline: detect -> scan_and_plan -> execute -> finalize.
+pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
+    let state = MountController::new(config)?
+        .detect()?
+        .scan_and_plan()?
+        .execute()?
+        .finalize()?
+        .into_state();
+    Ok(state)
+}
+
+/// Bootloop-aware pipeline entry point (ME15).
+/// Checks bootcount before running; restores backup config if threshold exceeded.
+pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<RuntimeState> {
+    if ZeroMountConfig::check_bootloop()? {
+        warn!("bootloop detected, restoring backup config");
+        let restored = ZeroMountConfig::restore_backup()?;
+        return run_full_pipeline(restored);
+    }
+
+    ZeroMountConfig::increment_bootcount()?;
+    run_full_pipeline(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Minimal RootManager for tests -- all operations are no-ops.
+    struct TestRootManager;
+
+    impl RootManager for TestRootManager {
+        fn name(&self) -> &str { "test" }
+        fn base_dir(&self) -> &Path { Path::new("/tmp/test") }
+        fn busybox_path(&self) -> std::path::PathBuf { "/tmp/busybox".into() }
+        fn susfs_binary_paths(&self) -> Vec<std::path::PathBuf> { vec![] }
+        fn update_description(&self, _text: &str) -> Result<()> { Ok(()) }
+        fn notify_module_mounted(&self) -> Result<()> { Ok(()) }
+    }
+
+    #[test]
+    fn typestate_compile_check() {
+        // Verify typestate chain compiles. Direct construction since new()
+        // would fail without KSU/APatch on dev machines.
+        let _ctrl = MountController {
+            state: Init {
+                config: ZeroMountConfig::default(),
+                root_mgr: Box::new(TestRootManager),
+            },
+        };
+    }
+
+    #[test]
+    fn runtime_state_degraded_on_none_scenario() {
+        let ctrl = MountController {
+            state: Mounted {
+                config: ZeroMountConfig::default(),
+                root_mgr: Box::new(TestRootManager),
+                detection: DetectionResult {
+                    scenario: Scenario::None,
+                    capabilities: CapabilityFlags::default(),
+                    driver_version: None,
+                    timestamp: 0,
+                },
+                results: Vec::new(),
+            },
+        };
+
+        let state = ctrl.build_runtime_state();
+        assert!(state.degraded);
+        assert_eq!(
+            state.degradation_reason.as_deref(),
+            Some("no VFS driver detected")
+        );
+        assert_eq!(state.scenario, Scenario::None);
+    }
+
+    #[test]
+    fn runtime_state_counts_rules() {
+        let results = vec![
+            MountResult {
+                module_id: "mod_a".into(),
+                strategy_used: MountStrategy::Vfs,
+                success: true,
+                rules_applied: 10,
+                rules_failed: 0,
+                error: None,
+                mount_paths: vec!["/system/bin".into()],
+            },
+            MountResult {
+                module_id: "mod_b".into(),
+                strategy_used: MountStrategy::Overlay,
+                success: true,
+                rules_applied: 5,
+                rules_failed: 2,
+                error: Some("partial failure".into()),
+                mount_paths: vec!["/vendor/lib64".into()],
+            },
+        ];
+
+        let ctrl = MountController {
+            state: Mounted {
+                config: ZeroMountConfig::default(),
+                root_mgr: Box::new(TestRootManager),
+                detection: DetectionResult {
+                    scenario: Scenario::Full,
+                    capabilities: CapabilityFlags::default(),
+                    driver_version: Some(1),
+                    timestamp: 0,
+                },
+                results,
+            },
+        };
+
+        let state = ctrl.build_runtime_state();
+        assert_eq!(state.rule_count, 15);
+        assert!(state.degraded);
+        assert_eq!(state.modules.len(), 2);
+        assert_eq!(state.driver_version, Some(1));
+    }
+
+    #[test]
+    fn description_summary_format() {
+        let ctrl = MountController {
+            state: Mounted {
+                config: ZeroMountConfig::default(),
+                root_mgr: Box::new(TestRootManager),
+                detection: DetectionResult {
+                    scenario: Scenario::Full,
+                    capabilities: CapabilityFlags::default(),
+                    driver_version: Some(1),
+                    timestamp: 0,
+                },
+                results: vec![
+                    MountResult {
+                        module_id: "a".into(),
+                        strategy_used: MountStrategy::Vfs,
+                        success: true,
+                        rules_applied: 1,
+                        rules_failed: 0,
+                        error: None,
+                        mount_paths: vec![],
+                    },
+                    MountResult {
+                        module_id: "b".into(),
+                        strategy_used: MountStrategy::Vfs,
+                        success: false,
+                        rules_applied: 0,
+                        rules_failed: 1,
+                        error: Some("fail".into()),
+                        mount_paths: vec![],
+                    },
+                ],
+            },
+        };
+
+        let desc = ctrl.build_description_summary();
+        assert_eq!(desc, "ZeroMount [Full] 1/2 modules mounted");
+    }
+
+    #[test]
+    fn clean_run_not_degraded() {
+        let ctrl = MountController {
+            state: Mounted {
+                config: ZeroMountConfig::default(),
+                root_mgr: Box::new(TestRootManager),
+                detection: DetectionResult {
+                    scenario: Scenario::Full,
+                    capabilities: CapabilityFlags::default(),
+                    driver_version: Some(2),
+                    timestamp: 100,
+                },
+                results: vec![MountResult {
+                    module_id: "clean".into(),
+                    strategy_used: MountStrategy::Vfs,
+                    success: true,
+                    rules_applied: 5,
+                    rules_failed: 0,
+                    error: None,
+                    mount_paths: vec!["/system/app".into()],
+                }],
+            },
+        };
+
+        let state = ctrl.build_runtime_state();
+        assert!(!state.degraded);
+        assert!(state.degradation_reason.is_none());
+        assert_eq!(state.engine_active, Some(true));
+        assert_eq!(state.rule_count, 5);
+    }
+}
