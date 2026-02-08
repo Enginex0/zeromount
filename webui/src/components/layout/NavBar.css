@@ -1,0 +1,103 @@
+/* Bottom navigation bar with glass morphism */
+.navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
+  padding: 8px 16px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+
+.navbar--fixed-nav {
+  padding-bottom: calc(8px + 48px + env(safe-area-inset-bottom));
+}
+
+.navbar__tabs {
+  position: relative;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Animated highlight behind active tab */
+.navbar__indicator {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: 12px;
+  opacity: 0.15;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.navbar__indicator--stretching {
+  transform: scaleX(1.2);
+}
+
+.navbar__tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.navbar__tab:active {
+  transform: scale(0.95);
+}
+
+.navbar__icon {
+  font-size: 24px;
+  transition: all 0.2s ease;
+  color: var(--text-tertiary);
+}
+
+.navbar__icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.navbar__tab--active .navbar__icon {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.5));
+}
+
+.navbar__tab--active .navbar__icon svg {
+  fill: currentColor;
+}
+
+.navbar__label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+  color: var(--text-tertiary);
+}
+
+.navbar__tab--active .navbar__label {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
