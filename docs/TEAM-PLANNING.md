@@ -8,7 +8,7 @@
 
 ## 1. Project Overview
 
-ZeroMount v2 is a Rust-based KernelSU/APatch metamodule that replaces ~2500 lines of shell scripts with a single binary. It mounts modules via VFS redirection when kernel patches are present, falling back to OverlayFS or magic mount when they're not. The binary uses a typestate pipeline pattern to enforce operation ordering at compile time, eliminating race conditions from the shell implementation. SUSFS integration moves from a maintained fork to build-time patches on upstream. A SolidJS WebUI provides device management through the KSU WebView. 80 architecture decisions are locked in DECISIONS.md. 27 features are tracked in features.json.
+ZeroMount v2 is a Rust-based KernelSU/APatch metamodule that replaces ~2500 lines of shell scripts with a single binary. It mounts modules via VFS redirection when kernel patches are present, falling back to OverlayFS or magic mount when they're not. The binary uses a typestate pipeline pattern to enforce operation ordering at compile time, eliminating race conditions from the shell implementation. SUSFS integration moves from a maintained fork to build-time patches on upstream. A SolidJS WebUI provides device management through the KSU WebView. 81 architecture decisions are locked in DECISIONS.md. 27 features are tracked in features.json.
 
 ---
 
@@ -33,7 +33,7 @@ Within each pair: one agent implements, the other validates. Both read the same 
 
 | Document | Path | What It Contains |
 |----------|------|------------------|
-| DECISIONS.md | `/home/claudetest/metamodule-experiment/DECISIONS.md` | All 80 architecture decisions with rationale and status |
+| DECISIONS.md | `/home/claudetest/metamodule-experiment/DECISIONS.md` | All 81 architecture decisions with rationale and status |
 | DESIGN.md | `/home/claudetest/metamodule-experiment/docs/DESIGN.md` | Component architecture, file structure, data flow, CLI interface |
 | GOAL.md | `/home/claudetest/metamodule-experiment/docs/GOAL.md` | Success criteria, scope boundaries |
 | features.json | `/home/claudetest/metamodule-experiment/.claude/features.json` | Feature backlog with dependencies and acceptance criteria |
@@ -442,7 +442,7 @@ webui/package.json, webui/vite.config.ts
 ### Pair 11-12: Detection + Platform
 
 **Domain:** Detection engine, platform abstraction, shell launchers, CI, ZIP packaging
-**Decision IDs:** DET01-DET07, KSU01-KSU10, CO01-CO04, B01-B05, S01-S02
+**Decision IDs:** DET01-DET07, KSU01-KSU11, CO01-CO04, B01-B05, S01-S02, S06, S11
 **Features:** F06, F17, F18, F20, F26, F27
 
 **Files to create:**
@@ -480,6 +480,7 @@ module/uninstall.sh, module/metainstall.sh, module/metauninstall.sh
 - KSU05: `override.description` is KSU-only; APatch uses direct module.prop sed
 - DET02: Use `/sys/kernel/zeromount/` NOT `/proc/filesystems` (miscdevice, not registered fs)
 - APatch is ARM64-only; x86/x86_64 binaries serve KSU users (emulators, Chromebooks)
+- KSU11: `post-mount.sh` and `boot-completed.sh` are intentionally NOT used -- document in shell headers
 
 ---
 
@@ -618,4 +619,4 @@ Each feature must pass before marking complete:
 
 ---
 
-*Generated from verified analysis of 6 domain reports covering 80 architecture decisions and 27 features.*
+*Generated from verified analysis of 6 domain reports covering 81 architecture decisions and 27 features.*

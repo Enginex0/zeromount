@@ -332,7 +332,7 @@ The `RootManager` trait (KSU02) abstracts this platform difference.
 ### KSU06: Thin `metamount.sh` launcher
 **Status:** DECIDED
 
-Under 30 lines. Detects architecture, selects correct binary, executes `zeromount mount`, handles bootloop counter, calls `ksud kernel notify-module-mounted` on success. All logic from the current 427-line `metamount.sh` moves into the Rust binary's `mount` subcommand.
+Under 30 lines. Detects architecture, selects correct binary, executes `zeromount mount`, handles bootloop counter. **Critical:** calls `ksud kernel notify-module-mounted` on success — this is the single most important metamodule requirement per the official guide (KernelSU doesn't know mounting is complete without it). All logic from the current 427-line `metamount.sh` moves into the Rust binary's `mount` subcommand.
 
 ### KSU07: `metainstall.sh` — partition normalization at module install
 **Status:** DECIDED
@@ -353,6 +353,18 @@ Call AFTER: rules injected, engine enabled, SUSFS applied, kstat pass complete, 
 **Status:** DECIDED
 
 Split: `post-fs-data.sh` runs the Rust binary's `detect` subcommand (kernel probe, SUSFS probe, writes detection result JSON). `metamount.sh` reads detection result and runs the `mount` pipeline. Separates lightweight probing (safe at post-fs-data time) from heavy I/O (module iteration, file copying). **Critical constraint:** `post-fs-data.sh` has a 10-second BLOCKING timeout shared across all module scripts. The `detect` subcommand must target <2 seconds to leave headroom for other modules' post-fs-data scripts.
+
+### KSU11: Boot lifecycle hook allocation
+**Status:** DECIDED
+
+KernelSU provides 4 boot stages for metamodules. ZeroMount's allocation:
+- **`post-fs-data.sh`** — detection probe only (`zeromount detect`). BLOCKING, 10s timeout shared across modules.
+- **`metamount.sh`** — full mount pipeline (`zeromount mount`). Called by KernelSU after post-fs-data. NON-BLOCKING.
+- **`service.sh`** — post-boot setup (UID blocking, SUSFS artifact hiding, WebUI symlink, inotify watcher startup). Runs after Android boot completes.
+- **`post-mount.sh`** — NOT used. ZeroMount's mount pipeline runs via `metamount.sh` (metamodule hook), not `post-mount.sh` (standard module hook).
+- **`boot-completed.sh`** — NOT used. No deferred work needed after boot completion.
+
+Intentionally unused hooks documented to prevent future confusion about whether they were forgotten or deliberately omitted.
 
 ---
 
@@ -586,12 +598,12 @@ Each sub-toggle disabled when parent capability unavailable (matches W03 pattern
 | VFS Integration (VFS) | 7 | 1 | 6 | 0 |
 | SUSFS Integration (S) | 13 | 2 | 4 | 7 |
 | Detection System (DET) | 7 | 2 | 5 | 0 |
-| Platform Integration (KSU) | 10 | 1 | 9 | 0 |
+| Platform Integration (KSU) | 11 | 1 | 10 | 0 |
 | WebUI (W) | 9 | 1 | 6 | 2 |
 | Build System (B) | 5 | 2 | 3 | 0 |
 | Carry-Over Fixes (CO) | 4 | 0 | 4 | 0 |
-| **Total** | **80** | **13** | **58** | **9** |
+| **Total** | **81** | **13** | **59** | **9** |
 
 ---
 
-*Last updated: 2026-02-08 — Session 3 (verification reports synthesized, corrections applied, ME13-15 added)*
+*Last updated: 2026-02-08 — Session 5 (design phase validated, all corrections applied, features.json + TEAM-PLANNING.md finalized)*

@@ -89,7 +89,7 @@ Replace shell-based orchestration with a single Rust binary that owns the full m
 ### Boot Sequence
 
 ```
-post-fs-data.sh
+post-fs-data.sh             # BLOCKING, 10s timeout shared across modules
   │
   ▼
 zeromount detect ──► writes .detection_result.json

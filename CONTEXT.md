@@ -302,11 +302,17 @@ metauninstall.sh → calls zm (clear, disable)
 | `susfs_apply_kstat()` | Spoofs file metadata to match stock | KEEP — critical for fonts |
 | `apply_font_redirect()` | Font-specific open_redirect + kstat | KEEP — 115 lines, specialized |
 | `late_kstat_pass()` | Re-processes deferred kstat entries | KEEP |
-| `susfs_update_config()` | Writes SUSFS config files | REVIEW — unclear if anyone reads these |
+| `susfs_update_config()` | Writes SUSFS config files | REVIEW — consumed by upstream SUSFS module at boot; unnecessary when ZeroMount replaces SUSFS module in v2 |
 | `susfs_clean_zeromount_entries()` | Removes [ZeroMount]-tagged SUSFS entries | KEEP |
 | `susfs_clean_module_entries()` | Per-module SUSFS cleanup | KEEP |
 | `susfs_clean_module_metadata_cache()` | Metadata cache cleanup | KEEP |
 | `zm_register_rule_with_susfs()` | Main entry after each `zm add` | KEEP |
+| `susfs_get_cached_metadata()` | Cache lookup for pre-overlay stat metadata | KEEP (in-memory in Rust) |
+| `susfs_hide_path()` | Simplified path hiding wrapper | KEEP |
+| `susfs_apply_maps()` | Maps hiding via `add_sus_map` | KEEP |
+| `susfs_capture_module_metadata()` | Batch stat capture for module files | KEEP |
+| `susfs_status()` | Status JSON output | KEEP — replaced by Rust binary status |
+| `susfs_reset_stats()` | Stats tracking reset | KEEP |
 
 ### 5.5 Data Directory (`/data/adb/zeromount/`)
 
@@ -465,8 +471,8 @@ Scans `/proc/mounts` for overlay/tmpfs and hides them. ZeroMount doesn't create 
 **ARCH-4: `sus_mount_check` classification in `susfs_classify_path()`**
 Triggers mount hiding for app paths. Unnecessary for mountless architecture.
 
-**ARCH-5: `susfs_update_config()` — unclear persistence model**
-Writes to SUSFS config directory files, duplicating runtime commands. Unknown if anything reads these files.
+**ARCH-5: `susfs_update_config()` — v1 persistence model**
+Writes SUSFS config files (`sus_path.txt`, `sus_maps.txt`, etc.) consumed by upstream SUSFS flashable module at boot (`boot-completed.sh`, `post-mount.sh`, `service.sh`). Unnecessary when ZeroMount replaces the SUSFS module in v2.
 
 **ARCH-6: WebUI dual styling strategy**
 CSS-file components (Badge, Button, Card) vs inline-styled components (Toggle, Modal, Toast). Both work but inconsistent for debugging.
@@ -529,9 +535,9 @@ Only page that directly imports `api` (for `fetchSystemColor()` and `setVerboseL
 
 ## 11. Open Questions
 
-1. Is the kernel 5.10 patch still maintained? Missing statfs/xattr/stat spoofing.
+1. Is the kernel 5.10 patch still maintained? Has statfs/xattr but missing relative-path stat, readdir dir-check, and recursive auto-parent injection.
 2. Are per-function SUSFS checks (`fix-zeromount-susfs-bypass.sh`) needed given centralized `zeromount_should_skip()` check?
-3. Does `susfs_update_config()` write files anything actually reads?
+3. ~~Does `susfs_update_config()` write files anything actually reads?~~ **RESOLVED:** Yes, upstream SUSFS flashable module reads them at boot (see S12). Moot in v2 — Rust binary replaces the SUSFS module entirely.
 4. Should `monitor.sh` force-stop KSU app (`com.rifsxd.ksunext`) on app changes?
 5. What is the intended behavior for `autoStartOnBoot` setting? Wire up or remove?
 
