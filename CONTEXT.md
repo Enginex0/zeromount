@@ -168,7 +168,7 @@ Skips all hooks when:
 Adds `susfs_is_current_proc_umounted()` guards to 10 exported functions. Defense-in-depth — the central `zeromount_should_skip()` already includes this check, but per-function guards cover early-return paths.
 
 **Kernel 5.10 variant** (`zeromount-kernel-5.10.patch`):
-Older version missing: statfs spoofing, xattr spoofing, relative-path stat, directory-already-redirected check in readdir, recursive auto-parent injection. Possibly unmaintained.
+Older version. Statfs spoofing (`zeromount_spoof_statfs()` at line 567) and xattr spoofing (`zeromount_spoof_xattr()` at line 638) ARE present. Missing 3 features: relative-path stat (`zeromount_build_absolute_path()`), directory-already-redirected check in readdir, recursive auto-parent injection. Possibly unmaintained.
 
 ### 3.6 SUSFS Kernel Coupling
 
@@ -192,7 +192,7 @@ extern bool zeromount_is_uid_blocked(uid_t uid);
 #endif
 ```
 
-Called at 3 SUSFS check points for path/mount/kstat visibility decisions.
+Called at 6 SUSFS check points (3 in sus_path visibility + 3 in mount display) for per-UID visibility decisions.
 
 ---
 
@@ -289,7 +289,7 @@ zm-diag.sh → calls zm (list, ver)
 metauninstall.sh → calls zm (clear, disable)
 ```
 
-### 5.4 `susfs_integration.sh` Functions (22+)
+### 5.4 `susfs_integration.sh` Functions (20)
 
 | Function | Purpose | Status |
 |----------|---------|--------|
@@ -423,13 +423,31 @@ SolidJS + Vite SPA running inside KernelSU WebView. No backend server. All devic
 - `monitor.sh:52-57` sets `/proc/self/comm` to `kworker/u<N>:zm` but `/proc/<pid>/cmdline` still shows `sh monitor.sh`.
 
 **BUG-L4: VfsRule naming inversion**
-- `types.ts:1-9` — `source` = real path, `target` = virtual path. Backwards from intuitive naming. `addRule()` and `deleteRule()` compound the confusion.
+- `types.ts:1-9` — `source` = real path, `target` = virtual path. Backwards from intuitive naming. `addRule()` and `deleteRule()` compound the confusion. The same field names mean different things in read vs write paths: parsing kernel output (`GET_LIST`) uses `source` = text before `->` = real_path, but `addRule()` passes `source` as the first arg to `zm add` which expects virtual_path. Read/write semantic flip on the same field.
 
 **BUG-L5: Verbose logging toggle deferred**
 - WebUI toggle appears instant but `.verbose` flag is only read at boot. No indication of reboot requirement.
 
 **BUG-L6: `zm ver` format mismatch**
 - Outputs bare integer (e.g., "1"). WebUI expects/displays "v3.0.0" format.
+
+### 7.4 Newly Discovered (Verification Phase)
+
+**NEW-1: monitor.sh hot-load misses whiteouts/symlinks/dirs**
+- Location: `monitor.sh:145-153` — `register_module()` only scans `-type f` (regular files). Misses whiteout char devices (`-type c`), directories, symlinks, and AUFS whiteouts. Contrasts with `metamount.sh:249` which scans `-type f -o -type d -o -type l -o -type c`. Cascades to WebUI rule count inaccuracy (`api.ts:557` runs `wc -l` on tracking files populated by monitor.sh).
+
+**NEW-2: sync.sh bypasses unified logging system**
+- Location: `sync.sh:13` — writes to `$ZEROMOUNT_DATA/zeromount.log` and defines its own `log_err`, `log_info`, `log_debug` functions instead of sourcing `logging.sh`.
+
+**NEW-3: Four different file-scan patterns across scripts and WebUI**
+- `metamount.sh:249`: `-type f -o -type d -o -type l -o -type c`
+- `monitor.sh:147`: `-type f` only
+- `sync.sh:70`: `-type f -o -type c`
+- `api.ts:682` (scanKsuModules): `-type f`, limited to 3 partitions
+- Extends ARCH-1 beyond partition lists to file type filtering.
+
+**NEW-4: service.sh hardcodes SUSFS binary path**
+- Location: `service.sh:4` — hardcodes `SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"` with `command -v` fallback. Differs from `susfs_integration.sh:56-71` which checks multiple paths.
 
 ---
 

@@ -19,9 +19,10 @@ Replace shell-based orchestration with a single Rust binary that owns the full m
 ### 2. Detection Engine (`detect/`)
 
 - **Purpose:** Probe kernel and userspace capabilities, select scenario
-- **Inputs:** `/dev/zeromount` device, SUSFS binary paths, `/proc/filesystems`
+- **Inputs:** `/dev/zeromount` device, SUSFS binary paths, `/sys/kernel/zeromount/` sysfs
 - **Outputs:** `Scenario` enum (FULL, SUSFS_FRONTEND, KERNEL_ONLY, NONE) + capability flags
-- **Dependencies:** VFS ioctl interface (for `GET_VERSION`), filesystem probing
+- **Dependencies:** VFS ioctl interface (for `GET_VERSION`), sysfs probing
+- **Three-layer SUSFS probe:** (1) Module state — check `.disabled` marker in SUSFS module dir, (2) Binary availability — search standard paths for `ksu_susfs`, probe standard capabilities, (3) Custom kernel ioctls — Rust binary probes kernel directly for build-time patched commands (`kstat_redirect`, `open_redirect_all`). Separation of concern: SUSFS binary is upstream/untouched; custom capabilities are our Rust binary + our kernel patches.
 
 ### 3. Module Scanner (`modules/scanner.rs`)
 
@@ -67,16 +68,18 @@ Replace shell-based orchestration with a single Rust binary that owns the full m
 
 ### 8. SUSFS Client (`susfs/`)
 
-- **Purpose:** Interface to `ksu_susfs` binary for metadata spoofing and path hiding
+- **Purpose:** Interface to SUSFS kernel commands for metadata spoofing and path hiding
 - **Inputs:** File paths, kstat metadata, capability flags
 - **Outputs:** Success/failure per operation
-- **Capabilities:** kstat spoofing, path hiding, maps hiding, font redirect
+- **Capabilities:** kstat spoofing, path hiding, maps hiding, font redirect, BRENE automation features (auto-hide APKs, zygisk maps, font maps; uname/AVC spoofing)
 - **Explicitly excluded:** mount hiding (root cause of LSPosed bug)
+- **Communication:** Dual invocation pattern. Standard commands (`add_sus_path`, `add_sus_map`, `add_sus_kstat_statically`, `add_open_redirect`) invoke the upstream `ksu_susfs` binary. Custom commands (`kstat_redirect` 0x55573, `open_redirect_all` 0x555c1) use direct `SYS_reboot` supercalls — `syscall(SYS_reboot, 0xDEADBEEF, 0xFAFAFAFA, CMD_SUSFS_xxx, &info_struct)` — since the upstream binary has no CLI handlers for them.
+- **FFI structs:** 5 key structs from `susfs_def.h` must have matching Rust `#[repr(C)]` layouts: `st_susfs_sus_path`, `st_susfs_sus_kstat`, `st_susfs_sus_kstat_redirect`, `st_susfs_open_redirect`, `st_susfs_sus_map`
 
 ### 9. CLI (`cli/`)
 
 - **Purpose:** clap-based subcommand dispatch for boot pipeline and WebUI queries
-- **Key commands:** `mount`, `status`, `module list/scan`, `config get/set`, `vfs *`, `uid *`, `diag`, `version`
+- **Key commands:** `mount`, `detect`, `status`, `module list/scan`, `config get/set`, `vfs *`, `uid *`, `susfs *`, `diag`, `version`
 - **WebUI pattern:** WebUI calls `ksu.exec("zeromount status")` → parses JSON stdout
 
 ---
@@ -91,6 +94,7 @@ post-fs-data.sh
   ▼
 zeromount detect ──► writes .detection_result.json
   │                   (scenario, capabilities, driver version)
+  │                   MUST complete in <2s (10s blocking timeout)
   │
 metamount.sh
   │
@@ -104,7 +108,7 @@ zeromount mount ──► reads .detection_result.json
   ├─ 5. Execute strategy:
   │     ├─ FULL/SUSFS_FE/KERNEL_ONLY → VFS inject + enable + refresh
   │     └─ NONE → OverlayFS (per-module magic mount fallback)
-  ├─ 6. Apply SUSFS protections (kstat, path hide, maps)
+  ├─ 6. Apply SUSFS protections (7 commands across 4 domains)
   ├─ 7. Register mounts for try_umount (overlay mode only)
   ├─ 8. Update module.prop description
   ├─ 9. Write .status_cache.json
@@ -159,7 +163,7 @@ src/
 │   └── state.rs         # RuntimeState, status JSON serialization
 ├── detect/
 │   ├── mod.rs           # Scenario detection orchestrator
-│   ├── kernel.rs        # /dev/zeromount + /proc probing
+│   ├── kernel.rs        # /dev/zeromount + sysfs probing
 │   └── susfs.rs         # SUSFS binary discovery + capability probe
 ├── modules/
 │   ├── scanner.rs       # Parallel module discovery (rayon)
@@ -177,7 +181,8 @@ src/
 │   ├── ioctls.rs        # Ioctl number definitions (_IOW/_IOR macros)
 │   └── types.rs         # ZeromountRule, kernel struct FFI
 ├── susfs/
-│   ├── mod.rs           # SUSFS client (executes ksu_susfs binary)
+│   ├── mod.rs           # SUSFS client (dual: binary + supercall)
+│   ├── ffi.rs           # SYS_reboot supercall, #[repr(C)] struct layouts
 │   ├── kstat.rs         # Kstat spoofing logic
 │   ├── paths.rs         # Path hiding + maps hiding
 │   └── fonts.rs         # Font redirect (open_redirect + kstat)
@@ -190,25 +195,34 @@ module/                  # Shipped in ZIP
 ├── module.prop          # metamodule=1
 ├── customize.sh         # Install hook (arch detect, binary copy)
 ├── metamount.sh         # Thin launcher → zeromount mount
-├── metainstall.sh       # Module install hook
-├── metauninstall.sh     # Cleanup hook
+├── metainstall.sh       # Module install hook (runs for OTHER module installs)
+├── metauninstall.sh     # Cleanup hook (runs for OTHER module uninstalls)
+├── uninstall.sh         # ZeroMount self-cleanup
 ├── post-fs-data.sh      # Detection probe → zeromount detect
 ├── service.sh           # Post-boot setup
-└── config.toml          # Default configuration template
+├── zm-arm64             # Rust binary (aarch64)
+├── zm-arm               # Rust binary (armv7)
+├── zm-x86_64            # Rust binary (x86_64, emulators/Chromebooks)
+├── zm-x86               # Rust binary (i686, emulators)
+├── bin/                 # aapt binary for module metadata
+├── config.toml          # Default configuration template
+└── webroot/             # Built WebUI output (from webui/ build)
 
-webui/                   # SolidJS WebUI
+webui/                   # SolidJS WebUI (custom components, no Material Web)
 ├── src/
 │   ├── App.tsx
 │   ├── lib/
 │   │   ├── api.ts       # ksu.exec calls to Rust binary
 │   │   ├── store.ts     # SolidJS signals
+│   │   ├── theme.ts     # JS-driven theme switching (dark/light/amoled)
 │   │   └── types.ts     # TypeScript interfaces
 │   ├── routes/
 │   │   ├── StatusTab.tsx # Scenario display, engine status
 │   │   ├── ModulesTab.tsx
 │   │   ├── ConfigTab.tsx
-│   │   └── SettingsTab.tsx # Capability-aware toggles
+│   │   └── SettingsTab.tsx # SUSFS toggles, BRENE features, glass morphism toggle
 │   └── components/
+│       └── Toggle.tsx   # Glass morphism toggle (accent-adaptive via --accent-rgb)
 └── vite.config.ts       # Output → module/webroot/
 ```
 
@@ -234,6 +248,7 @@ zeromount vfs list                 # List active rules
 zeromount vfs query-status         # Engine enabled state
 zeromount uid block <uid>          # Exclude UID from redirection
 zeromount uid unblock <uid>        # Include UID in redirection
+zeromount susfs <feature> <on|off> # Toggle BRENE automation features
 zeromount diag                     # Diagnostic dump
 zeromount version                  # Version from module.prop
 ```

@@ -87,7 +87,7 @@ Release profile: `lto = true`, `strip = true`, `opt-level = "s"`, `codegen-units
 ### ME01: Storage backend cascade — EROFS → tmpfs → ext4
 **Status:** CONFIRMED (ext4 fallback confirmed by user)
 
-Three-tier storage for overlay lower layers. EROFS preferred (compressed read-only, matches Android's native partition format, detection-resistant). tmpfs fallback if kernel supports xattr (`CONFIG_TMPFS_XATTR=y`). ext4 loopback image as last resort for maximum compatibility. Backend selected by runtime capability probing at boot.
+Three-tier storage for overlay lower layers. EROFS preferred (compressed read-only, matches Android's native partition format, detection-resistant). tmpfs fallback if kernel supports xattr (`CONFIG_TMPFS_XATTR=y`). ext4 loopback image as last resort for maximum compatibility. Backend selected by runtime capability probing at boot. **Note:** `CONFIG_TMPFS_XATTR` is NOT set in stock GKI 5.10 defconfig (`CONFIG_TMPFS_POSIX_ACL` which auto-selects it is also absent). On stock GKI kernels, the effective cascade is EROFS -> ext4. tmpfs xattr is a bonus when OEM kernels enable it.
 
 ### ME02: OverlayFS mounting — new mount API + legacy fallback
 **Status:** DECIDED
@@ -127,7 +127,11 @@ Support all three whiteout formats: character device (`mknod c 0 0`), xattr (`tr
 ### ME09: Source="KSU" on all mounts
 **Status:** DECIDED
 
-Hardcode mount source name to `"KSU"` for all overlay/tmpfs mounts. Required for KernelSU's `try_umount` to recognize and reverse these mounts per-app. Without this, per-app mount hiding breaks entirely. Configurable source name deferred to v2 (APatch may need different value).
+Hardcode mount source name to `"KSU"` for all overlay/tmpfs mounts. Two consumers of this value:
+- **Zygisk-based unmount tools** (Shamiko, ZygiskNext) scan `/proc/mounts` and match on the source name field to identify module-created mounts. `"KSU"` is the expected value.
+- **KSU's kernel-level `try_umount`** works via explicit mount path registration (SUSFS `add_try_umount` or `ksud kernel umount add`), NOT source name matching. The source name is irrelevant for this mechanism.
+
+Configurable source name deferred (APatch may need `"APatch"` for its zygisk tools).
 
 ### ME10: KSU try_umount integration
 **Status:** DECIDED
@@ -143,6 +147,21 @@ All staging areas use a random 12-char alphanumeric path under `/mnt/` (or `/mnt
 **Status:** DECIDED
 
 When using ext4 loop images, delete backing file after mount (kernel keeps inode alive via open reference). Hide loop device from sysfs via SUSFS if available. EROFS images also nuked after mount.
+
+### ME13: Config backup/restore for bootloop resilience
+**Status:** DECIDED
+
+At boot (metamount.sh lines 36-61 pattern), save a copy of current config before the mount pipeline runs. If bootloop counter exceeds threshold, restore the backup config instead of using potentially-broken current config. The Rust binary implements: `config.toml` → `config.toml.bak` before pipeline, restore from `.bak` on bootloop recovery. Prevents config corruption from causing permanent boot failure.
+
+### ME14: Redirect xattr handling (`trusted.overlay.redirect`)
+**Status:** DECIDED
+
+Extends ME08. OverlayFS metacopy and redirect features use `trusted.overlay.redirect` xattr to indicate files that have been redirected in the overlay upper layer without full data copy. The Rust binary must detect and handle this xattr when processing overlay modules. If the xattr points to an existing lower layer file, use the redirect target; otherwise treat as a regular file. This is distinct from whiteouts — redirects indicate "same content, different metadata" rather than deletion.
+
+### ME15: Per-module runtime tracking format
+**Status:** DECIDED
+
+Replace the current `module_paths/<name>` file-per-module tracking with a single `runtime_state.json` containing all per-module tracking data: mount strategy used, rule count, error list, mount paths. The Rust binary writes this atomically after each pipeline stage. WebUI reads it for module-level status display. Eliminates the pattern of monitor.sh writing tracking files that only the WebUI reads (fragile cross-process file protocol).
 
 ---
 
@@ -161,7 +180,7 @@ Within a single boot, all modules use the same strategy. No per-module VFS vs ov
 ### VFS03: VFS ioctl interface rewritten in Rust
 **Status:** DECIDED
 
-All 10 ioctl interactions from `zm.c` (304 lines freestanding C) rewritten using `libc` crate. Proper `_IOW`/`_IOR` macro derivation fixes ARM32 compatibility (VFS05). Error messages include errno. `REFRESH` command implemented (fixes BUG-M1).
+All 10 kernel-defined ioctl commands rewritten using `libc` crate (9 were implemented in `zm.c`, REFRESH was missing — fixes BUG-M1). Proper `_IOW`/`_IOR` macro derivation fixes ARM32 compatibility (VFS05). Error messages include errno.
 
 ### VFS04: Ghost directory bug mitigation
 **Status:** DECIDED
@@ -200,15 +219,16 @@ The `zeromount_is_uid_blocked` export and `#ifdef CONFIG_ZEROMOUNT` guards at SU
 ### S03: SUSFS binary interactions moved to Rust
 **Status:** DECIDED
 
-The 978-line `susfs_integration.sh` is absorbed into the Rust binary. Direct execution of `ksu_susfs` binary replaces per-path shell-out. Type-safe kstat struct handling replaces `cut -d'|'` parsing. In-memory metadata replaces MD5-keyed file cache. Four capabilities retained: kstat spoofing, path hiding, maps hiding, font redirect.
+The 978-line `susfs_integration.sh` is absorbed into the Rust binary. Dual invocation pattern: standard SUSFS commands (`add_sus_path`, `add_sus_map`, etc.) invoke the upstream `ksu_susfs` binary directly; custom commands (`kstat_redirect` 0x55573, `open_redirect_all` 0x555c1) use direct `SYS_reboot` supercalls since the upstream binary has no CLI handlers for them. Type-safe kstat struct handling replaces `cut -d'|'` parsing. In-memory metadata replaces MD5-keyed file cache. Four capability domains retained: kstat spoofing, path hiding, maps hiding, font redirect.
 
 ### S04: SUSFS API capabilities used
 **Status:** DECIDED
 
-- **kstat spoofing** (`add_sus_kstat_statically/redirect`) — critical for font/emoji modules
-- **Path hiding** (`add_sus_path/loop`) — hide module sources from detection apps
+Four capability domains, seven distinct SUSFS commands:
+- **kstat spoofing** (`add_sus_kstat_statically`, `add_sus_kstat_redirect` [custom 0x55573]) — critical for font/emoji modules
+- **Path hiding** (`add_sus_path`, `add_sus_path_loop`) — hide module sources from detection apps
 - **Maps hiding** (`add_sus_map`) — hide injected libraries from `/proc/pid/maps`
-- **Font redirect** (`add_open_redirect` + kstat) — specialized font module handling
+- **Font redirect** (`add_open_redirect` [per-UID], `add_open_redirect_all` [custom 0x555c1, all UIDs]) + kstat — specialized font module handling
 - **Mount hiding** — NOT used (see S05)
 
 ### S05: Remove `susfs_apply_mount_hiding()` entirely
@@ -219,7 +239,11 @@ Root cause of LSPosed instability (ARCH-3). The function scans `/proc/mounts` fo
 ### S06: Keep `zeromount_is_uid_blocked` kernel export
 **Status:** DECIDED
 
-SUSFS consumes this at 3 check points for per-UID visibility decisions. Without it, a UID excluded from ZeroMount would still have SUSFS protections applied, creating inconsistency. The export moves to the ZeroMount patch chain per S02.
+SUSFS consumes this at 6 check points across 2 subsystems for per-UID visibility decisions:
+- **SUS_PATH** (3 points in `susfs.c`): `is_i_uid_in_android_data_not_allowed()`, `is_i_uid_in_sdcard_not_allowed()`, `is_i_uid_not_allowed()` — skip path hiding for excluded UIDs.
+- **SUS_MOUNT** (3 points in GKI patch): `show_vfsmnt()`, `show_mountinfo()`, `show_vfsstat()` — don't hide mounts in `/proc/mounts`, `/proc/mountinfo`, `/proc/mountstat` for excluded UIDs.
+
+Without this export, a UID excluded from ZeroMount would still have SUSFS protections applied, creating inconsistency. The export moves to the ZeroMount patch chain per S02.
 
 ---
 
@@ -238,7 +262,7 @@ SUSFS consumes this at 3 check points for per-UID visibility decisions. Without 
 ### DET02: Kernel capability probing at boot
 **Status:** DECIDED
 
-Probe order: (1) `/dev/zeromount` existence, (2) `GET_VERSION` ioctl for driver version, (3) `/proc/filesystems` for zeromount entry, (4) `/proc/config.gz` for `CONFIG_ZEROMOUNT=y`. Steps 1+2 always, 3-4 only on first boot or version mismatch.
+Probe order: (1) `/dev/zeromount` existence, (2) `GET_VERSION` ioctl for driver version, (3) `/sys/kernel/zeromount/` sysfs existence check, (4) `/proc/config.gz` for `CONFIG_ZEROMOUNT=y`. Steps 1+2 always, 3-4 only on first boot or version mismatch. Note: ZeroMount is a miscdevice (`misc_register`), NOT a registered filesystem — `/proc/filesystems` will NOT contain a zeromount entry.
 
 ### DET03: SUSFS detection — three-layer probe
 **Status:** CONFIRMED
@@ -288,32 +312,37 @@ Check `$KSU` and `$APATCH` environment variables. Filesystem fallback: `/data/ad
 ### KSU03: Config storage abstraction
 **Status:** DECIDED
 
-KernelSU has `ksud module config` (32 keys, 1MB values). APatch does not. The Rust binary uses file-based config (TOML) as the universal approach, avoiding platform-specific config APIs. `ksud module config` used only for `override.description` (KSU05) and `manage.kernel_umount` when on KSU.
+KernelSU has `ksud module config` (32 keys, 1MB values). APatch does not. The Rust binary uses file-based config (TOML) as the universal approach, avoiding platform-specific config APIs. `ksud module config` used only for `override.description` (KSU05) when on KSU.
 
 ### KSU04: No `manage.kernel_umount` declaration
 **Status:** DECIDED
 
-ZeroMount uses VFS redirection, not mounts. Declaring `kernel_umount` would cause ksud to try unmounting nonexistent mount points. In overlay fallback mode (DET01 NONE scenario), ZeroMount manages its own try_umount registration (ME10) rather than delegating to KSU's automatic system.
+`manage.kernel_umount` is a module config key (set via `ksud module config`) that controls whether a metamodule manages KernelSU's per-app "Umount Modules" feature. We do NOT declare it because:
+- **VFS mode:** No mounts exist, so per-app unmounting is irrelevant.
+- **Overlay fallback mode:** We WANT KSU's default per-app unmount behavior to apply to our overlay mounts. Not declaring `manage.kernel_umount` lets the default apply, which ME10 explicitly relies on for apps configured with "Umount Modules" in their KSU App Profile.
 
 ### KSU05: Dynamic description via `override.description`
 **Status:** DECIDED
 
-Update `module.prop` description after pipeline completion: `"GHOST | N Module(s) | mod1, mod2, mod3"` when active, `"Idle"` when no modules, `"ERROR: [reason]"` on failure. Cross-platform (both KSU and APatch display module.prop description).
+Update module description after pipeline completion: `"GHOST | N Module(s) | mod1, mod2, mod3"` when active, `"Idle"` when no modules, `"ERROR: [reason]"` on failure. Platform-specific implementation:
+- **KSU:** Use `ksud module config set override.description "text"` (KSU-only API).
+- **APatch:** Modify `module.prop` description field directly via `sed` (APatch lacks `ksud module config`).
+The `RootManager` trait (KSU02) abstracts this platform difference.
 
 ### KSU06: Thin `metamount.sh` launcher
 **Status:** DECIDED
 
 Under 30 lines. Detects architecture, selects correct binary, executes `zeromount mount`, handles bootloop counter, calls `ksud kernel notify-module-mounted` on success. All logic from the current 427-line `metamount.sh` moves into the Rust binary's `mount` subcommand.
 
-### KSU07: `metainstall.sh` — partition normalization at install
+### KSU07: `metainstall.sh` — partition normalization at module install
 **Status:** DECIDED
 
-Detect which partitions exist on the device at install time. Write `partitions.conf` for the Rust binary. Eliminates BUG-M2 (4 scripts with different partition lists) by detecting once rather than guessing at boot.
+Runs when OTHER modules are installed through ZeroMount (not ZeroMount's own install — that uses `customize.sh`). Detects which partitions exist on the device at install time. Writes `partitions.conf` for the Rust binary. Eliminates BUG-M2 (4 scripts with different partition lists) by detecting once rather than guessing at boot. Note: `metainstall.sh` is SOURCED by KernelSU, not executed — has access to `install_module` function which must be called to trigger built-in installation.
 
-### KSU08: `metauninstall.sh` — cleanup
+### KSU08: `metauninstall.sh` — cleanup on module uninstall
 **Status:** DECIDED
 
-Clear VFS rules, disable engine, remove `/data/adb/zeromount/` data directory, clean SUSFS entries tagged `[ZeroMount]`. Current 17-line script is appropriate with SUSFS cleanup addition.
+Runs when OTHER modules are uninstalled through ZeroMount (not ZeroMount's own uninstall — that uses `uninstall.sh`). Removes VFS rules associated with the uninstalled module and cleans per-module SUSFS entries tagged `[ZeroMount]`. ZeroMount's own self-cleanup (VFS rules, engine, `/data/adb/zeromount/` data directory) goes in `uninstall.sh`.
 
 ### KSU09: `notify-module-mounted` after full pipeline
 **Status:** DECIDED
@@ -323,16 +352,16 @@ Call AFTER: rules injected, engine enabled, SUSFS applied, kstat pass complete, 
 ### KSU10: `post-fs-data.sh` for detection, `metamount.sh` for mounting
 **Status:** DECIDED
 
-Split: `post-fs-data.sh` runs the Rust binary's `detect` subcommand (kernel probe, SUSFS probe, writes detection result JSON). `metamount.sh` reads detection result and runs the `mount` pipeline. Separates lightweight probing (safe at post-fs-data time) from heavy I/O (module iteration, file copying).
+Split: `post-fs-data.sh` runs the Rust binary's `detect` subcommand (kernel probe, SUSFS probe, writes detection result JSON). `metamount.sh` reads detection result and runs the `mount` pipeline. Separates lightweight probing (safe at post-fs-data time) from heavy I/O (module iteration, file copying). **Critical constraint:** `post-fs-data.sh` has a 10-second BLOCKING timeout shared across all module scripts. The `detect` subcommand must target <2 seconds to leave headroom for other modules' post-fs-data scripts.
 
 ---
 
 ## W: WebUI
 
-### W01: SolidJS + Material Web Components
+### W01: SolidJS with custom components
 **Status:** DECIDED
 
-Continue existing stack. Add `ScenarioIndicator` component showing active detection scenario with colored badge (green=FULL, yellow=SUSFS_FRONTEND, orange=KERNEL_ONLY).
+Continue existing SolidJS + Vite + TypeScript stack. `@material/web` is a phantom dependency — listed in `package.json` but no Material Web Components are actually imported or used; all UI is custom SolidJS components (Card, Button, Toggle, Input, Badge, Skeleton, Modal). Remove `@material/web` and `@material/material-color-utilities` from dependencies. Add `ScenarioIndicator` component showing active detection scenario with colored badge (green=FULL, yellow=SUSFS_FRONTEND, orange=KERNEL_ONLY).
 
 ### W02: JSON stdout for binary communication
 **Status:** DECIDED
@@ -386,7 +415,7 @@ Separate CI step: `cd webui/ && npm ci && npm run build`. Output to `module/webr
 ### B04: Module ZIP packaging
 **Status:** DECIDED
 
-Final ZIP contains: `module.prop`, `customize.sh`, `metainstall.sh`, `metamount.sh`, `metauninstall.sh`, `service.sh`, `post-fs-data.sh`, `zm-arm64`, `zm-arm`, `bin/` (aapt), `webroot/`. Eliminates 5 shell scripts (~2200 lines): `logging.sh`, `susfs_integration.sh`, `monitor.sh`, `sync.sh`, `zm-diag.sh` — all absorbed into Rust binary.
+Final ZIP contains: `module.prop`, `customize.sh`, `metainstall.sh`, `metamount.sh`, `metauninstall.sh`, `service.sh`, `post-fs-data.sh`, `zm-arm64`, `zm-arm`, `zm-x86_64`, `zm-x86`, `bin/` (aapt), `webroot/`. Eliminates 5 shell scripts (~2200 lines): `logging.sh`, `susfs_integration.sh`, `monitor.sh`, `sync.sh`, `zm-diag.sh` — all absorbed into Rust binary.
 
 ### B05: Module-only CI pipeline
 **Status:** CONFIRMED
@@ -400,7 +429,7 @@ Builds Rust binary + WebUI + packages ZIP. Kernel patches tested separately by u
 ### CO01: Ghost directory entries — kernel patch fix
 **Status:** DECIDED
 
-BUG-H1. Modify kernel `del_rule` to clean `dirs_ht` child entries. Modify `clear_all` to iterate and free `dirs_ht`. Rust binary mitigates via `CLEAR_ALL` + re-inject pattern for hot-reload.
+BUG-H1. Both `del_rule` AND `clear_all` leak `dirs_ht` entries — neither touches `zeromount_dirs_ht`. The `zeromount_dir_node` and `zeromount_child_name` structs allocated in `zeromount_auto_inject_parent()` are never freed by any ioctl path. Kernel patch must add `dirs_ht` cleanup to both functions. Rust binary mitigates via `CLEAR_ALL` + full re-injection pattern for hot-reload (stale entries masked by dedup check on re-inject).
 
 ### CO02: Centralize partition list
 **Status:** DECIDED
@@ -464,6 +493,8 @@ Custom kernel command `CMD_SUSFS_ADD_SUS_KSTAT_REDIRECT` exists in the ZeroMount
 
 Custom kernel command `CMD_SUSFS_ADD_OPEN_REDIRECT_ALL` redirects file opens for ALL UIDs, not just per-UID. Used for font handling where all processes need to see the redirected font. The Rust binary must support this. Falls back to per-UID `open_redirect` if custom command unavailable.
 
+**Note:** `open_redirect_all` has NO CLI handler in the upstream `ksu_susfs` binary — the `#define` exists in `main.c:42` but no `main()` branch handles it. The Rust binary MUST invoke this command directly via the `SYS_reboot` supercall mechanism (see SUSFS supercall section below), not by shelling out to `ksu_susfs`.
+
 ### S11: SUSFS unicode filter (`KSU_SUSFS_UNICODE_FILTER`)
 **Status:** PENDING
 
@@ -472,7 +503,7 @@ Custom Kconfig option in the fork that blocks scoped storage bypass via unicode 
 ### S12: SUSFS config — direct binary calls, no config files
 **Status:** PENDING
 
-Current `susfs_update_config()` writes config files that nothing appears to read (ARCH-5). The Rust binary calls `ksu_susfs` commands directly — no config files, no symlinks. SUSFS config files are a v1 artifact. All configuration lives in ZeroMount's own `config.toml`.
+In v1, `susfs_update_config()` writes config files (`sus_path.txt`, `sus_path_loop.txt`, `sus_open_redirect.txt`, `sus_maps.txt`, `sus_mount.txt`) that ARE read by the upstream SUSFS flashable module at boot (`boot-completed.sh`, `post-mount.sh`, `service.sh`) as a reboot persistence mechanism. In v2, ZeroMount replaces the SUSFS module entirely — the Rust binary handles all SUSFS commands at boot via its own pipeline, making these config files unnecessary. All configuration lives in ZeroMount's own `config.toml`.
 
 ### S13: SUSFS fork diff — exact patch boundaries
 **Status:** PENDING (pre-implementation task)
@@ -486,7 +517,12 @@ Full line-by-line diff between upstream SUSFS (`gitlab.com/simonpunk/susfs4ksu`)
 ### W08: Glass morphism toggle migration
 **Status:** PENDING
 
-Replace Material Web Components toggle with custom glass morphism toggle from `/home/president/Git-repo-success/glass-toggle.css`. Accent-adaptive via `--accent-rgb` CSS custom property. Uses standard CSS (no exotic features), compatible with Android WebView. Applied to: engine toggle (StatusTab), all SUSFS capability toggles (SettingsTab), BRENE feature toggles.
+Replace inline-styled custom toggle (`Toggle.tsx`, 84 lines) with class-based glass morphism toggle from `/home/president/Git-repo-success/glass-toggle.css`. Accent-adaptive via `--accent-rgb` CSS custom property (already set by `theme.ts:175`). Uses standard CSS, compatible with Android WebView. Applied to: engine toggle (StatusTab), all SUSFS capability toggles (SettingsTab), BRENE feature toggles.
+
+**Integration notes:**
+- Use `var(--text-accent)` not `var(--accent)` — the codebase has no `--accent` variable; `--text-accent` is used in 15+ places.
+- Remove `@media (prefers-color-scheme: light)` block — redundant with JS-driven theme switching (`store.settings.theme`), and KSU WebView may not propagate this media query.
+- `inset: 0` is fine — already used extensively in the codebase (`Toggle.tsx:58`, `StatusTab.css:50`, `app.css:336,353,360`).
 
 ### W09: BRENE-style feature toggles in settings
 **Status:** PENDING
@@ -494,8 +530,11 @@ Replace Material Web Components toggle with custom glass morphism toggle from `/
 New settings section for SUSFS automation features (from S08). Hierarchical toggle groups:
 - **Auto-hiding** (parent toggle) → APK injection, zygisk maps, font maps, rooted app folders, recovery folders, `/data/local/tmp`, `/sdcard/Android/data`
 - **Custom lists** → sus_path, sus_map, sus_path_loop (text-area input, WebUI editable)
-- **Spoofing** → Uname (3 modes), properties, AVC logs
+- **Spoofing** → Uname (3 modes), AVC logs
+- **Property spoofing** → Separate section (NOT a SUSFS feature — uses `resetprop`, a KSU/Magisk utility, not `ksu_susfs`)
 Each sub-toggle disabled when parent capability unavailable (matches W03 pattern).
+
+**Persistence:** BRENE toggles MUST persist to `config.toml` via `zeromount config set/get` CLI, NOT localStorage. The Rust binary needs toggle state at boot (before WebUI opens). localStorage doesn't survive WebView cache clears. The WebUI calls `zeromount config set susfs.auto_hide_apks true` etc.
 
 ---
 
@@ -543,16 +582,16 @@ Each sub-toggle disabled when parent capability unavailable (matches W03 pattern
 | Category | Count | CONFIRMED | DECIDED | PENDING |
 |----------|-------|-----------|---------|---------|
 | Rust Binary (R) | 10 | 2 | 8 | 0 |
-| Mount Engine (ME) | 12 | 2 | 10 | 0 |
+| Mount Engine (ME) | 15 | 2 | 13 | 0 |
 | VFS Integration (VFS) | 7 | 1 | 6 | 0 |
-| SUSFS Integration (S) | 13 | 3 | 3 | 7 |
+| SUSFS Integration (S) | 13 | 2 | 4 | 7 |
 | Detection System (DET) | 7 | 2 | 5 | 0 |
 | Platform Integration (KSU) | 10 | 1 | 9 | 0 |
 | WebUI (W) | 9 | 1 | 6 | 2 |
 | Build System (B) | 5 | 2 | 3 | 0 |
 | Carry-Over Fixes (CO) | 4 | 0 | 4 | 0 |
-| **Total** | **77** | **14** | **54** | **9** |
+| **Total** | **80** | **13** | **58** | **9** |
 
 ---
 
-*Last updated: 2026-02-08 — Session 2 (all subsystems reviewed, DET03/B02/R10 updated, SUSFS/WebUI expansion pending)*
+*Last updated: 2026-02-08 — Session 3 (verification reports synthesized, corrections applied, ME13-15 added)*
