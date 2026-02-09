@@ -120,7 +120,7 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig) -> Result<Bre
     // -- Font redirect (delegates to F15) --
 
     if brene.auto_hide_fonts {
-        let count = process_font_modules(client);
+        let count = process_font_modules(client, &config.mount.overlay_source);
         result.font_modules_processed = count;
         info!("BRENE: processed {count} font modules");
     }
@@ -245,7 +245,7 @@ fn hide_apk_paths(client: &SusfsClient) -> u32 {
 }
 
 /// Scan /data/adb/modules/ for font modules and apply redirect via F15.
-fn process_font_modules(client: &SusfsClient) -> u32 {
+fn process_font_modules(client: &SusfsClient, overlay_source: &str) -> u32 {
     let modules_dir = Path::new(MODULES_DIR);
     if !modules_dir.is_dir() {
         return 0;
@@ -279,7 +279,7 @@ fn process_font_modules(client: &SusfsClient) -> u32 {
             None => continue,
         };
 
-        match fonts::redirect_font_module(client, &module_id, &font_dir, SYSTEM_FONTS_DIR) {
+        match fonts::redirect_font_module(client, &module_id, &font_dir, SYSTEM_FONTS_DIR, overlay_source) {
             Ok(result) => {
                 debug!(
                     "font module '{}': strategy={:?}, redirected={}",
@@ -478,7 +478,7 @@ mod tests {
             path: true,
             ..SusfsFeatures::default()
         });
-        let count = process_font_modules(&client);
+        let count = process_font_modules(&client, "auto");
         assert_eq!(count, 0);
     }
 

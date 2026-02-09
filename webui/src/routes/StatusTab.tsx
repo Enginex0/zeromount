@@ -428,7 +428,7 @@ export function StatusTab() {
               Source
             </div>
             <div class="status-mount__card-value color-text-accent">
-              KSU
+              {store.rootManager() ?? 'Unknown'}
             </div>
           </div>
         </div>
@@ -578,6 +578,10 @@ export function StatusTab() {
             <div>
               <span class="status-info__label color-text-tertiary">SUSFS:</span>
               <span class="color-text-accent">{store.systemInfo.susfsVersion}</span>
+            </div>
+            <div>
+              <span class="status-info__label color-text-tertiary">Root:</span>
+              <span class="color-text-accent">{store.rootManager() ?? 'Unknown'}</span>
             </div>
             <div>
               <span class="status-info__label color-text-tertiary">misc:</span>

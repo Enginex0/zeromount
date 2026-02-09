@@ -47,6 +47,7 @@ function createAppStore() {
   const [moduleStatuses, setModuleStatuses] = createSignal<ModuleStatus[]>([]);
   const [degraded, setDegraded] = createSignal(false);
   const [degradationReason, setDegradationReason] = createSignal<string | null>(null);
+  const [rootManager, setRootManager] = createSignal<string | null>(null);
 
   const savedTheme = typeof window !== 'undefined'
     ? (localStorage.getItem('zeromount-theme') as 'dark' | 'light' | 'auto' | 'amoled' | null)
@@ -103,6 +104,8 @@ function createAppStore() {
     overlay_preferred: true,
     magic_mount_fallback: true,
     random_mount_paths: true,
+    mount_source: 'auto',
+    overlay_source: 'auto',
   };
 
   const [settings, setSettings] = createStore<Settings>({
@@ -522,6 +525,14 @@ function createAppStore() {
       }
     });
     setSettings('mount', prev => ({ ...prev, ...mount }));
+    const mountSource = await api.configGet('mount.mount_source');
+    if (mountSource !== null) {
+      setSettings('mount', 'mount_source', mountSource);
+    }
+    const overlaySource = await api.configGet('mount.overlay_source');
+    if (overlaySource !== null) {
+      setSettings('mount', 'overlay_source', overlaySource);
+    }
     console.log('[ZM-Store] loadMountSettings() loaded:', mount);
   };
 
@@ -561,6 +572,30 @@ function createAppStore() {
       console.error('[ZM-Store] setMountToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('mount', key, prev);
+    }
+  };
+
+  const setMountSource = async (value: string) => {
+    const prev = settings.mount.mount_source;
+    setSettings('mount', 'mount_source', value);
+    try {
+      await api.configSet('mount.mount_source', value);
+      await api.logActivity('SETTING_CHANGED', `Staging source → ${value}`);
+    } catch (e) {
+      showToast('Failed to save mount source', 'error');
+      setSettings('mount', 'mount_source', prev);
+    }
+  };
+
+  const setOverlaySource = async (value: string) => {
+    const prev = settings.mount.overlay_source;
+    setSettings('mount', 'overlay_source', value);
+    try {
+      await api.configSet('mount.overlay_source', value);
+      await api.logActivity('SETTING_CHANGED', `Overlay source → ${value}`);
+    } catch (e) {
+      showToast('Failed to save overlay source', 'error');
+      setSettings('mount', 'overlay_source', prev);
     }
   };
 
@@ -611,6 +646,7 @@ function createAppStore() {
       setModuleStatuses(status.modules);
       setDegraded(status.degraded);
       setDegradationReason(status.degradation_reason);
+      setRootManager(status.root_manager);
 
       if (status.engine_active !== null) {
         setEngineActive(status.engine_active);
@@ -837,6 +873,7 @@ function createAppStore() {
     moduleStatuses,
     degraded,
     degradationReason,
+    rootManager,
     settings,
     currentTheme,
     toast,
@@ -853,6 +890,8 @@ function createAppStore() {
     setMountStrategy,
     setMountStorageMode,
     setMountToggle,
+    setMountSource,
+    setOverlaySource,
     activeStrategy,
     scanKsuModules,
     loadKsuModule,

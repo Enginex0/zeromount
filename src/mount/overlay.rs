@@ -7,8 +7,6 @@ use tracing::{debug, info};
 
 use crate::core::types::{MountResult, MountStrategy};
 
-const MOUNT_SOURCE: &str = "KSU";
-
 // Syscall numbers for the new mount API (Linux 5.2+)
 #[cfg(target_arch = "aarch64")]
 mod syscall_nr {
@@ -58,6 +56,7 @@ pub fn mount_overlay(
     work: &Path,
     target: &Path,
     module_id: &str,
+    overlay_source: &str,
 ) -> Result<MountResult> {
     if lower_dirs.is_empty() {
         return Ok(MountResult {
@@ -84,7 +83,7 @@ pub fn mount_overlay(
     let lowerdir = build_lowerdir_string(lower_dirs, target);
 
     // Try new mount API first, fall back to legacy
-    let result = match mount_overlay_new_api(&lowerdir, work, target) {
+    let result = match mount_overlay_new_api(&lowerdir, work, target, overlay_source) {
         Ok(()) => {
             info!(
                 target = %target.display(),
@@ -99,7 +98,7 @@ pub fn mount_overlay(
                 error = %e,
                 "new mount API failed, trying legacy mount(2)"
             );
-            mount_overlay_legacy(&lowerdir, work, target)
+            mount_overlay_legacy(&lowerdir, work, target, overlay_source)
                 .map(|()| {
                     info!(
                         target = %target.display(),
@@ -154,7 +153,7 @@ fn escape_overlay_path(path: &str) -> String {
 
 /// New mount API: fsopen -> fsconfig -> fsmount -> move_mount (Linux 5.2+).
 /// Provides structured error reporting vs the legacy single-call approach.
-fn mount_overlay_new_api(lowerdir: &str, work: &Path, target: &Path) -> Result<()> {
+fn mount_overlay_new_api(lowerdir: &str, work: &Path, target: &Path, overlay_source: &str) -> Result<()> {
     let c_fstype = CString::new("overlay")?;
 
     // fsopen("overlay", 0)
@@ -170,7 +169,7 @@ fn mount_overlay_new_api(lowerdir: &str, work: &Path, target: &Path) -> Result<(
     // Ensure we close fs_fd on any error path
     let result = (|| -> Result<()> {
         // fsconfig(fs_fd, FSCONFIG_SET_STRING, "source", "KSU", 0)
-        fsconfig_set_string(fs_fd, "source", MOUNT_SOURCE)?;
+        fsconfig_set_string(fs_fd, "source", overlay_source)?;
 
         // fsconfig(fs_fd, FSCONFIG_SET_STRING, "lowerdir", lowerdir, 0)
         fsconfig_set_string(fs_fd, "lowerdir", lowerdir)?;
@@ -255,8 +254,8 @@ fn fsconfig_set_string(fs_fd: libc::c_int, key: &str, value: &str) -> Result<()>
 }
 
 /// Legacy mount(2) fallback for kernels without the new mount API.
-fn mount_overlay_legacy(lowerdir: &str, work: &Path, target: &Path) -> Result<()> {
-    let c_source = CString::new(MOUNT_SOURCE)?;
+fn mount_overlay_legacy(lowerdir: &str, work: &Path, target: &Path, overlay_source: &str) -> Result<()> {
+    let c_source = CString::new(overlay_source)?;
     let c_target = CString::new(target.as_os_str().as_encoded_bytes())?;
     let c_fstype = CString::new("overlay")?;
 

@@ -289,6 +289,7 @@ export const MockAPI = {
       timestamp: Date.now(),
       degraded: false,
       degradation_reason: null,
+      root_manager: 'KernelSU',
     };
   },
 
@@ -318,4 +319,6 @@ const mockBreneConfig: Record<string, string> = {
   'mount.overlay_preferred': 'true',
   'mount.magic_mount_fallback': 'true',
   'mount.random_mount_paths': 'true',
+  'mount.mount_source': 'auto',
+  'mount.overlay_source': 'auto',
 };

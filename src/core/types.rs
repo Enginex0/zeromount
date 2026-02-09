@@ -175,6 +175,7 @@ pub struct RuntimeState {
     pub timestamp: u64,
     pub degraded: bool,
     pub degradation_reason: Option<String>,
+    pub root_manager: Option<String>,
 }
 
 impl Default for RuntimeState {
@@ -192,6 +193,7 @@ impl Default for RuntimeState {
             timestamp: 0,
             degraded: false,
             degradation_reason: None,
+            root_manager: None,
         }
     }
 }

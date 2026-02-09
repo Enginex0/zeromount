@@ -23,6 +23,8 @@ const accentColors = [
 
 export function SettingsTab() {
   const [showClearConfirm, setShowClearConfirm] = createSignal(false);
+  const [customOverlaySource, setCustomOverlaySource] = createSignal('');
+  const [customMountSource, setCustomMountSource] = createSignal('');
   const selectedAccent = () => store.settings.accentColor;
 
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'auto' | 'amoled') => {
@@ -323,6 +325,92 @@ Engine: ${store.engineActive() ? 'Active' : 'Inactive'}
               onChange={(v) => store.setMountToggle('random_mount_paths', v)}
             />
           </div>
+
+          <div class="settings__item">
+            <div class="settings__item-content">
+              <div class="settings__item-label">Overlay Mount Source</div>
+              <div class="settings__item-desc">
+                Source device for overlay mounts
+                <Show when={store.settings.mount.overlay_source === 'auto'}>
+                  <span style={{ "font-style": "italic" }}> — resolves per root manager</span>
+                </Show>
+              </div>
+            </div>
+            <select
+              class="settings__select"
+              value={['auto', 'KSU', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                if (val === 'custom') {
+                  setCustomOverlaySource('');
+                  store.setOverlaySource('');
+                } else {
+                  store.setOverlaySource(val);
+                }
+              }}
+            >
+              <option value="auto">Auto</option>
+              <option value="KSU">KSU</option>
+              <option value="overlay">overlay</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <Show when={!['auto', 'KSU', 'overlay'].includes(store.settings.mount.overlay_source)}>
+            <div class="settings__item settings__item--sub">
+              <div class="settings__item-content">
+                <div class="settings__item-label">Custom Source</div>
+              </div>
+              <Input
+                value={store.settings.mount.overlay_source === 'custom' ? customOverlaySource() : store.settings.mount.overlay_source}
+                placeholder="e.g. my_overlay"
+                onBlur={(e) => store.setOverlaySource(e.currentTarget.value)}
+              />
+            </div>
+          </Show>
+
+          <div class="settings__item">
+            <div class="settings__item-content">
+              <div class="settings__item-label">Staging Mount Source</div>
+              <div class="settings__item-desc">
+                Source device for staging mounts
+                <Show when={store.settings.mount.mount_source === 'auto'}>
+                  <span style={{ "font-style": "italic" }}> — random selection per boot</span>
+                </Show>
+              </div>
+            </div>
+            <select
+              class="settings__select"
+              value={['auto', 'tmpfs', 'none', 'shmem', 'shm', 'custom'].includes(store.settings.mount.mount_source) ? store.settings.mount.mount_source : 'custom'}
+              onChange={(e) => {
+                const val = e.currentTarget.value;
+                if (val === 'custom') {
+                  setCustomMountSource('');
+                  store.setMountSource('');
+                } else {
+                  store.setMountSource(val);
+                }
+              }}
+            >
+              <option value="auto">Auto</option>
+              <option value="tmpfs">tmpfs</option>
+              <option value="none">none</option>
+              <option value="shmem">shmem</option>
+              <option value="shm">shm</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <Show when={!['auto', 'tmpfs', 'none', 'shmem', 'shm'].includes(store.settings.mount.mount_source)}>
+            <div class="settings__item settings__item--sub">
+              <div class="settings__item-content">
+                <div class="settings__item-label">Custom Source</div>
+              </div>
+              <Input
+                value={store.settings.mount.mount_source === 'custom' ? customMountSource() : store.settings.mount.mount_source}
+                placeholder="e.g. my_source"
+                onBlur={(e) => store.setMountSource(e.currentTarget.value)}
+              />
+            </div>
+          </Show>
         </Show>
       </Card>
 

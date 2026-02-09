@@ -68,6 +68,7 @@ export interface RuntimeStatus {
   timestamp: number;
   degraded: boolean;
   degradation_reason: string | null;
+  root_manager: string | null;
 }
 
 export interface KsuModule {
@@ -136,6 +137,8 @@ export interface MountSettings {
   overlay_preferred: boolean;
   magic_mount_fallback: boolean;
   random_mount_paths: boolean;
+  mount_source: string;
+  overlay_source: string;
 }
 
 export interface Settings {

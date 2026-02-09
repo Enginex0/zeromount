@@ -76,6 +76,10 @@ pub struct MountConfig {
     pub magic_mount_fallback: bool,
     #[serde(default = "default_true")]
     pub random_mount_paths: bool,
+    #[serde(default = "default_auto")]
+    pub mount_source: String,
+    #[serde(default = "default_auto")]
+    pub overlay_source: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,6 +104,8 @@ impl Default for MountConfig {
             overlay_preferred: true,
             magic_mount_fallback: true,
             random_mount_paths: true,
+            mount_source: default_auto(),
+            overlay_source: default_auto(),
         }
     }
 }
@@ -265,6 +271,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_auto() -> String {
+    "auto".to_string()
+}
+
 // -- 3-layer resolution --
 
 impl ZeroMountConfig {
@@ -386,6 +396,8 @@ impl ZeroMountConfig {
             "mount.overlay_preferred" => Some(self.mount.overlay_preferred.to_string()),
             "mount.magic_mount_fallback" => Some(self.mount.magic_mount_fallback.to_string()),
             "mount.random_mount_paths" => Some(self.mount.random_mount_paths.to_string()),
+            "mount.mount_source" => Some(self.mount.mount_source.clone()),
+            "mount.overlay_source" => Some(self.mount.overlay_source.clone()),
 
             // susfs.*
             "susfs.enabled" => Some(self.susfs.enabled.to_string()),
@@ -438,6 +450,8 @@ impl ZeroMountConfig {
             "mount.overlay_preferred" => self.mount.overlay_preferred = value.parse()?,
             "mount.magic_mount_fallback" => self.mount.magic_mount_fallback = value.parse()?,
             "mount.random_mount_paths" => self.mount.random_mount_paths = value.parse()?,
+            "mount.mount_source" => self.mount.mount_source = value.to_string(),
+            "mount.overlay_source" => self.mount.overlay_source = value.to_string(),
 
             // susfs.*
             "susfs.enabled" => self.susfs.enabled = value.parse()?,
@@ -604,6 +618,8 @@ mod tests {
         assert!(config.mount.overlay_preferred);
         assert!(config.mount.magic_mount_fallback);
         assert!(config.mount.random_mount_paths);
+        assert_eq!(config.mount.mount_source, "auto");
+        assert_eq!(config.mount.overlay_source, "auto");
         assert!(config.susfs.enabled);
         assert!(config.susfs.kstat);
         assert!(config.brene.auto_hide_apk);
@@ -759,6 +775,8 @@ kstat = false
         assert_eq!(config.mount.storage_mode, StorageMode::Auto);
         assert!(config.mount.overlay_preferred);
         assert!(config.mount.random_mount_paths);
+        assert_eq!(config.mount.mount_source, "auto");
+        assert_eq!(config.mount.overlay_source, "auto");
         assert!(config.susfs.enabled);
         assert!(config.brene.auto_hide_apk);
         assert!(config.brene.auto_hide_rooted_folders);
@@ -794,5 +812,17 @@ kstat = false
     fn unknown_key_rejected() {
         let mut config = ZeroMountConfig::default();
         assert!(config.set("nonexistent", "value").is_err());
+    }
+
+    #[test]
+    fn mount_source_fields_roundtrip() {
+        let mut config = ZeroMountConfig::default();
+        assert_eq!(config.get("mount.mount_source").unwrap(), "auto");
+        assert_eq!(config.get("mount.overlay_source").unwrap(), "auto");
+
+        config.set("mount.mount_source", "tmpfs").unwrap();
+        config.set("mount.overlay_source", "KSU").unwrap();
+        assert_eq!(config.get("mount.mount_source").unwrap(), "tmpfs");
+        assert_eq!(config.get("mount.overlay_source").unwrap(), "KSU");
     }
 }

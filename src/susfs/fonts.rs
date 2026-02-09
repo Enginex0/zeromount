@@ -206,6 +206,7 @@ pub fn redirect_font_module(
     module_id: &str,
     module_font_dir: &Path,
     system_font_dir: &str,
+    overlay_source: &str,
 ) -> Result<FontModuleResult> {
     // Try SUSFS redirect first
     if client.is_available() && client.features().open_redirect {
@@ -237,7 +238,7 @@ pub fn redirect_font_module(
     }
 
     // OverlayFS fallback (S07 exception to VFS02)
-    match mount_font_overlay(module_font_dir, system_font_dir) {
+    match mount_font_overlay(module_font_dir, system_font_dir, overlay_source) {
         Ok(count) => {
             info!("font module '{module_id}': overlay fallback mounted {count} files");
             Ok(FontModuleResult {
@@ -264,7 +265,7 @@ pub fn redirect_font_module(
 /// Creates an overlay with the module's font dir as upper layer over
 /// /system/fonts. This produces a visible mount point, so it's only
 /// used when SUSFS redirect is unavailable or unreliable.
-fn mount_font_overlay(module_font_dir: &Path, system_font_dir: &str) -> Result<usize> {
+fn mount_font_overlay(module_font_dir: &Path, system_font_dir: &str, overlay_source: &str) -> Result<usize> {
     let target = Path::new(system_font_dir);
     if !target.is_dir() {
         bail!("system font directory missing: {system_font_dir}");
@@ -296,7 +297,7 @@ fn mount_font_overlay(module_font_dir: &Path, system_font_dir: &str) -> Result<u
     let target_c = CString::new(system_font_dir)
         .map_err(|_| anyhow::anyhow!("invalid target path"))?;
     let fstype = CString::new("overlay")?;
-    let source = CString::new("KSU")?;
+    let source = CString::new(overlay_source)?;
     let opts_c = CString::new(opts.as_str())
         .map_err(|_| anyhow::anyhow!("invalid overlay options"))?;
 

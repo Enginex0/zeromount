@@ -100,6 +100,36 @@ impl RootManager for APatchManager {
     }
 }
 
+// -- Magisk --
+
+pub struct MagiskManager;
+
+impl RootManager for MagiskManager {
+    fn name(&self) -> &str {
+        "Magisk"
+    }
+
+    fn base_dir(&self) -> &Path {
+        Path::new("/data/adb/magisk/")
+    }
+
+    fn busybox_path(&self) -> PathBuf {
+        PathBuf::from("/data/adb/magisk/busybox")
+    }
+
+    fn susfs_binary_paths(&self) -> Vec<PathBuf> {
+        vec![]
+    }
+
+    fn update_description(&self, text: &str) -> Result<()> {
+        write_description_to_module_prop(text)
+    }
+
+    fn notify_module_mounted(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
 // -- Shared --
 
 fn write_description_to_module_prop(text: &str) -> Result<()> {
@@ -147,5 +177,14 @@ pub fn detect_root_manager() -> Result<Box<dyn RootManager>> {
         return Ok(Box::new(APatchManager));
     }
 
-    anyhow::bail!("no supported root manager detected (neither KernelSU nor APatch found)")
+    // Magisk: check $MAGISK or filesystem
+    if std::env::var("MAGISK").ok().as_deref() == Some("true") {
+        return Ok(Box::new(MagiskManager));
+    }
+
+    if Path::new("/data/adb/magisk/").exists() {
+        return Ok(Box::new(MagiskManager));
+    }
+
+    anyhow::bail!("no supported root manager detected (neither KernelSU, APatch, nor Magisk found)")
 }

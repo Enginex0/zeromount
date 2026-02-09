@@ -425,6 +425,7 @@ impl MountController<Mounted> {
             timestamp,
             degraded,
             degradation_reason,
+            root_manager: Some(self.state.root_mgr.name().to_string()),
         }
     }
 }

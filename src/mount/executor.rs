@@ -62,7 +62,7 @@ fn execute_overlay(
         let target = &pm.mount_point;
 
         let mount_id = pm.contributing_modules.join("+");
-        let result = mount_overlay(&lower_refs, &work, target, &mount_id)?;
+        let result = mount_overlay(&lower_refs, &work, target, &mount_id, &storage.overlay_source)?;
 
         // ME12: nuke backing file after successful mount — kernel keeps inode alive
         if result.success {
