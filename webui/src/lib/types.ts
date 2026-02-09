@@ -16,7 +16,7 @@ export interface ExcludedUid {
 
 export interface ActivityItem {
   id: string;
-  type: 'rule_added' | 'rule_removed' | 'uid_excluded' | 'uid_included' | 'engine_enabled' | 'engine_disabled';
+  type: 'rule_added' | 'rule_removed' | 'uid_excluded' | 'uid_included' | 'engine_enabled' | 'engine_disabled' | 'setting_changed' | 'mount_strategy_changed' | 'susfs_toggle' | 'brene_toggle' | 'theme_changed';
   message: string;
   timestamp: Date;
 }
@@ -108,6 +108,9 @@ export interface BreneSettings {
   auto_hide_sdcard_data: boolean;
   avc_log_spoofing: boolean;
   susfs_log: boolean;
+  hide_sus_mounts: boolean;
+  emulate_vold_app_data: boolean;
+  force_hide_lsposed: boolean;
   prop_spoofing: boolean;
 }
 

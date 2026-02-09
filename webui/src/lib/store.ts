@@ -77,8 +77,11 @@ function createAppStore() {
     auto_hide_recovery: true,
     auto_hide_tmp: true,
     auto_hide_sdcard_data: true,
-    avc_log_spoofing: false,
+    avc_log_spoofing: true,
     susfs_log: false,
+    hide_sus_mounts: true,
+    emulate_vold_app_data: true,
+    force_hide_lsposed: true,
     prop_spoofing: true,
   };
 
@@ -368,6 +371,9 @@ function createAppStore() {
   const updateSettings = (updates: Partial<Settings>) => {
     console.log('[ZM-Store] updateSettings() called:', updates);
     setSettings(updates);
+    if (updates.theme) api.logActivity('THEME_CHANGED', `Theme → ${updates.theme}`);
+    if (updates.accentColor) api.logActivity('THEME_CHANGED', `Accent → ${updates.accentColor}`);
+    if (updates.fixedNav !== undefined) api.logActivity('SETTING_CHANGED', `Fixed nav → ${updates.fixedNav ? 'ON' : 'OFF'}`);
   };
 
   const fetchSystemColor = async () => {
@@ -385,6 +391,7 @@ function createAppStore() {
     setSettings({ verboseLogging: enabled });
     try {
       await api.setVerboseLogging(enabled);
+      await api.logActivity('SETTING_CHANGED', `Verbose logging → ${enabled ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error('[ZM-Store] setVerboseLogging() error:', e);
       showToast('Failed to set verbose logging', 'error');
@@ -396,6 +403,7 @@ function createAppStore() {
       'auto_hide_apk', 'auto_hide_zygisk', 'auto_hide_fonts',
       'auto_hide_rooted_folders', 'auto_hide_recovery', 'auto_hide_tmp',
       'auto_hide_sdcard_data', 'avc_log_spoofing', 'susfs_log',
+      'hide_sus_mounts', 'emulate_vold_app_data', 'force_hide_lsposed',
     ];
     const results = await Promise.allSettled([
       ...breneKeys.map(k => api.configGet(`brene.${k}`)),
@@ -432,10 +440,22 @@ function createAppStore() {
     setSettings('brene', key, value);
     try {
       await api.configSet(`brene.${key}`, String(value));
-      // Chain AVC log spoofing to SUSFS kernel command
+      // Chain controlled settings to SUSFS kernel + config.sh
       if (key === 'avc_log_spoofing') {
         await api.setSusfsAvcSpoofing(value);
+        await api.writeSusfsConfigVar('avc_log_spoofing', value ? '1' : '0');
+      } else if (key === 'susfs_log') {
+        await api.setSusfsLog(value);
+        await api.writeSusfsConfigVar('susfs_log', value ? '1' : '0');
+      } else if (key === 'hide_sus_mounts') {
+        await api.setSusfsHideMounts(value);
+        await api.writeSusfsConfigVar('hide_sus_mnts_for_all_or_non_su_procs', value ? '1' : '0');
+      } else if (key === 'emulate_vold_app_data') {
+        await api.writeSusfsConfigVar('emulate_vold_app_data', value ? '1' : '0');
+      } else if (key === 'force_hide_lsposed') {
+        await api.writeSusfsConfigVar('force_hide_lsposed', value ? '1' : '0');
       }
+      await api.logActivity('BRENE_TOGGLE', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error('[ZM-Store] setBreneToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
@@ -447,6 +467,7 @@ function createAppStore() {
     setSettings('susfs', key, value);
     try {
       await api.configSet(`susfs.${key}`, String(value));
+      await api.logActivity('SUSFS_TOGGLE', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error('[ZM-Store] setSusfsToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
@@ -459,6 +480,7 @@ function createAppStore() {
     setSettings('uname', 'mode', mode);
     try {
       await api.configSet('uname.mode', mode);
+      await api.logActivity('SETTING_CHANGED', `Uname mode → ${mode}`);
     } catch (e) {
       console.error('[ZM-Store] setUnameMode() error:', e);
       showToast('Failed to save uname mode', 'error');
@@ -471,6 +493,7 @@ function createAppStore() {
     setSettings('uname', field, value);
     try {
       await api.configSet(`uname.${field}`, value);
+      await api.logActivity('SETTING_CHANGED', `Uname ${field} → ${value || '(empty)'}`);
     } catch (e) {
       console.error('[ZM-Store] setUnameField() error:', e);
       showToast(`Failed to save uname ${field}`, 'error');
@@ -507,6 +530,7 @@ function createAppStore() {
     setSettings('mount', 'storage_mode', mode);
     try {
       await api.configSet('mount.storage_mode', mode);
+      await api.logActivity('SETTING_CHANGED', `Storage mode → ${mode}`);
       console.log('[ZM-Store] setMountStorageMode() saved:', mode);
     } catch (e) {
       console.error('[ZM-Store] setMountStorageMode() error:', e);
@@ -521,6 +545,7 @@ function createAppStore() {
     setSettings('mount', key, value);
     try {
       await api.configSet(`mount.${key}`, String(value));
+      await api.logActivity('SETTING_CHANGED', `${key} → ${value ? 'ON' : 'OFF'}`);
       console.log('[ZM-Store] setMountToggle() saved:', key, value);
     } catch (e) {
       console.error('[ZM-Store] setMountToggle() error:', e);
@@ -549,6 +574,7 @@ function createAppStore() {
         api.configSet('mount.overlay_preferred', String(newOverlay)),
         api.configSet('mount.magic_mount_fallback', String(newMagic)),
       ]);
+      await api.logActivity('MOUNT_STRATEGY_CHANGED', `Strategy → ${strategy}`);
       console.log('[ZM-Store] setMountStrategy() saved:', strategy, '→ overlay_preferred:', newOverlay, 'magic_mount_fallback:', newMagic);
     } catch (e) {
       console.error('[ZM-Store] setMountStrategy() error:', e);

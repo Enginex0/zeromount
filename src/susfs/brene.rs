@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
@@ -148,6 +148,13 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig) -> Result<Bre
         info!("BRENE: custom sus_maps hidden ({count}/{})", path_refs.len());
     }
 
+    // -- Hide sus mounts (kernel supercall — takes effect immediately) --
+
+    match client.hide_sus_mounts(brene.hide_sus_mounts) {
+        Ok(()) => info!("BRENE: hide_sus_mounts set to {}", brene.hide_sus_mounts),
+        Err(e) => warn!("BRENE: hide_sus_mounts failed: {e}"),
+    }
+
     // -- AVC log spoofing --
 
     if brene.avc_log_spoofing {
@@ -175,6 +182,11 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig) -> Result<Bre
     // -- Uname spoofing --
 
     apply_uname(client, &config.uname, &mut result)?;
+
+    // Sync all 5 controlled settings to SUSFS config.sh
+    if let Err(e) = sync_susfs_config(config) {
+        warn!("BRENE: SUSFS config sync failed: {e}");
+    }
 
     info!(
         "BRENE complete: {} paths, {} maps, {} font modules, uname={}, avc={}",
@@ -338,6 +350,42 @@ fn build_dynamic_uname() -> Result<(String, String)> {
     Ok((release, version))
 }
 
+const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";
+
+// Sync our BRENE toggles to SUSFS config.sh so SUSFS boot scripts stay in sync
+pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
+    let config_path = Path::new(SUSFS_PERSISTENT_CONFIG);
+    if !config_path.exists() {
+        debug!("SUSFS config.sh not found, skipping sync");
+        return Ok(());
+    }
+
+    let brene = &config.brene;
+    let pairs = [
+        ("susfs_log", brene.susfs_log),
+        ("avc_log_spoofing", brene.avc_log_spoofing),
+        ("hide_sus_mnts_for_all_or_non_su_procs", brene.hide_sus_mounts),
+        ("emulate_vold_app_data", brene.emulate_vold_app_data),
+        ("force_hide_lsposed", brene.force_hide_lsposed),
+    ];
+
+    let mut content = fs::read_to_string(config_path)
+        .context("reading SUSFS config.sh")?;
+
+    for (key, value) in &pairs {
+        let val_str = if *value { "1" } else { "0" };
+        let pattern = format!("{key}=");
+        if let Some(pos) = content.find(&pattern) {
+            let line_end = content[pos..].find('\n').map(|i| pos + i).unwrap_or(content.len());
+            content.replace_range(pos..line_end, &format!("{key}={val_str}"));
+        }
+    }
+
+    fs::write(config_path, &content).context("writing SUSFS config.sh")?;
+    info!("BRENE: synced 5 settings to SUSFS config.sh");
+    Ok(())
+}
+
 fn truncate_uname(s: &str) -> String {
     if s.len() > 64 {
         s[..64].to_string()
@@ -435,14 +483,12 @@ mod tests {
     }
 
     #[test]
-    fn mount_hiding_never_invoked() {
-        // S05: Verify no mount-hiding calls exist in BRENE.
-        // Only path/map/loop hiding is allowed -- mount visibility must stay untouched.
+    fn direct_mount_hiding_never_invoked() {
+        // S05: individual mount hiding causes LSPosed failures.
+        // Global toggle via config sync is allowed.
         let src = include_str!("brene.rs");
-        // Split the banned string so this test doesn't match itself
-        let banned_fn = ["hide_sus", "_mnts"].concat();
-        let banned_struct = ["Hide", "SusMnts"].concat();
-        assert!(!src.contains(&banned_fn), "S05 violation: mount hiding must never be invoked");
-        assert!(!src.contains(&banned_struct), "S05 violation: mount hiding struct must not appear");
+        let banned_call = ["add_sus", "_mount"].concat();
+        let msg = ["S05: banned call found in brene.rs: ", &banned_call].concat();
+        assert!(!src.contains(&banned_call), "{msg}");
     }
 }

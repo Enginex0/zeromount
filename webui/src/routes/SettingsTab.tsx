@@ -476,6 +476,38 @@ Engine: ${store.engineActive() ? 'Active' : 'Inactive'}
             />
           </div>
 
+          <div class="settings__group-label color-text-tertiary">SUSFS Control</div>
+          <div class="settings__item">
+            <div class="settings__item-content">
+              <div class="settings__item-label">Hide Sus Mounts</div>
+              <div class="settings__item-desc">Hide module mounts from non-root processes</div>
+            </div>
+            <Toggle
+              checked={store.settings.brene.hide_sus_mounts}
+              onChange={(v) => handleBreneToggle('hide_sus_mounts', v)}
+            />
+          </div>
+          <div class="settings__item">
+            <div class="settings__item-content">
+              <div class="settings__item-label">Emulate Vold App Data</div>
+              <div class="settings__item-desc">Hide app data paths via sus_path on /sdcard/Android/data</div>
+            </div>
+            <Toggle
+              checked={store.settings.brene.emulate_vold_app_data}
+              onChange={(v) => handleBreneToggle('emulate_vold_app_data', v)}
+            />
+          </div>
+          <div class="settings__item">
+            <div class="settings__item-content">
+              <div class="settings__item-label">Force Hide LSPosed</div>
+              <div class="settings__item-desc">Unmount dex2oat paths to hide LSPosed injection</div>
+            </div>
+            <Toggle
+              checked={store.settings.brene.force_hide_lsposed}
+              onChange={(v) => handleBreneToggle('force_hide_lsposed', v)}
+            />
+          </div>
+
           <div class="settings__group-label color-text-tertiary">Spoofing</div>
           <div class="settings__item">
             <div class="settings__item-content">

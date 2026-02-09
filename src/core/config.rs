@@ -154,6 +154,12 @@ pub struct BreneConfig {
     pub avc_log_spoofing: bool,
     #[serde(default)]
     pub susfs_log: bool,
+    #[serde(default = "default_true")]
+    pub hide_sus_mounts: bool,
+    #[serde(default = "default_true")]
+    pub emulate_vold_app_data: bool,
+    #[serde(default = "default_true")]
+    pub force_hide_lsposed: bool,
     #[serde(default)]
     pub custom_sus_paths: Vec<String>,
     #[serde(default)]
@@ -174,6 +180,9 @@ impl Default for BreneConfig {
             auto_hide_sdcard_data: true,
             avc_log_spoofing: false,
             susfs_log: false,
+            hide_sus_mounts: true,
+            emulate_vold_app_data: true,
+            force_hide_lsposed: true,
             custom_sus_paths: Vec::new(),
             custom_sus_maps: Vec::new(),
             custom_sus_path_loops: Vec::new(),
@@ -397,6 +406,9 @@ impl ZeroMountConfig {
             "brene.auto_hide_sdcard_data" => Some(self.brene.auto_hide_sdcard_data.to_string()),
             "brene.avc_log_spoofing" => Some(self.brene.avc_log_spoofing.to_string()),
             "brene.susfs_log" => Some(self.brene.susfs_log.to_string()),
+            "brene.hide_sus_mounts" => Some(self.brene.hide_sus_mounts.to_string()),
+            "brene.emulate_vold_app_data" => Some(self.brene.emulate_vold_app_data.to_string()),
+            "brene.force_hide_lsposed" => Some(self.brene.force_hide_lsposed.to_string()),
             "brene.custom_sus_paths" => Some(self.brene.custom_sus_paths.join(",")),
             "brene.custom_sus_maps" => Some(self.brene.custom_sus_maps.join(",")),
             "brene.custom_sus_path_loops" => Some(self.brene.custom_sus_path_loops.join(",")),
@@ -446,6 +458,9 @@ impl ZeroMountConfig {
             "brene.auto_hide_sdcard_data" => self.brene.auto_hide_sdcard_data = value.parse()?,
             "brene.avc_log_spoofing" => self.brene.avc_log_spoofing = value.parse()?,
             "brene.susfs_log" => self.brene.susfs_log = value.parse()?,
+            "brene.hide_sus_mounts" => self.brene.hide_sus_mounts = value.parse()?,
+            "brene.emulate_vold_app_data" => self.brene.emulate_vold_app_data = value.parse()?,
+            "brene.force_hide_lsposed" => self.brene.force_hide_lsposed = value.parse()?,
             "brene.custom_sus_paths" => self.brene.custom_sus_paths = parse_csv(value),
             "brene.custom_sus_maps" => self.brene.custom_sus_maps = parse_csv(value),
             "brene.custom_sus_path_loops" => self.brene.custom_sus_path_loops = parse_csv(value),
@@ -600,6 +615,9 @@ mod tests {
         assert!(config.brene.auto_hide_sdcard_data);
         assert!(!config.brene.avc_log_spoofing);
         assert!(!config.brene.susfs_log);
+        assert!(config.brene.hide_sus_mounts);
+        assert!(config.brene.emulate_vold_app_data);
+        assert!(config.brene.force_hide_lsposed);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
         assert!(config.per_module.is_empty());
     }

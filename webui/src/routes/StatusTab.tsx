@@ -14,32 +14,54 @@ export function StatusTab() {
   const [animatedExcludedUids, setAnimatedExcludedUids] = createSignal(0);
   const [showAllActivity, setShowAllActivity] = createSignal(false);
 
-  const mountModeLabel = createMemo(() => {
+  // Effective mount mode: user preference gated by detected capabilities
+  const effectiveMode = createMemo(() => {
     const s = store.scenario?.() || 'none';
-    switch (s) {
-      case 'full': case 'kernel_only': return 'VFS Redirection';
-      case 'susfs_frontend': return 'OverlayFS';
+    const strategy = store.activeStrategy();
+
+    if (s === 'susfs_only') return 'susfs_only' as const;
+    if (s === 'none' && strategy !== 'Vfs') return 'none' as const;
+
+    switch (strategy) {
+      case 'Vfs': {
+        const caps = store.capabilities();
+        if (caps?.vfs_driver) return 'vfs' as const;
+        return caps?.overlay_supported ? 'overlay' as const : 'magicmount' as const;
+      }
+      case 'Overlay': return 'overlay' as const;
+      case 'MagicMount': return 'magicmount' as const;
+    }
+  });
+
+  const mountModeLabel = createMemo(() => {
+    switch (effectiveMode()) {
+      case 'vfs': return 'VFS Redirection';
+      case 'overlay': return 'OverlayFS';
+      case 'magicmount': return 'Magic Mount';
+      case 'susfs_only': return 'SUSFS Only';
       case 'none': return 'Magic Mount';
     }
   });
 
   const mountModeValue = createMemo(() => {
     const s = store.scenario?.() || 'none';
-    switch (s) {
-      case 'full': return 'Active';
-      case 'kernel_only': return 'VFS Only';
-      case 'susfs_frontend': return 'Fallback';
-      case 'none': return 'Fallback';
-    }
+    const mode = effectiveMode();
+    if (mode === 'vfs' && (s === 'full' || s === 'kernel_only')) return 'Active';
+    if (mode === 'susfs_only') return 'No Mount';
+    if (mode === 'none') return 'Fallback';
+    // User selected overlay/magic but we haven't run the pipeline yet
+    const strategy = store.activeStrategy();
+    if (mode === 'vfs' && !store.capabilities()?.vfs_driver) return 'Unavailable';
+    return strategy === store.activeStrategy() ? 'Selected' : 'Fallback';
   });
 
   const mountModeColor = createMemo(() => {
-    const s = store.scenario?.() || 'none';
     const t = store.currentTheme();
-    switch (s) {
-      case 'full': return t.colorSuccess;
-      case 'kernel_only': return '#FF8E53';
-      case 'susfs_frontend': return t.colorWarning;
+    switch (effectiveMode()) {
+      case 'vfs': return t.colorSuccess;
+      case 'overlay': return t.colorInfo || '#3b82f6';
+      case 'magicmount': return t.colorWarning;
+      case 'susfs_only': return '#FF8E53';
       case 'none': return t.colorError;
     }
   });
@@ -108,6 +130,21 @@ export function StatusTab() {
         return (
           <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorError}>
             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+          </svg>
+        );
+      case 'setting_changed':
+      case 'brene_toggle':
+      case 'susfs_toggle':
+      case 'mount_strategy_changed':
+        return (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorInfo || '#3b82f6'}>
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        );
+      case 'theme_changed':
+        return (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.textAccent}>
+            <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/>
           </svg>
         );
       default:
@@ -296,6 +333,20 @@ export function StatusTab() {
             </div>
             <span class="status-mode__value color-text-accent">
               {mountModeValue()}
+            </span>
+          </div>
+          <div class="status-mode__row">
+            <div class="status-mode__label">
+              <span
+                class="status-mode__dot"
+                style={{ background: strategyColor(store.activeStrategy()) }}
+              />
+              <span class="status-mode__text color-text-primary">
+                Strategy
+              </span>
+            </div>
+            <span class="status-mode__value color-text-accent">
+              {store.activeStrategy()}
             </span>
           </div>
           <div class="status-mode__row">

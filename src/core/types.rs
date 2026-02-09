@@ -225,6 +225,7 @@ pub enum SusfsCommand {
     SetCmdline = 0x555b0,
     AddOpenRedirect = 0x555c0,
     AddOpenRedirectAll = 0x555c1,
+    HideSusMntsForNonSuProcs = 0x55561,
     ShowVersion = 0x555e1,
     ShowEnabledFeatures = 0x555e2,
     ShowVariant = 0x555e3,

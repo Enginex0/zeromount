@@ -135,7 +135,7 @@ async function parseActivityLog(): Promise<ActivityItem[]> {
       return [];
     }
 
-    const validTypes = ['rule_added', 'rule_removed', 'uid_excluded', 'uid_included', 'engine_enabled', 'engine_disabled'];
+    const validTypes = ['rule_added', 'rule_removed', 'uid_excluded', 'uid_included', 'engine_enabled', 'engine_disabled', 'setting_changed', 'mount_strategy_changed', 'susfs_toggle', 'brene_toggle', 'theme_changed'];
     const lines = stdout.trim().split('\n').filter(line => line.trim());
     const items = lines.map((line, index) => {
       const match = line.match(/^\[(.+?)\]\s+(\w+):\s+(.+)$/);
@@ -683,5 +683,42 @@ echo "]"
       return;
     }
     await execCommand(`ksu_susfs enable_avc_log_spoofing ${enabled ? 1 : 0}`);
+  },
+
+  async logActivity(type: string, message: string): Promise<void> {
+    return logActivity(type, message);
+  },
+
+  async setSusfsLog(enabled: boolean): Promise<void> {
+    if (shouldUseMock()) return;
+    await execCommand(`ksu_susfs enable_log ${enabled ? 1 : 0}`);
+  },
+
+  async setSusfsHideMounts(enabled: boolean): Promise<void> {
+    if (shouldUseMock()) return;
+    // v2.0.0+ uses hide_sus_mnts_for_all_procs, fallback to non_su_procs
+    const { errno } = await execCommand(`ksu_susfs hide_sus_mnts_for_all_procs ${enabled ? 1 : 0}`);
+    if (errno !== 0) {
+      await execCommand(`ksu_susfs hide_sus_mnts_for_non_su_procs ${enabled ? 1 : 0}`);
+    }
+  },
+
+  async writeSusfsConfigVar(key: string, value: string): Promise<void> {
+    if (shouldUseMock()) return;
+    const configPath = '/data/adb/susfs4ksu/config.sh';
+    await execCommand(`sed -i 's/^${escapeShellArg(key)}=.*/${escapeShellArg(key)}=${escapeShellArg(value)}/' ${escapeShellArg(configPath)}`);
+  },
+
+  async readSusfsConfigVar(key: string): Promise<string | null> {
+    if (shouldUseMock()) return null;
+    try {
+      const { errno, stdout } = await execCommand(
+        `grep -m1 '^${escapeShellArg(key)}=' /data/adb/susfs4ksu/config.sh | cut -d= -f2`
+      );
+      if (errno === 0 && stdout.trim()) return stdout.trim();
+    } catch (e) {
+      console.error('[ZM-API] readSusfsConfigVar() error:', e);
+    }
+    return null;
   },
 };

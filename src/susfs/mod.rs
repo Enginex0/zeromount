@@ -378,6 +378,20 @@ impl SusfsClient {
         check_err(info.err, "enable_log")
     }
 
+    // ---- Hide sus mounts ----
+
+    pub fn hide_sus_mounts(&self, enable: bool) -> Result<()> {
+        self.ensure_available()?;
+        let mut info = StSusfsHideSusMnts {
+            enabled: u8::from(enable),
+            _pad0: [0; 3],
+            err: ERR_CMD_NOT_SUPPORTED,
+        };
+
+        self.do_supercall(SusfsCommand::HideSusMntsForNonSuProcs, &mut info as *mut _ as *mut u8)?;
+        check_err(info.err, "hide_sus_mounts")
+    }
+
     // ---- AVC log spoofing ----
 
     pub fn enable_avc_log_spoofing(&self, enable: bool) -> Result<()> {
