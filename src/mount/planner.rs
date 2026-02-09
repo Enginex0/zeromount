@@ -81,7 +81,7 @@ pub fn plan_mounts(
 fn select_strategy(scenario: Scenario, capabilities: &CapabilityFlags) -> MountStrategy {
     match scenario {
         Scenario::Full | Scenario::SusfsFrontend | Scenario::KernelOnly => MountStrategy::Vfs,
-        Scenario::None => {
+        Scenario::SusfsOnly | Scenario::None => {
             if capabilities.overlay_supported {
                 MountStrategy::Overlay
             } else {

@@ -19,6 +19,11 @@ const scenarioConfig: Record<string, { label: string; color: string; description
     color: '#FF8E53',
     description: 'VFS redirection only, no SUSFS',
   },
+  susfs_only: {
+    label: 'SUSFS Only',
+    color: 'var(--color-success)',
+    description: 'SUSFS protections active, overlay/magic mount for modules',
+  },
   none: {
     label: 'Mount Fallback',
     color: 'var(--color-error)',

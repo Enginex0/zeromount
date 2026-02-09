@@ -11,6 +11,7 @@ pub enum Scenario {
     Full,
     SusfsFrontend,
     KernelOnly,
+    SusfsOnly,
     None,
 }
 

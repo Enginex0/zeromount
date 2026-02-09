@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use tracing::{debug, warn};
 
 use super::{ConfigAction, LogAction, ModuleAction, UidAction, VfsAction};
 
@@ -82,13 +83,31 @@ pub fn handle_status(json: bool) -> Result<()> {
     let mut state = crate::core::types::RuntimeState::read_status_file(status_path)
         .unwrap_or_default();
 
+    // Backfill from .detection.json when .status.json is missing or has bare defaults
+    if !state.capabilities.vfs_driver && !state.capabilities.susfs_available {
+        match crate::detect::load_detection() {
+            Ok(det) => {
+                debug!(
+                    scenario = ?det.scenario,
+                    susfs = det.capabilities.susfs_available,
+                    "backfilling status from .detection.json"
+                );
+                state.scenario = det.scenario;
+                state.capabilities = det.capabilities;
+                state.driver_version = det.driver_version;
+            }
+            Err(e) => {
+                warn!("no .status.json or .detection.json available: {e}");
+            }
+        }
+    }
+
     // Augment cached state with live kernel data when the driver is reachable
     if let Ok(driver) = crate::vfs::VfsDriver::open() {
         state.capabilities.vfs_driver = true;
         if let Ok(v) = driver.get_version() {
             state.driver_version = Some(v);
         }
-        // GET_STATUS ioctl (#11) may not exist in older kernels — Ok(None) keeps cached value
         if let Ok(Some(s)) = driver.get_status() {
             state.engine_active = Some(s.enabled);
         }

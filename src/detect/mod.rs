@@ -19,15 +19,24 @@ pub fn detect_scenario() -> Result<DetectionResult> {
     let vfs = kernel::probe_vfs_driver()?;
     let susfs_caps = susfs::probe_susfs()?;
 
-    // DET01: Scenario selection
+    debug!(
+        vfs_driver = vfs.vfs_driver,
+        susfs_available = susfs_caps.susfs_available,
+        susfs_kstat = susfs_caps.susfs_kstat,
+        susfs_path = susfs_caps.susfs_path,
+        "probe results"
+    );
+
+    // DET01: Scenario selection — SUSFS is independent of VFS driver
     let scenario = match (vfs.vfs_driver, susfs_caps.susfs_available) {
         (true, true) if susfs_caps.susfs_kstat && susfs_caps.susfs_path => Scenario::Full,
         (true, true) => Scenario::SusfsFrontend,
         (true, false) => Scenario::KernelOnly,
-        (false, _) => Scenario::None,
+        (false, true) => Scenario::SusfsOnly,
+        (false, false) => Scenario::None,
     };
 
-    info!("detected scenario: {:?}", scenario);
+    info!(scenario = ?scenario, "detection complete");
 
     // Merge capabilities from both probes
     let capabilities = CapabilityFlags {

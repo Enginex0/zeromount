@@ -137,6 +137,6 @@ export interface Settings {
   uname: UnameSettings;
 }
 
-export type Scenario = 'full' | 'susfs_frontend' | 'kernel_only' | 'none';
+export type Scenario = 'full' | 'susfs_frontend' | 'kernel_only' | 'susfs_only' | 'none';
 
 export type Tab = 'status' | 'modules' | 'config' | 'settings';

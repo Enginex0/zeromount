@@ -160,9 +160,9 @@ impl MountController<Planned> {
     /// Execute mount operations: dispatch to VFS, overlay, or magic mount.
     ///
     /// Strategy selection based on scenario:
-    ///   Full / KernelOnly -> VFS (primary), overlay/magic fallback
-    ///   SusfsFrontend     -> overlay preferred, magic fallback
-    ///   None              -> magic mount only
+    ///   Full / KernelOnly     -> VFS (primary), overlay/magic fallback
+    ///   SusfsFrontend/SusfsOnly -> overlay preferred, magic fallback
+    ///   None                  -> magic mount only
     pub fn execute(self) -> Result<MountController<Mounted>> {
         info!("pipeline: execute phase");
 
@@ -182,7 +182,7 @@ impl MountController<Planned> {
             Scenario::Full | Scenario::KernelOnly => {
                 self.execute_vfs(&self.state.modules, &self.state.plan, capabilities, config)
             }
-            Scenario::SusfsFrontend => {
+            Scenario::SusfsFrontend | Scenario::SusfsOnly => {
                 self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
             }
             Scenario::None => {
@@ -389,10 +389,19 @@ impl MountController<Mounted> {
             })
             .collect();
 
-        let degraded = total_failed > 0 || det.scenario == Scenario::None;
+        let no_vfs = matches!(det.scenario, Scenario::None | Scenario::SusfsOnly);
+        let degraded = total_failed > 0 || no_vfs;
         let degradation_reason = if det.scenario == Scenario::None {
+            info!("degraded: no VFS driver, no SUSFS");
             Some("no VFS driver detected".to_string())
+        } else if det.scenario == Scenario::SusfsOnly {
+            info!(
+                susfs_version = ?det.capabilities.susfs_version,
+                "degraded: no VFS driver, SUSFS protections active"
+            );
+            Some("no VFS driver, SUSFS protections active".to_string())
         } else if total_failed > 0 {
+            warn!(total_failed, "degraded: rules failed to apply");
             Some(format!("{total_failed} rules failed to apply"))
         } else {
             None
@@ -406,7 +415,7 @@ impl MountController<Mounted> {
         RuntimeState {
             scenario: det.scenario,
             capabilities: det.capabilities.clone(),
-            engine_active: Some(det.scenario != Scenario::None),
+            engine_active: Some(!matches!(det.scenario, Scenario::None)),
             driver_version: det.driver_version,
             rule_count: total_rules,
             excluded_uid_count: 0,
