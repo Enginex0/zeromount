@@ -436,21 +436,29 @@ export const api = {
   },
 
   async setVerboseLogging(enabled: boolean): Promise<void> {
-    console.log('[ZM-API] setVerboseLogging() called:', { enabled, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return MockAPI.setVerboseLogging(enabled);
     }
 
-    const cmd = enabled
-      ? `touch "${PATHS.VERBOSE_FLAG}"`
-      : `rm -f "${PATHS.VERBOSE_FLAG}"`;
-    console.log('[ZM-API] setVerboseLogging() executing:', cmd);
+    const subcmd = enabled ? 'enable' : 'disable';
+    const cmd = `${PATHS.BINARY} log ${subcmd}`;
     const { errno, stderr } = await execCommand(cmd);
     if (errno !== 0) {
-      console.error('[ZM-API] setVerboseLogging() failed:', { errno, stderr });
       throw new Error(stderr || 'Failed to set verbose logging');
     }
-    console.log('[ZM-API] setVerboseLogging() success');
+  },
+
+  async getVerboseLogging(): Promise<boolean> {
+    if (shouldUseMock()) {
+      return false;
+    }
+
+    const cmd = `${PATHS.BINARY} config get logging.verbose`;
+    const { errno, stdout } = await execCommand(cmd);
+    if (errno !== 0) {
+      return false;
+    }
+    return stdout.trim() === 'true';
   },
 
   async getInstalledApps(): Promise<InstalledApp[]> {

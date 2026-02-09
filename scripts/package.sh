@@ -38,7 +38,6 @@ SCRIPTS=(
     metainstall.sh
     metauninstall.sh
     customize.sh
-    monitor.sh
 )
 
 for script in "${SCRIPTS[@]}"; do
@@ -148,6 +147,13 @@ else
     exit 1
 fi
 
+# -- LKM (nuke_ext4) --
+if [ -d "$MODULE_DIR/lkm" ] && ls "$MODULE_DIR/lkm"/*.ko >/dev/null 2>&1; then
+    mkdir -p "$STAGING/lkm"
+    cp "$MODULE_DIR/lkm"/*.ko "$STAGING/lkm/"
+    echo "    LKM: $(ls "$MODULE_DIR/lkm"/*.ko | wc -l) kernel modules"
+fi
+
 # -- META-INF for recovery/KSU compatibility --
 mkdir -p "$STAGING/META-INF/com/google/android"
 cat > "$STAGING/META-INF/com/google/android/update-binary" << 'UPDATER'
@@ -184,6 +190,7 @@ case "$OUT_NAME" in
     /*) OUT_PATH="$OUT_NAME" ;;
     *)  OUT_PATH="$PROJECT_ROOT/$OUT_NAME" ;;
 esac
+rm -f "$OUT_PATH"
 (cd "$STAGING" && zip -r9 "$OUT_PATH" .)
 
 echo "==> Built: $OUT_PATH"
@@ -194,4 +201,5 @@ echo ""
 echo "==> Verification:"
 echo "    Binaries: $FOUND_BINS/4 (bin/<abi>/zeromount)"
 echo "    WebUI: $([ -d "$STAGING/webroot" ] && echo "present" || echo "MISSING")"
+echo "    LKM: $([ -d "$STAGING/lkm" ] && ls "$STAGING/lkm"/*.ko 2>/dev/null | wc -l || echo "0") kernel modules"
 echo "    Eliminated scripts: verified absent"

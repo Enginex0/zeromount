@@ -8,6 +8,7 @@ case "$(uname -m)" in
     armv7*|armv8l) ABI=armeabi-v7a ;;
     x86_64) ABI=x86_64 ;;
     i686|i386) ABI=x86 ;;
+    *) exit 1 ;;
 esac
 
 BIN="$MODDIR/bin/${ABI}/zeromount"

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::core::types::RuntimeState;
 
@@ -170,7 +170,7 @@ impl ModuleWatcher {
     /// Event loop: poll for changes, invoke callback on each batch.
     /// Runs until the callback returns Err or the process is signaled.
     pub fn run_loop(&self, mut on_change: impl FnMut(Vec<WatchEvent>) -> Result<()>) -> Result<()> {
-        info!(dir = %self.modules_dir.display(), "module watcher loop started");
+        debug!(dir = %self.modules_dir.display(), "module watcher loop started");
 
         loop {
             let events = self.poll(10_000)?;
@@ -197,7 +197,7 @@ pub fn start_watcher_fallback(
     interval_secs: u64,
     mut on_change: impl FnMut() -> Result<()>,
 ) -> Result<()> {
-    info!(
+    debug!(
         dir = %modules_dir.display(),
         interval_secs,
         "fallback mtime polling started"

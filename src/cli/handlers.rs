@@ -9,12 +9,26 @@ pub fn handle_mount(post_boot: bool) -> Result<()> {
     if post_boot {
         tracing::info!("post-boot tasks started");
 
+        // Run pipeline once at boot before watching for changes.
+        // On KSU/APatch metamodule mode, metamount.sh already ran the pipeline
+        // at post-fs-data; cleanup_previous_mounts() makes this idempotent.
+        // On Magisk, this is the only pipeline execution path.
+        let config = crate::core::config::ZeroMountConfig::load(None)?;
+        let state = crate::core::pipeline::run_pipeline_with_bootloop_guard(config)?;
+        tracing::info!(
+            scenario = ?state.scenario,
+            rules = state.rule_count,
+            modules = state.modules.len(),
+            degraded = state.degraded,
+            "initial pipeline finished"
+        );
+
         let modules_dir = std::path::Path::new("/data/adb/modules");
         crate::detect::watcher::start_module_watcher(modules_dir, || {
-            tracing::info!("module change detected, triggering re-scan");
+            tracing::debug!("module change detected, triggering re-scan");
             let config = crate::core::config::ZeroMountConfig::load(None)?;
             let mut state = crate::core::pipeline::run_pipeline_with_bootloop_guard(config)?;
-            tracing::info!(
+            tracing::debug!(
                 modules = state.modules.len(),
                 rules = state.rule_count,
                 "hot-reload complete"
@@ -74,7 +88,7 @@ pub fn handle_detect() -> Result<()> {
     println!("overlay: {}", result.capabilities.overlay_supported);
     println!("tmpfs_xattr: {}", result.capabilities.tmpfs_xattr);
 
-    tracing::info!(scenario = ?result.scenario, "detection complete");
+    tracing::debug!(scenario = ?result.scenario, "detection complete");
     Ok(())
 }
 
@@ -148,12 +162,12 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
         }
         ModuleAction::Scan { update_conf, cleanup } => {
             if let Some(module_id) = cleanup {
-                tracing::info!("cleaning rules for uninstalled module: {module_id}");
+                tracing::debug!("cleaning rules for uninstalled module: {module_id}");
                 // VFS clear for specific module would need kernel support;
                 // for now, full clear + re-mount is the safe path
                 if let Ok(driver) = crate::vfs::VfsDriver::open() {
                     let _ = driver.clear_all();
-                    tracing::info!("cleared VFS rules after module uninstall");
+                    tracing::debug!("cleared VFS rules after module uninstall");
                 }
             }
 
@@ -164,7 +178,7 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
             }
 
             if update_conf {
-                tracing::info!("partitions.conf rebuild requested");
+                tracing::debug!("partitions.conf rebuild requested");
             }
         }
     }
@@ -172,6 +186,15 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
 }
 
 pub fn handle_config(action: ConfigAction) -> Result<()> {
+    match action {
+        ConfigAction::Defaults => {
+            let defaults = crate::core::config::ZeroMountConfig::default();
+            let toml = toml::to_string_pretty(&defaults)?;
+            print!("{toml}");
+            return Ok(());
+        }
+        _ => {}
+    }
     let mut config = crate::core::config::ZeroMountConfig::load(None)?;
     match action {
         ConfigAction::Get { key } => {
@@ -190,6 +213,7 @@ pub fn handle_config(action: ConfigAction) -> Result<()> {
             restored.save(None)?;
             println!("config restored from backup");
         }
+        ConfigAction::Defaults => unreachable!(),
     }
     Ok(())
 }

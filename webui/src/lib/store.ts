@@ -218,6 +218,7 @@ function createAppStore() {
         loadBreneSettings(),
         settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
         loadMountSettings(),
+        loadVerboseState(),
       ]);
 
       const status = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -522,6 +523,15 @@ function createAppStore() {
     });
     setSettings('mount', prev => ({ ...prev, ...mount }));
     console.log('[ZM-Store] loadMountSettings() loaded:', mount);
+  };
+
+  const loadVerboseState = async () => {
+    try {
+      const verbose = await api.getVerboseLogging();
+      setSettings({ verboseLogging: verbose });
+    } catch (e) {
+      // Non-fatal: default to false
+    }
   };
 
   const setMountStorageMode = async (mode: StorageMode) => {

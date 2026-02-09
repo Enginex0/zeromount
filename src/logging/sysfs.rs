@@ -36,23 +36,33 @@ fn set_verbose_marker(enabled: bool) -> Result<()> {
     Ok(())
 }
 
+fn persist_verbose_config(enabled: bool) {
+    if let Ok(mut config) = crate::core::config::ZeroMountConfig::load(None) {
+        config.logging.verbose = enabled;
+        let _ = config.save(None);
+    }
+}
+
 pub fn enable() -> Result<()> {
     write_kernel_debug_level(1)?;
     set_verbose_marker(true)?;
-    println!("logging enabled (sysfs=1, .verbose=present)");
+    persist_verbose_config(true);
+    println!("logging enabled (sysfs=1, .verbose=present, config=true)");
     Ok(())
 }
 
 pub fn disable() -> Result<()> {
     write_kernel_debug_level(0)?;
     set_verbose_marker(false)?;
-    println!("logging disabled (sysfs=0, .verbose=removed)");
+    persist_verbose_config(false);
+    println!("logging disabled (sysfs=0, .verbose=removed, config=false)");
     Ok(())
 }
 
 pub fn set_level(level: u32) -> Result<()> {
     write_kernel_debug_level(level)?;
     set_verbose_marker(level > 0)?;
+    persist_verbose_config(level > 0);
     println!("debug level set to {level}");
     Ok(())
 }
@@ -71,5 +81,10 @@ pub fn status() -> Result<()> {
     }
 
     println!(".verbose marker: {}", if verbose_present { "present" } else { "absent" });
+
+    match crate::core::config::ZeroMountConfig::load(None) {
+        Ok(config) => println!("config.toml logging.verbose: {}", config.logging.verbose),
+        Err(_) => println!("config.toml logging.verbose: unknown (load failed)"),
+    }
     Ok(())
 }

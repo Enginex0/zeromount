@@ -1,7 +1,9 @@
 use std::ffi::CString;
 use std::fs;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use tracing::{debug, info, warn};
@@ -12,6 +14,48 @@ use crate::core::types::CapabilityFlags;
 const MOUNT_SOURCE: &str = "KSU";
 const RANDOM_PATH_LEN: usize = 12;
 const FIXED_PATH_NAME: &str = "zeromount";
+const CMD_TIMEOUT: Duration = Duration::from_secs(30);
+const CMD_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const MODULES_DIR_PATH: &str = "/data/adb/modules";
+const MIN_EXT4_SIZE_MB: u64 = 64;
+const LKM_DIR: &str = "lkm";
+
+fn run_command_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output> {
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .with_context(|| format!("failed to spawn {:?}", cmd.get_program()))?;
+
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+                if let Some(ref mut out) = child.stdout {
+                    let _ = out.read_to_end(&mut stdout);
+                }
+                if let Some(ref mut err) = child.stderr {
+                    let _ = err.read_to_end(&mut stderr);
+                }
+                return Ok(std::process::Output { status, stdout, stderr });
+            }
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    warn!(program = ?cmd.get_program(), "command timed out, killing");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    bail!("command {:?} timed out after {timeout:?}", cmd.get_program());
+                }
+                std::thread::sleep(CMD_POLL_INTERVAL);
+            }
+            Err(e) => bail!("error waiting for {:?}: {e}", cmd.get_program()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageMode {
@@ -162,6 +206,7 @@ fn try_mode_ext4(base_path: &Path) -> Option<StorageHandle> {
     match try_ext4_storage(base_path) {
         Ok(()) => {
             info!(mode = "ext4", path = %base_path.display(), "storage initialized");
+            nuke_ext4_sysfs(base_path);
             Some(StorageHandle { mode: StorageMode::Ext4, base_path: base_path.to_path_buf(), cleaned_up: false })
         }
         Err(e) => {
@@ -255,12 +300,13 @@ fn is_erofs_available() -> bool {
 fn try_erofs_storage(base_path: &Path) -> Result<()> {
     let image_path = base_path.with_extension("erofs.img");
 
-    let status = Command::new("mkfs.erofs")
-        .args(["-z", "lz4hc", "-x", "256"])
-        .arg(&image_path)
-        .arg(base_path)
-        .output()
-        .context("mkfs.erofs not found")?;
+    let status = run_command_with_timeout(
+        Command::new("mkfs.erofs")
+            .args(["-z", "lz4hc", "-x", "256"])
+            .arg(&image_path)
+            .arg(base_path),
+        CMD_TIMEOUT,
+    )?;
 
     if !status.status.success() {
         let stderr = String::from_utf8_lossy(&status.stderr);
@@ -324,33 +370,72 @@ fn try_tmpfs_with_xattr(base_path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn calculate_ext4_image_size_mb() -> u64 {
+    let modules_dir = Path::new(MODULES_DIR_PATH);
+    if !modules_dir.is_dir() {
+        return MIN_EXT4_SIZE_MB;
+    }
+
+    let total_bytes: u64 = fs::read_dir(modules_dir)
+        .ok()
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .map(|e| dir_size_recursive(&e.path()))
+                .sum()
+        })
+        .unwrap_or(0);
+
+    let total_mb = total_bytes / (1024 * 1024);
+    let sized = (total_mb as f64 * 1.5) as u64;
+    sized.max(MIN_EXT4_SIZE_MB)
+}
+
+fn dir_size_recursive(path: &Path) -> u64 {
+    let mut total = 0u64;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                total += dir_size_recursive(&p);
+            } else if let Ok(meta) = p.metadata() {
+                total += meta.len();
+            }
+        }
+    }
+    total
+}
+
 /// Create a sparse ext4 image and loop-mount it.
 fn try_ext4_storage(base_path: &Path) -> Result<()> {
     let image_path = base_path.with_extension("ext4.img");
 
-    // Sparse image: 2GB virtual, near-zero actual disk usage
-    let dd_status = Command::new("dd")
-        .args([
+    let image_size_mb = calculate_ext4_image_size_mb();
+    debug!(size_mb = image_size_mb, "ext4 image size calculated");
+
+    let dd_status = run_command_with_timeout(
+        Command::new("dd").args([
             "if=/dev/zero",
             &format!("of={}", image_path.display()),
             "bs=1M",
             "count=0",
-            "seek=2048",
-        ])
-        .output()
-        .context("dd not found")?;
+            &format!("seek={image_size_mb}"),
+        ]),
+        CMD_TIMEOUT,
+    )?;
 
     if !dd_status.status.success() {
         let stderr = String::from_utf8_lossy(&dd_status.stderr);
         bail!("dd sparse image failed: {stderr}");
     }
 
-    // Format without journal to reduce overhead
-    let mkfs_status = Command::new("mkfs.ext4")
-        .args(["-O", "^has_journal"])
-        .arg(&image_path)
-        .output()
-        .context("mkfs.ext4 not found")?;
+    let mkfs_status = run_command_with_timeout(
+        Command::new("mkfs.ext4")
+            .args(["-O", "^has_journal"])
+            .arg(&image_path),
+        CMD_TIMEOUT,
+    )?;
 
     if !mkfs_status.status.success() {
         let _ = fs::remove_file(&image_path);
@@ -436,4 +521,98 @@ pub fn nuke_backing_file(path: &Path) -> Result<()> {
         debug!(path = %path.display(), "nuked backing file");
     }
     Ok(())
+}
+
+/// Remove ext4 sysfs entries to hide loop mount evidence.
+/// Dual-path: try ksud first (KSU/APatch), fall back to LKM (Magisk).
+/// Always non-fatal -- detection evasion is best-effort.
+fn nuke_ext4_sysfs(mount_point: &Path) {
+    let mount_str = mount_point.to_string_lossy();
+
+    // Path 1: ksud (KSU/APatch 22105+)
+    match Command::new("ksud")
+        .args(["kernel", "nuke-ext4-sysfs", &mount_str])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            debug!(path = %mount_str, "ext4 sysfs nuked via ksud");
+            return;
+        }
+        Ok(_) => debug!("ksud nuke-ext4-sysfs failed, trying LKM fallback"),
+        Err(_) => debug!("ksud not available, trying LKM fallback"),
+    }
+
+    // Path 2: LKM fallback
+    let Some(ko_path) = select_nuke_ko(mount_point) else {
+        debug!("no suitable nuke LKM found, skipping ext4 sysfs nuke");
+        return;
+    };
+
+    let Some(symaddr) = read_kallsyms_address("ext4_unregister_sysfs") else {
+        debug!("ext4_unregister_sysfs not found in /proc/kallsyms, skipping LKM nuke");
+        return;
+    };
+
+    match Command::new("insmod")
+        .arg(&ko_path)
+        .arg(format!("mount_point={mount_str}"))
+        .arg(format!("symaddr={symaddr}"))
+        .output()
+    {
+        Ok(output) if output.status.code() != Some(0) => {
+            // insmod returns non-zero because the module returns -EAGAIN (intentional auto-unload)
+            debug!(path = %mount_str, "ext4 sysfs nuked via LKM");
+        }
+        Ok(_) => debug!(path = %mount_str, "LKM nuke loaded (unexpected success code)"),
+        Err(e) => debug!(error = %e, "insmod failed for nuke LKM"),
+    }
+}
+
+/// Find the best-matching nuke .ko file for the running kernel.
+/// Files are at <module_dir>/lkm/nuke-android<ver>-<kernel>.ko
+fn select_nuke_ko(_module_base: &Path) -> Option<PathBuf> {
+    // Module directory: /data/adb/modules/zeromount/lkm/
+    let lkm_dir = Path::new("/data/adb/modules/zeromount").join(LKM_DIR);
+    if !lkm_dir.is_dir() {
+        return None;
+    }
+
+    let uname_r = fs::read_to_string("/proc/version")
+        .ok()
+        .and_then(|v| v.split_whitespace().nth(2).map(String::from))?;
+
+    // Extract major.minor from uname -r (e.g., "5.10.198-android12" -> "5.10")
+    let kernel_ver: String = uname_r
+        .split('.')
+        .take(2)
+        .collect::<Vec<_>>()
+        .join(".");
+
+    // Find .ko files and pick the one matching our kernel version
+    let entries = fs::read_dir(&lkm_dir).ok()?;
+    let mut best: Option<PathBuf> = None;
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.ends_with(".ko") && name_str.contains(&kernel_ver) {
+            best = Some(entry.path());
+            break;
+        }
+    }
+
+    best
+}
+
+/// Read the address of a kernel symbol from /proc/kallsyms.
+/// Returns the hex address string (e.g., "0xffffffc010abcdef").
+fn read_kallsyms_address(symbol: &str) -> Option<String> {
+    let content = fs::read_to_string("/proc/kallsyms").ok()?;
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 && parts[2] == symbol {
+            return Some(format!("0x{}", parts[0]));
+        }
+    }
+    None
 }

@@ -314,10 +314,14 @@ impl VfsDriver {
             )
         };
         match result {
-            Ok(ret) => Ok(Some(VfsStatus {
-                enabled: ret != 0,
-                rule_count: status_val as u32,
-            })),
+            // Dual-read: kernel may return status in ret OR buffer (same as get_version)
+            Ok(ret) => {
+                let enabled = if ret > 0 { ret != 0 } else { status_val != 0 };
+                Ok(Some(VfsStatus {
+                    enabled,
+                    rule_count: 0,
+                }))
+            }
             Err(IoctlError::IoctlFailed { errno, .. })
                 if errno == libc::ENOTTY || errno == libc::EINVAL =>
             {

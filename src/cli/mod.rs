@@ -99,6 +99,8 @@ pub enum ConfigAction {
     Set { key: String, value: String },
     /// Restore config from backup (bootloop recovery)
     Restore,
+    /// Print compiled-in defaults as TOML (used by customize.sh)
+    Defaults,
 }
 
 #[derive(Subcommand)]
