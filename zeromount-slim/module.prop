@@ -1,7 +1,0 @@
-id=zeromount
-metamodule=1
-name=Zero-Mount
-version=v3.4.0
-versionCode=7
-author=Enginex0
-description=Mountless VFS-level Redirection which Replaces Magic mount & Overlayfs. GHOST👻

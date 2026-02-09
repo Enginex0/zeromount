@@ -45,3 +45,7 @@ target/
 
 # Reference repos (not part of this project)
 susfs4ksu-new/
+zeromount/
+
+# Compiled binaries (built via CI)
+module/zm-*
