@@ -27,10 +27,28 @@ export const accentPresets: Record<string, { gradient: string; textAccent: strin
     rgb: '0, 180, 216',
     textOnAccent: '#1A1A2E',
   },
-  '#64748B': { // Slate
-    gradient: 'linear-gradient(135deg, #64748B 0%, #94A3B8 50%, #CBD5E1 100%)',
-    textAccent: '#94A3B8',
-    rgb: '100, 116, 139',
+  '#D4A574': { // Beige
+    gradient: 'linear-gradient(135deg, #D4A574 0%, #DEB887 50%, #F0D9B5 100%)',
+    textAccent: '#DEB887',
+    rgb: '212, 165, 116',
+    textOnAccent: '#1A1A2E',
+  },
+  '#A855F7': { // Amethyst
+    gradient: 'linear-gradient(135deg, #A855F7 0%, #C084FC 50%, #DDD6FE 100%)',
+    textAccent: '#C084FC',
+    rgb: '168, 85, 247',
+    textOnAccent: '#FFFFFF',
+  },
+  '#D946EF': { // Fuchsia
+    gradient: 'linear-gradient(135deg, #D946EF 0%, #E879F9 50%, #F0ABFC 100%)',
+    textAccent: '#E879F9',
+    rgb: '217, 70, 239',
+    textOnAccent: '#FFFFFF',
+  },
+  '#84CC16': { // Lime
+    gradient: 'linear-gradient(135deg, #84CC16 0%, #A3E635 50%, #BEF264 100%)',
+    textAccent: '#A3E635',
+    rgb: '132, 204, 22',
     textOnAccent: '#1A1A2E',
   },
   '#6366F1': { // Indigo
