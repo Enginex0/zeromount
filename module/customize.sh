@@ -37,8 +37,9 @@ for d in "$MODPATH"/bin/*/; do
     rm -rf "$d"
 done
 
-# Stable path for WebUI and shell scripts
-ln -sf "$MODPATH/bin/${ABI}/zeromount" "$MODPATH/bin/zm"
+# Stable binary path for WebUI and shell scripts — no symlinks
+cp "$BIN" "$MODPATH/bin/zm"
+chmod 755 "$MODPATH/bin/zm"
 
 # Create persistent data directory
 ZM_DATA="/data/adb/zeromount"
@@ -64,5 +65,6 @@ fi
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 chmod 755 "$MODPATH"/*.sh
 chmod 755 "$MODPATH/bin/${ABI}"/*
+chmod 755 "$MODPATH/bin/zm"
 
 ui_print "- ZeroMount installed successfully"

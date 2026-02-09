@@ -14,6 +14,36 @@ export function StatusTab() {
   const [animatedExcludedUids, setAnimatedExcludedUids] = createSignal(0);
   const [showAllActivity, setShowAllActivity] = createSignal(false);
 
+  const mountModeLabel = createMemo(() => {
+    const s = store.scenario?.() || 'none';
+    switch (s) {
+      case 'full': case 'kernel_only': return 'VFS Redirection';
+      case 'susfs_frontend': return 'OverlayFS';
+      case 'none': return 'Magic Mount';
+    }
+  });
+
+  const mountModeValue = createMemo(() => {
+    const s = store.scenario?.() || 'none';
+    switch (s) {
+      case 'full': return 'Active';
+      case 'kernel_only': return 'VFS Only';
+      case 'susfs_frontend': return 'Fallback';
+      case 'none': return 'Fallback';
+    }
+  });
+
+  const mountModeColor = createMemo(() => {
+    const s = store.scenario?.() || 'none';
+    const t = store.currentTheme();
+    switch (s) {
+      case 'full': return t.colorSuccess;
+      case 'kernel_only': return '#FF8E53';
+      case 'susfs_frontend': return t.colorWarning;
+      case 'none': return t.colorError;
+    }
+  });
+
   createEffect(() => {
     if (store.engineActive()) {
       const interval = setInterval(() => {
@@ -258,30 +288,32 @@ export function StatusTab() {
             <div class="status-mode__label">
               <span
                 class="status-mode__dot"
-                style={{ background: store.currentTheme().colorSuccess }}
+                style={{ background: mountModeColor() }}
               />
               <span class="status-mode__text color-text-primary">
-                VFS Redirection
+                {mountModeLabel()}
               </span>
             </div>
             <span class="status-mode__value color-text-accent">
-              {store.rules().length}
+              {mountModeValue()}
             </span>
           </div>
           <div class="status-mode__row">
             <div class="status-mode__label">
               <span
                 class="status-mode__dot"
-                style={{ background: store.currentTheme().colorInfo || '#3b82f6' }}
+                style={{ background: store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
+                  ? store.currentTheme().colorSuccess
+                  : store.currentTheme().colorError }}
               />
               <span class="status-mode__text color-text-primary">
-                SUSFS Available
+                SUSFS
               </span>
             </div>
             <span class="status-mode__value color-text-accent">
               {store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
-                ? `Yes (${store.systemInfo.susfsVersion})`
-                : 'No'}
+                ? store.systemInfo.susfsVersion
+                : 'Unavailable'}
             </span>
           </div>
         </div>
