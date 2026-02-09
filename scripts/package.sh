@@ -10,11 +10,13 @@ MODULE_DIR="$PROJECT_ROOT/module"
 VERSION="v2.0.0"
 OUT_NAME=""
 STAGING=""
+BUILD=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) VERSION="$2"; shift 2 ;;
         --out)     OUT_NAME="$2"; shift 2 ;;
+        --build)   BUILD=true; shift ;;
         *)         echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
@@ -35,6 +37,7 @@ SCRIPTS=(
     metainstall.sh
     metauninstall.sh
     customize.sh
+    monitor.sh
 )
 
 for script in "${SCRIPTS[@]}"; do
@@ -59,23 +62,73 @@ VERSION_CODE="${VERSION#v}"
 VERSION_CODE="${VERSION_CODE//.}"
 sed -i "s/^versionCode=.*/versionCode=${VERSION_CODE}/" "$STAGING/module.prop"
 
-# -- Rust binaries --
-BINARIES=(zm-arm64 zm-arm zm-x86_64 zm-x86)
+# -- Cross-compile Rust binaries (optional) --
+declare -A ABI_TARGET=(
+    [arm64-v8a]=aarch64-linux-android
+    [armeabi-v7a]=armv7-linux-androideabi
+    [x86_64]=x86_64-linux-android
+    [x86]=i686-linux-android
+)
+
+if [ "$BUILD" = true ]; then
+    NDK_BIN="/opt/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    if [ ! -d "$NDK_BIN" ]; then
+        echo "FATAL: Android NDK not found at /opt/android-ndk-r25b" >&2
+        exit 1
+    fi
+
+    # Use president's rustup if available, fall back to system cargo
+    if [ -f "/home/president/.cargo/bin/cargo" ]; then
+        export RUSTUP_HOME=/home/president/.rustup
+        export CARGO_HOME=/home/president/.cargo
+        CARGO="/home/president/.cargo/bin/cargo"
+    else
+        CARGO="cargo"
+    fi
+    export PATH="$NDK_BIN:$PATH"
+
+    for abi in "${!ABI_TARGET[@]}"; do
+        target="${ABI_TARGET[$abi]}"
+        echo "==> Building $abi ($target)"
+        "$CARGO" build --manifest-path "$PROJECT_ROOT/Cargo.toml" \
+            --target "$target" --release 2>&1
+        mkdir -p "$MODULE_DIR/bin/$abi"
+        cp "$PROJECT_ROOT/target/$target/release/zeromount" "$MODULE_DIR/bin/$abi/zeromount"
+    done
+    echo "==> All targets built"
+fi
+
+# -- Collect binaries into staging --
+declare -A ABI_MAP=(
+    [arm64-v8a]=zm-arm64
+    [armeabi-v7a]=zm-arm
+    [x86_64]=zm-x86_64
+    [x86]=zm-x86
+)
 FOUND_BINS=0
 
-for bin in "${BINARIES[@]}"; do
-    # Check module/ first (local build), then staging/ (CI artifacts)
-    if [ -f "$MODULE_DIR/$bin" ]; then
-        cp "$MODULE_DIR/$bin" "$STAGING/$bin"
+for abi in "${!ABI_MAP[@]}"; do
+    old_name="${ABI_MAP[$abi]}"
+    mkdir -p "$STAGING/bin/$abi"
+
+    if [ -f "$MODULE_DIR/bin/$abi/zeromount" ]; then
+        cp "$MODULE_DIR/bin/$abi/zeromount" "$STAGING/bin/$abi/zeromount"
         FOUND_BINS=$((FOUND_BINS + 1))
-    elif [ -f "$PROJECT_ROOT/staging/$bin/$bin" ]; then
-        cp "$PROJECT_ROOT/staging/$bin/$bin" "$STAGING/$bin"
+    elif [ -f "$PROJECT_ROOT/target/${ABI_TARGET[$abi]}/release/zeromount" ]; then
+        cp "$PROJECT_ROOT/target/${ABI_TARGET[$abi]}/release/zeromount" "$STAGING/bin/$abi/zeromount"
         FOUND_BINS=$((FOUND_BINS + 1))
+    elif [ -f "$PROJECT_ROOT/staging/$old_name/$old_name" ]; then
+        cp "$PROJECT_ROOT/staging/$old_name/$old_name" "$STAGING/bin/$abi/zeromount"
+        FOUND_BINS=$((FOUND_BINS + 1))
+    fi
+
+    if [ -f "$MODULE_DIR/bin/$abi/aapt" ]; then
+        cp "$MODULE_DIR/bin/$abi/aapt" "$STAGING/bin/$abi/aapt"
     fi
 done
 
 if [ "$FOUND_BINS" -ne 4 ]; then
-    echo "FATAL: found $FOUND_BINS/4 binaries (need all: zm-arm64 zm-arm zm-x86_64 zm-x86)" >&2
+    echo "FATAL: found $FOUND_BINS/4 zeromount binaries (need all 4 ABIs)" >&2
     exit 1
 fi
 
@@ -109,7 +162,7 @@ ui_print() { echo -e "ui_print $1\nui_print" >> $OUTFD; }
 MODPATH="${MODPATH:-/data/adb/modules/zeromount}"
 mkdir -p "$MODPATH"
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
-chmod 755 "$MODPATH"/*.sh "$MODPATH"/zm-* 2>/dev/null || true
+chmod 755 "$MODPATH"/*.sh "$MODPATH"/bin/*/zeromount 2>/dev/null || true
 ui_print "ZeroMount installed via recovery"
 exit 0
 UPDATER
@@ -117,7 +170,7 @@ UPDATER
 echo "" > "$STAGING/META-INF/com/google/android/updater-script"
 
 # -- Verify eliminated scripts are ABSENT --
-ELIMINATED=(logging.sh susfs_integration.sh monitor.sh sync.sh zm-diag.sh)
+ELIMINATED=(logging.sh susfs_integration.sh sync.sh zm-diag.sh)
 for dead in "${ELIMINATED[@]}"; do
     if [ -f "$STAGING/$dead" ]; then
         echo "FATAL: eliminated script $dead found in staging!" >&2
@@ -138,6 +191,6 @@ unzip -l "$OUT_PATH" | tail -n +4 | head -n -2
 
 echo ""
 echo "==> Verification:"
-echo "    Binaries: $FOUND_BINS/4"
+echo "    Binaries: $FOUND_BINS/4 (bin/<abi>/zeromount)"
 echo "    WebUI: $([ -d "$STAGING/webroot" ] && echo "present" || echo "MISSING")"
 echo "    Eliminated scripts: verified absent"

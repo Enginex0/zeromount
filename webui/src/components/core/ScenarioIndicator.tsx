@@ -46,12 +46,12 @@ export function ScenarioIndicator() {
   return (
     <div class="scenario">
       <div class="scenario__chip" style={{ 'border-color': config().color }}>
-        <span class="scenario__dot" style={{ background: config().color }} />
-        <span class="scenario__label" style={{ color: config().color }}>
+        <span class="scenario__dot" style={{ background: config().color, color: config().color }} />
+        <span class="scenario__label">
           {config().label}
         </span>
       </div>
-      <div class="scenario__desc color-text-tertiary">
+      <div class="scenario__desc">
         {config().description}
       </div>
       <Show when={scenario() === 'susfs_frontend' && missing().length > 0}>

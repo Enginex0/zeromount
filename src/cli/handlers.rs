@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use super::{ConfigAction, ModuleAction, UidAction, VfsAction};
+use super::{ConfigAction, LogAction, ModuleAction, UidAction, VfsAction};
 
 pub fn handle_mount(post_boot: bool) -> Result<()> {
     if post_boot {
@@ -41,20 +41,59 @@ pub fn handle_mount(post_boot: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn handle_log(action: LogAction) -> Result<()> {
+    match action {
+        LogAction::Enable => crate::logging::sysfs::enable(),
+        LogAction::Disable => crate::logging::sysfs::disable(),
+        LogAction::Level { level } => crate::logging::sysfs::set_level(level),
+        LogAction::Status => crate::logging::sysfs::status(),
+    }
+}
+
 pub fn handle_detect() -> Result<()> {
     let result = crate::detect::detect_and_persist()?;
-    tracing::info!(
-        "detection complete: scenario={:?}, driver_version={:?}",
-        result.scenario,
-        result.driver_version
-    );
+
+    println!("scenario: {:?}", result.scenario);
+    if let Some(ver) = result.driver_version {
+        println!("driver_version: v{}", ver);
+    }
+    println!("vfs_driver: {}", result.capabilities.vfs_driver);
+    println!("susfs: {}", result.capabilities.susfs_available);
+    if result.capabilities.susfs_available {
+        if let Some(ref v) = result.capabilities.susfs_version {
+            println!("  version: {}", v);
+        }
+        println!("  kstat: {}", result.capabilities.susfs_kstat);
+        println!("  path: {}", result.capabilities.susfs_path);
+        println!("  maps: {}", result.capabilities.susfs_maps);
+        println!("  open_redirect: {}", result.capabilities.susfs_open_redirect);
+        println!("  kstat_redirect: {}", result.capabilities.susfs_kstat_redirect);
+        println!("  open_redirect_all: {}", result.capabilities.susfs_open_redirect_all);
+    }
+    println!("overlay: {}", result.capabilities.overlay_supported);
+    println!("tmpfs_xattr: {}", result.capabilities.tmpfs_xattr);
+
+    tracing::info!(scenario = ?result.scenario, "detection complete");
     Ok(())
 }
 
 pub fn handle_status(json: bool) -> Result<()> {
     let status_path = std::path::Path::new("/data/adb/zeromount/.status.json");
-    let state = crate::core::types::RuntimeState::read_status_file(status_path)
+    let mut state = crate::core::types::RuntimeState::read_status_file(status_path)
         .unwrap_or_default();
+
+    // Augment cached state with live kernel data when the driver is reachable
+    if let Ok(driver) = crate::vfs::VfsDriver::open() {
+        state.capabilities.vfs_driver = true;
+        if let Ok(v) = driver.get_version() {
+            state.driver_version = Some(v);
+        }
+        // GET_STATUS ioctl (#11) may not exist in older kernels — Ok(None) keeps cached value
+        if let Ok(Some(s)) = driver.get_status() {
+            state.engine_active = Some(s.enabled);
+        }
+    }
+
     if json {
         let out = serde_json::to_string_pretty(&state)?;
         println!("{out}");

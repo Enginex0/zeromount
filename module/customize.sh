@@ -8,33 +8,36 @@ ui_print "- Installing ZeroMount v2.0.0"
 # Extract module files
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
 
-# Detect architecture
+# Detect architecture and map to ABI directory
 case "$(uname -m)" in
-    aarch64)       ARCH=arm64 ;;
-    armv7*|armv8l) ARCH=arm ;;
-    x86_64)        ARCH=x86_64 ;;
-    i686|i386)     ARCH=x86 ;;
+    aarch64)       ABI=arm64-v8a ;;
+    armv7*|armv8l) ABI=armeabi-v7a ;;
+    x86_64)        ABI=x86_64 ;;
+    i686|i386)     ABI=x86 ;;
     *)
         abort "! Unsupported architecture: $(uname -m)"
         ;;
 esac
 
-ui_print "- Architecture: $ARCH"
+ui_print "- Architecture: $ABI"
 
-BIN="$MODPATH/zm-${ARCH}"
+BIN="$MODPATH/bin/${ABI}/zeromount"
 
 if [ ! -f "$BIN" ]; then
-    abort "! Binary not found: zm-${ARCH}"
+    abort "! Binary not found: bin/${ABI}/zeromount"
 fi
 
-# Set executable permissions on all binaries
-chmod 755 "$MODPATH"/zm-*
+# Set executable permissions on this arch's binaries
+chmod 755 "$MODPATH/bin/${ABI}"/*
 
-# Remove binaries for other architectures to save space
-for f in "$MODPATH"/zm-*; do
-    [ "$f" = "$BIN" ] && continue
-    rm -f "$f"
+# Remove other architecture directories to save space
+for d in "$MODPATH"/bin/*/; do
+    [ "$d" = "$MODPATH/bin/${ABI}/" ] && continue
+    rm -rf "$d"
 done
+
+# Stable path for WebUI and shell scripts
+ln -sf "$MODPATH/bin/${ABI}/zeromount" "$MODPATH/bin/zm"
 
 # Create persistent data directory
 ZM_DATA="/data/adb/zeromount"
@@ -56,9 +59,9 @@ if command -v chcon >/dev/null 2>&1; then
     chcon -R u:object_r:adb_data_file:s0 "$ZM_DATA" 2>/dev/null || true
 fi
 
-# Set permissions on shell scripts
+# Set permissions on shell scripts and binaries
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 chmod 755 "$MODPATH"/*.sh
-chmod 755 "$BIN"
+chmod 755 "$MODPATH/bin/${ABI}"/*
 
 ui_print "- ZeroMount installed successfully"

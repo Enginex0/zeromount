@@ -212,15 +212,16 @@ impl VfsDriver {
     /// Query driver version. Only ioctl NOT requiring CAP_SYS_ADMIN.
     pub fn get_version(&self) -> Result<u32> {
         let mut version: i32 = 0;
-        unsafe {
-            let ret = raw_ioctl(
+        let ret = unsafe {
+            raw_ioctl(
                 self.raw_fd(),
                 IOCTL_GET_VERSION,
                 &mut version as *mut i32 as *mut libc::c_void,
-            )?;
-            // Kernel returns version directly as ioctl return value
-            Ok(ret as u32)
-        }
+            )?
+        };
+        // Kernel returns version as ioctl return value, not buffer
+        let ver = if ret > 0 { ret as u32 } else { version as u32 };
+        Ok(ver)
     }
 
     /// Exclude a UID from VFS redirection.

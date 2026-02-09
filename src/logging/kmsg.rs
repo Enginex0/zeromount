@@ -37,20 +37,39 @@ impl KmsgLayer {
 
 struct MessageVisitor {
     message: String,
+    fields: String,
 }
 
 impl MessageVisitor {
     fn new() -> Self {
         Self {
             message: String::new(),
+            fields: String::new(),
         }
     }
 }
 
 impl Visit for MessageVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "message" {
+            self.message = value.to_string();
+        } else {
+            if !self.fields.is_empty() { self.fields.push(' '); }
+            self.fields.push_str(&format!("{}={:?}", field.name(), value));
+        }
+    }
+
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if field.name() == "message" {
-            self.message = format!("{:?}", value);
+            let raw = format!("{:?}", value);
+            // Strip surrounding debug quotes from string values
+            self.message = raw.strip_prefix('"')
+                .and_then(|s| s.strip_suffix('"'))
+                .unwrap_or(&raw)
+                .to_string();
+        } else {
+            if !self.fields.is_empty() { self.fields.push(' '); }
+            self.fields.push_str(&format!("{}={:?}", field.name(), value));
         }
     }
 }
@@ -70,7 +89,12 @@ impl<S: Subscriber> Layer<S> for KmsgLayer {
         event.record(&mut visitor);
 
         let pri = Self::kmsg_level(event.metadata().level());
-        // kmsg format: <priority>tag: message
-        let _ = writeln!(file, "<{pri}>{TAG}: {}", visitor.message);
+        // kmsg format: <priority>tag: message [fields]
+        let msg = if visitor.fields.is_empty() {
+            format!("{TAG}: {}", visitor.message)
+        } else {
+            format!("{TAG}: {} {}", visitor.message, visitor.fields)
+        };
+        let _ = writeln!(file, "<{pri}>{msg}");
     }
 }

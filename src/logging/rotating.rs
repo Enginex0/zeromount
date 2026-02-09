@@ -93,20 +93,39 @@ impl RotatingState {
 
 struct LogVisitor {
     message: String,
+    fields: String,
 }
 
 impl LogVisitor {
     fn new() -> Self {
         Self {
             message: String::new(),
+            fields: String::new(),
         }
     }
 }
 
 impl Visit for LogVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "message" {
+            self.message = value.to_string();
+        } else {
+            if !self.fields.is_empty() { self.fields.push(' '); }
+            self.fields.push_str(&format!("{}={:?}", field.name(), value));
+        }
+    }
+
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if field.name() == "message" {
-            self.message = format!("{:?}", value);
+            let raw = format!("{:?}", value);
+            // Strip surrounding debug quotes from string values
+            self.message = raw.strip_prefix('"')
+                .and_then(|s| s.strip_suffix('"'))
+                .unwrap_or(&raw)
+                .to_string();
+        } else {
+            if !self.fields.is_empty() { self.fields.push(' '); }
+            self.fields.push_str(&format!("{}={:?}", field.name(), value));
         }
     }
 }
@@ -132,7 +151,11 @@ impl<S: Subscriber> Layer<S> for RotatingFileLayer {
         let level = event.metadata().level();
         let target = event.metadata().target();
         let ts = timestamp();
-        let line = format!("{ts} [{level}] {target}: {}", visitor.message);
+        let line = if visitor.fields.is_empty() {
+            format!("{ts} [{level}] {target}: {}", visitor.message)
+        } else {
+            format!("{ts} [{level}] {target}: {} {}", visitor.message, visitor.fields)
+        };
         guard.write_line(&line);
     }
 }

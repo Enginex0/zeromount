@@ -48,6 +48,11 @@ pub enum Commands {
         #[command(subcommand)]
         action: UidAction,
     },
+    /// Runtime logging control (kernel sysfs + .verbose marker)
+    Log {
+        #[command(subcommand)]
+        action: LogAction,
+    },
     /// SUSFS feature toggles
     Susfs {
         feature: String,
@@ -57,6 +62,18 @@ pub enum Commands {
     Diag,
     /// Print version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum LogAction {
+    /// Enable kernel debug logging (sysfs=1, .verbose=touch)
+    Enable,
+    /// Disable kernel debug logging (sysfs=0, .verbose=remove)
+    Disable,
+    /// Set kernel debug level (0=off, 1=standard, 2=verbose)
+    Level { level: u32 },
+    /// Show current kernel debug level and .verbose state
+    Status,
 }
 
 #[derive(Subcommand)]

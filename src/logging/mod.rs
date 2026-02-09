@@ -1,5 +1,6 @@
 mod kmsg;
 mod rotating;
+pub mod sysfs;
 
 use std::path::Path;
 
@@ -9,26 +10,30 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-const VERBOSE_MARKER: &str = "/data/adb/zeromount/.verbose";
-const LOG_DIR: &str = "/data/adb/zeromount/logs";
-const MAX_LOG_SIZE: u64 = 512 * 1024; // 512KB per file
-const MAX_LOG_FILES: usize = 3;
+use crate::core::config::LoggingConfig;
 
-pub fn init(verbose_flag: bool) -> Result<()> {
-    let verbose = verbose_flag || Path::new(VERBOSE_MARKER).exists();
+const VERBOSE_MARKER: &str = "/data/adb/zeromount/.verbose";
+
+pub fn init(verbose_flag: bool, config: &LoggingConfig) -> Result<()> {
+    let verbose = verbose_flag || config.verbose || Path::new(VERBOSE_MARKER).exists();
     let level = if verbose { Level::TRACE } else { Level::INFO };
 
     let env_filter = EnvFilter::builder()
         .with_default_directive(level.into())
         .from_env_lossy();
 
+    let log_dir = config.log_dir.to_string_lossy();
+    let max_size = (config.max_log_size_mb as u64) * 1024 * 1024;
+    let max_files = config.max_log_files as usize;
+
     let kmsg_layer = kmsg::KmsgLayer::new();
-    let file_layer = rotating::RotatingFileLayer::new(LOG_DIR, MAX_LOG_SIZE, MAX_LOG_FILES);
+    let file_layer = rotating::RotatingFileLayer::new(&log_dir, max_size, max_files);
 
     tracing_subscriber::registry()
         .with(env_filter)
         .with(kmsg_layer)
         .with(file_layer)
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .init();
 
     Ok(())

@@ -13,9 +13,9 @@
   padding: 6px 14px;
   border: 1px solid;
   border-radius: 20px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .scenario__dot {
@@ -23,6 +23,7 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px 2px currentColor, 0 0 14px currentColor;
 }
 
 .scenario__label {
@@ -30,11 +31,13 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  color: #fff;
 }
 
 .scenario__desc {
   font-size: 11px;
   text-align: center;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .scenario__missing {

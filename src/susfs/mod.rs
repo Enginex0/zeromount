@@ -536,23 +536,49 @@ fn apply_spoof_values(info: &mut StSusfsSusKstat, meta: &fs::Metadata, spoof: &K
 }
 
 /// Probe whether a custom SUSFS command is recognized by the kernel.
-/// Uses a zeroed struct with err pre-set to ERR_CMD_NOT_SUPPORTED.
+/// Uses a full-sized zeroed struct with err pre-set to ERR_CMD_NOT_SUPPORTED.
 /// If the kernel doesn't handle the command, the err field stays unchanged.
+/// Must use the correct struct size -- kernel's copy_from_user() EFAULTs on undersized buffers.
 fn probe_custom_cmd(cmd: SusfsCommand) -> bool {
-    let mut probe_buf = [0u8; 4]; // just an i32 err field at minimum
-    let err_offset = 0;
-    probe_buf[err_offset] = ERR_CMD_NOT_SUPPORTED as u8;
-
-    // The supercall may fail at the syscall level (EPERM if not root, etc.)
-    // In that case we can't determine support, default to false.
-    if supercall(cmd, probe_buf.as_mut_ptr()).is_err() {
-        return false;
+    match cmd {
+        SusfsCommand::AddSusKstatRedirect => {
+            let mut info = StSusfsSusKstatRedirect {
+                virtual_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
+                real_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
+                spoofed_ino: 0,
+                spoofed_dev: 0,
+                spoofed_nlink: 0,
+                _pad0: [0; 4],
+                spoofed_size: 0,
+                spoofed_atime_tv_sec: 0,
+                spoofed_mtime_tv_sec: 0,
+                spoofed_ctime_tv_sec: 0,
+                spoofed_atime_tv_nsec: 0,
+                spoofed_mtime_tv_nsec: 0,
+                spoofed_ctime_tv_nsec: 0,
+                spoofed_blksize: 0,
+                spoofed_blocks: 0,
+                err: ERR_CMD_NOT_SUPPORTED,
+            };
+            if supercall(cmd, &mut info as *mut _ as *mut u8).is_err() {
+                return false;
+            }
+            info.err != ERR_CMD_NOT_SUPPORTED
+        }
+        SusfsCommand::AddOpenRedirectAll => {
+            let mut info = StSusfsOpenRedirect {
+                target_ino: 0,
+                target_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
+                redirected_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
+                err: ERR_CMD_NOT_SUPPORTED,
+            };
+            if supercall(cmd, &mut info as *mut _ as *mut u8).is_err() {
+                return false;
+            }
+            info.err != ERR_CMD_NOT_SUPPORTED
+        }
+        _ => false,
     }
-
-    // If the kernel handled the command, it would have written to err.
-    // ERR_CMD_NOT_SUPPORTED (126) means the handler explicitly rejected it.
-    let err = i32::from_ne_bytes(probe_buf);
-    err != ERR_CMD_NOT_SUPPORTED
 }
 
 fn parse_features(features_str: &str) -> SusfsFeatures {

@@ -41,7 +41,8 @@ fn main() -> Result<()> {
         eprintln!("camouflage failed (non-fatal): {e}");
     }
 
-    logging::init(cli.verbose)?;
+    let config = core::config::ZeroMountConfig::load(None)?;
+    logging::init(cli.verbose, &config.logging)?;
 
     match cli.command {
         Commands::Mount { post_boot } => cli::handlers::handle_mount(post_boot),
@@ -51,6 +52,7 @@ fn main() -> Result<()> {
         Commands::Config { action } => cli::handlers::handle_config(action),
         Commands::Vfs { action } => cli::handlers::handle_vfs(action),
         Commands::Uid { action } => cli::handlers::handle_uid(action),
+        Commands::Log { action } => cli::handlers::handle_log(action),
         Commands::Susfs { feature, state } => cli::handlers::handle_susfs(&feature, &state),
         Commands::Diag => cli::handlers::handle_diag(),
         Commands::Version => {

@@ -10,14 +10,14 @@ use crate::utils::platform;
 /// SUSFS module directory names (checked under /data/adb/modules/)
 const SUSFS_MODULE_IDS: &[&str] = &["susfs4ksu", "susfs"];
 
-/// DET03: Three-layer SUSFS probe.
+/// DET03: Two-phase SUSFS probe.
 ///
 /// 1. Module state -- check for .disabled marker in SUSFS module dir.
-///    If disabled, skip all SUSFS operations regardless of binary/kernel.
-/// 2. Binary availability -- locate ksu_susfs binary, probe standard
-///    capabilities via SusfsClient::probe().
-/// 3. Custom kernel ioctls -- probe kstat_redirect + open_redirect_all
-///    (done inside SusfsClient::probe() via supercall).
+///    If disabled, skip all SUSFS operations regardless of kernel state.
+/// 2. Kernel probe -- SusfsClient::probe() queries standard features
+///    (via show_enabled_features) and custom commands (kstat_redirect,
+///    open_redirect_all) via supercall. Binary presence is logged but
+///    does not gate detection.
 pub fn probe_susfs() -> Result<CapabilityFlags> {
     let mut caps = CapabilityFlags::default();
 
@@ -27,13 +27,13 @@ pub fn probe_susfs() -> Result<CapabilityFlags> {
         return Ok(caps);
     }
 
-    // Layer 2: Binary availability and standard capability probe
+    // Binary location -- useful for CLI operations but not required for
+    // kernel-level detection (SusfsClient::probe uses supercalls directly)
     let binary = find_susfs_binary();
-    if binary.is_none() {
-        debug!("SUSFS binary not found in any search path");
-        return Ok(caps);
+    match &binary {
+        Some(p) => debug!("SUSFS binary found at: {}", p.display()),
+        None => debug!("SUSFS binary not found (kernel probe still proceeds)"),
     }
-    debug!("SUSFS binary found at: {}", binary.as_ref().map(|p| p.display().to_string()).unwrap_or_default());
 
     // Layer 2+3: SusfsClient probes both standard features
     // (via show_enabled_features) and custom commands (via supercall probe)
