@@ -65,8 +65,9 @@ static const unsigned char PAT_BOM[]            = {0xEF, 0xBB, 0xBF};\
 \
 bool susfs_check_unicode_bypass(const char __user *filename)\
 {\
-\tchar buf[PATH_MAX];\
+\tchar *buf;\
 \tunsigned int uid;\
+\tbool blocked = false;\
 \tlong len;\
 \tint i;\
 \
@@ -77,9 +78,15 @@ bool susfs_check_unicode_bypass(const char __user *filename)\
 \tif (uid == 0 || uid == 1000)\
 \t\treturn false;\
 \
-\tlen = strncpy_from_user(buf, filename, PATH_MAX - 1);\
-\tif (len <= 0)\
+\tbuf = kmalloc(PATH_MAX, GFP_KERNEL);\
+\tif (!buf)\
 \t\treturn false;\
+\
+\tlen = strncpy_from_user(buf, filename, PATH_MAX - 1);\
+\tif (len <= 0) {\
+\t\tkfree(buf);\
+\t\treturn false;\
+\t}\
 \tbuf[len] = '"'"'\\0'"'"';\
 \
 \tfor (i = 0; i < len; i++) {\
@@ -98,24 +105,29 @@ bool susfs_check_unicode_bypass(const char __user *filename)\
 \t\t\t    memcmp(&buf[i], PAT_ZWJ, 3) == 0 ||\
 \t\t\t    memcmp(&buf[i], PAT_BOM, 3) == 0) {\
 \t\t\t\tSUSFS_LOGI("unicode: blocked pattern uid=%u\\n", uid);\
-\t\t\t\treturn true;\
+\t\t\t\tblocked = true;\
+\t\t\t\tbreak;\
 \t\t\t}\
 \t\t}\
 \
 \t\tif (c == 0xD0 || c == 0xD1) {\
 \t\t\tSUSFS_LOGI("unicode: blocked cyrillic uid=%u\\n", uid);\
-\t\t\treturn true;\
+\t\t\tblocked = true;\
+\t\t\tbreak;\
 \t\t}\
 \
 \t\tif (c == 0xCC || (c == 0xCD && i + 1 < len && (unsigned char)buf[i+1] <= 0xAF)) {\
 \t\t\tSUSFS_LOGI("unicode: blocked diacritical uid=%u\\n", uid);\
-\t\t\treturn true;\
+\t\t\tblocked = true;\
+\t\t\tbreak;\
 \t\t}\
 \
 \t\tSUSFS_LOGI("unicode: blocked byte 0x%02x uid=%u\\n", c, uid);\
-\t\treturn true;\
+\t\tblocked = true;\
+\t\tbreak;\
 \t}\
-\treturn false;\
+\tkfree(buf);\
+\treturn blocked;\
 }\
 #endif
     }' "$SUSFS_C"

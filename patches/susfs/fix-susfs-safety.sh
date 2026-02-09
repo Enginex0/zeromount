@@ -312,4 +312,14 @@ sed -i '/void susfs_set_cmdline_or_bootconfig/,/^}/ {
     s/	$/	/
 }' "$SUSFS_C"
 
+# --- 8. Fix format specifier: spoofed_size is loff_t (long long), not unsigned int ---
+# Upstream uses '%u' for spoofed_size in the #else (non-STAT64) SUSFS_LOGI paths
+if grep -q "spoofed_size: '%u'" "$SUSFS_C"; then
+    echo "[+] Fixing spoofed_size format specifier (%u -> %llu)"
+    sed -i "s/spoofed_size: '%u'/spoofed_size: '%llu'/g" "$SUSFS_C"
+    ((fix_count++)) || true
+else
+    echo "[=] spoofed_size format specifier already correct"
+fi
+
 echo "=== Done: $fix_count fixes applied ==="
