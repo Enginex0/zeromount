@@ -575,6 +575,7 @@ function createAppStore() {
         api.configSet('mount.magic_mount_fallback', String(newMagic)),
       ]);
       await api.logActivity('MOUNT_STRATEGY_CHANGED', `Strategy → ${strategy}`);
+      showToast('Mount strategy changed — reboot to apply', 'info');
       console.log('[ZM-Store] setMountStrategy() saved:', strategy, '→ overlay_preferred:', newOverlay, 'magic_mount_fallback:', newMagic);
     } catch (e) {
       console.error('[ZM-Store] setMountStrategy() error:', e);

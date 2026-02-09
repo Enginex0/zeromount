@@ -29,12 +29,13 @@
   font-weight: 500;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  background: var(--gradient-primary);
+  background: linear-gradient(90deg, #c9a44c 0%, #f5d98e 40%, #e8c55a 60%, #c9a44c 100%);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  opacity: 0.85;
-  animation: subtitleGlow 3s ease-in-out infinite alternate;
+  animation: subtitleGlow 3s ease-in-out infinite alternate, subtitleShimmer 5s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(245, 217, 142, 0.4));
 }
 
 @keyframes headerPulse {
@@ -43,6 +44,11 @@
 }
 
 @keyframes subtitleGlow {
-  0% { opacity: 0.6; filter: brightness(0.9); }
-  100% { opacity: 1; filter: brightness(1.2); }
+  0% { opacity: 0.7; filter: drop-shadow(0 0 4px rgba(245, 217, 142, 0.3)) brightness(0.95); }
+  100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(245, 217, 142, 0.6)) brightness(1.15); }
+}
+
+@keyframes subtitleShimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
 }

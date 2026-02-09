@@ -284,6 +284,9 @@ Engine: ${store.engineActive() ? 'Active' : 'Inactive'}
               <div class="settings__strategy-hint">Bind Mount</div>
             </button>
           </div>
+          <div class="settings__item-desc" style={{ "margin-top": "8px", "font-style": "italic" }}>
+            Switching mode requires reboot
+          </div>
         </div>
 
         {/* Storage + random paths only apply to overlay/magic — VFS uses kernel driver */}

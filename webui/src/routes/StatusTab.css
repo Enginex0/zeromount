@@ -153,6 +153,21 @@
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
 }
 
+.status-mode__desc {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 12px;
+  padding-left: 16px;
+  margin-top: -6px;
+}
+
+.status-mode__reboot-hint {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 11px;
+  font-style: italic;
+  padding-left: 16px;
+  margin-top: -4px;
+}
+
 /* Per-Module Strategy */
 .status-mode__modules {
   margin-top: 16px;

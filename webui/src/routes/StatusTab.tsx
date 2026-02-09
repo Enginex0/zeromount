@@ -48,11 +48,9 @@ export function StatusTab() {
     const mode = effectiveMode();
     if (mode === 'vfs' && (s === 'full' || s === 'kernel_only')) return 'Active';
     if (mode === 'susfs_only') return 'No Mount';
-    if (mode === 'none') return 'Fallback';
-    // User selected overlay/magic but we haven't run the pipeline yet
-    const strategy = store.activeStrategy();
+    if (mode === 'none') return 'Default';
     if (mode === 'vfs' && !store.capabilities()?.vfs_driver) return 'Unavailable';
-    return strategy === store.activeStrategy() ? 'Selected' : 'Fallback';
+    return 'Selected';
   });
 
   const mountModeColor = createMemo(() => {
@@ -62,7 +60,19 @@ export function StatusTab() {
       case 'overlay': return t.colorInfo || '#3b82f6';
       case 'magicmount': return t.colorWarning;
       case 'susfs_only': return '#FF8E53';
-      case 'none': return t.colorError;
+      case 'none': return t.colorSuccess;
+    }
+  });
+
+  const mountModeDescription = createMemo(() => {
+    const mode = effectiveMode();
+    const storage = store.settings.mount.storage_mode;
+    switch (mode) {
+      case 'vfs': return 'Kernel VFS driver handling filesystem redirection';
+      case 'overlay': return `OverlayFS stacked filesystem \u00b7 Storage: ${storage}`;
+      case 'magicmount': return `Bind mounts (KSU default) \u00b7 Storage: ${storage}`;
+      case 'susfs_only': return 'SUSFS hiding active, no mount redirection';
+      case 'none': return 'KSU default bind mounts, no additional drivers';
     }
   });
 
@@ -335,6 +345,9 @@ export function StatusTab() {
               {mountModeValue()}
             </span>
           </div>
+          <div class="status-mode__desc color-text-tertiary">
+            {mountModeDescription()}
+          </div>
           <div class="status-mode__row">
             <div class="status-mode__label">
               <span
@@ -348,6 +361,9 @@ export function StatusTab() {
             <span class="status-mode__value color-text-accent">
               {store.activeStrategy()}
             </span>
+          </div>
+          <div class="status-mode__reboot-hint color-text-tertiary">
+            Switching mode requires reboot
           </div>
           <div class="status-mode__row">
             <div class="status-mode__label">
