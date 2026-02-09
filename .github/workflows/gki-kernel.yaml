@@ -1,0 +1,120 @@
+name: Build nuke_ext4 LKM
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "GKI version (e.g. android14-6.1)"
+        required: true
+        type: string
+      os_patch_level:
+        description: "Patch level (e.g. 2025-10)"
+        required: true
+        type: string
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "GKI version (e.g. android14-6.1)"
+        required: true
+        type: string
+      os_patch_level:
+        description: "Patch level (e.g. 2025-10)"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build LKM for ${{ inputs.version }}.${{ inputs.os_patch_level }}
+
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev git python3 unzip wget cpio gcc-aarch64-linux-gnu llvm-15
+
+      - name: Clone AOSP GKI kernel
+        run: |
+          mkdir android-kernel && cd android-kernel
+          TAG="${{ inputs.version }}-${{ inputs.os_patch_level }}"
+          echo "Fetching GKI tag: ${TAG}"
+          curl https://storage.googleapis.com/git-repo-downloads/repo > repo
+          chmod +x repo
+          ./repo init --depth=1 https://android.googlesource.com/kernel/manifest -b "common-${TAG}"
+          ./repo sync -c -j $(nproc)
+
+      - name: Prepare GKI
+        working-directory: android-kernel
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CC=clang
+
+          cd common
+          mv ../../nuke_ext4_lkm drivers/nuke_ext4_lkm
+          ls -lha drivers/nuke_ext4_lkm
+
+          sed -i 's/endmenu//g' drivers/Kconfig
+          echo "source \"drivers/nuke_ext4_lkm/Kconfig\"" >> drivers/Kconfig
+          echo "endmenu" >> drivers/Kconfig
+          echo 'obj-y += nuke_ext4_lkm/' >> drivers/Makefile
+
+          sed -i '/check_exports(mod)/d' scripts/mod/modpost.c
+
+          [ -f "android/abi_gki_aarch64" ] && echo "  register_kprobe" >> android/abi_gki_aarch64 && echo "  unregister_kprobe" >> android/abi_gki_aarch64
+
+          tail -n10 drivers/Kconfig
+          tail -n10 drivers/Makefile
+
+          cd ../
+          ls -la
+
+          # bazel builds: android14-5.15, android14-6.1, android15-6.6
+          if [ ! -e build/build.sh ]; then
+            sed -i 's/needs unknown symbol/Dont abort when unknown symbol/g' build/kernel/*.sh || echo "No unknown symbol scripts found"
+            if [ -e common/modules.bzl ]; then
+              sed -i 's/_COMMON_GKI_MODULES_LIST = \[/_COMMON_GKI_MODULES_LIST = \[ "drivers\/nuke_ext4_lkm\/nuke.ko",/g' common/modules.bzl
+            fi
+          else
+            TARGET_FILE="build/kernel/build.sh"
+            if [ ! -e "$TARGET_FILE" ]; then
+              TARGET_FILE="build/build.sh"
+            fi
+            sed -i 's/needs unknown symbol/Dont abort when unknown symbol/g' $TARGET_FILE || echo "No unknown symbol in $TARGET_FILE"
+            sed -i 's/if ! diff -u "\${KERNEL_DIR}\/\${MODULES_ORDER}" "\${OUT_DIR}\/modules\.order"; then/if false; then/g' $TARGET_FILE
+            sed -i 's@${ROOT_DIR}/build/abi/compare_to_symbol_list@echo@g' $TARGET_FILE
+            sed -i 's/needs unknown symbol/Dont abort when unknown symbol/g' build/kernel/*.sh || echo "No unknown symbol scripts found"
+          fi
+
+          if [ -e build/build.sh ]; then
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="clang"
+          else
+            tools/bazel run --disk_cache=/home/runner/.cache/bazel --config=fast --config=stamp --lto=thin //common:kernel_aarch64_dist -- --dist_dir=dist
+          fi
+
+          if [ -f ./dist/nuke.ko ]; then
+            mv ./dist/nuke.ko nuke.ko
+          else
+            mv out/${{ inputs.version }}/common/drivers/nuke_ext4_lkm/nuke.ko nuke.ko
+          fi
+
+      - name: Upload nuke.ko
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuke_ext4-${{ inputs.version }}-${{ inputs.os_patch_level }}
+          path: android-kernel/nuke.ko

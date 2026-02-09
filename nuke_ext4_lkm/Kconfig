@@ -1,0 +1,10 @@
+menu "nuke ext4 sysfs"
+
+config NUKE_EXT4_SYSFS
+	tristate "nuke ext4 sysfs"
+	default m
+	depends on MODULES
+	help
+	  One-shot LKM that unregisters ext4 sysfs for a given mount point.
+
+endmenu
