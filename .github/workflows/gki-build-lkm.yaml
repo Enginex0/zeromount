@@ -6,6 +6,7 @@ on:
 jobs:
   build-lkm:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - version: "android12-5.10"
