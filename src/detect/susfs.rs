@@ -110,7 +110,7 @@ pub fn find_susfs_binary() -> Option<PathBuf> {
         "/data/adb/ksu/bin/ksu_susfs",
         "/data/adb/ap/bin/ksu_susfs",
         "/data/adb/ksu/bin/susfs",
-        "/data/adb/modules/zeromount/ksu_susfs",
+        "/data/adb/modules/meta-zeromount/ksu_susfs",
     ];
 
     for path in &fallback_paths {

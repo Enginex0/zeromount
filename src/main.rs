@@ -14,7 +14,7 @@ use clap::Parser;
 use cli::{Cli, Commands};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const MODULE_PROP_PATH: &str = "/data/adb/modules/zeromount/module.prop";
+const MODULE_PROP_PATH: &str = "/data/adb/modules/meta-zeromount/module.prop";
 
 fn read_version_from_prop() -> String {
     let content = match std::fs::read_to_string(MODULE_PROP_PATH) {

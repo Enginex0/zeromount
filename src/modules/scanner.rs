@@ -1,5 +1,5 @@
 use std::fs;
-use std::os::unix::fs::FileTypeExt;
+use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -35,7 +35,7 @@ pub const SUPPORTED_PARTITIONS: &[&str] = &[
     "vendor_dlkm",
 ];
 
-const BLACKLISTED_NAMES: &[&str] = &["zeromount", ".", "..", "lost+found"];
+const BLACKLISTED_NAMES: &[&str] = &["meta-zeromount", ".", "..", "lost+found"];
 
 /// Scan /data/adb/modules/ for active modules, classify files, detect conflicts.
 /// Returns modules sorted reverse-alphabetically (last-installed wins on conflict).
@@ -54,6 +54,20 @@ pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
         })
         .filter(|p| is_module_enabled(p) && !has_skip_mount(p))
         .collect();
+
+    // Filesystem corruption can create duplicate directory entries (same inode).
+    // Dedup by inode to avoid scanning the same module twice.
+    let entries = {
+        let mut seen_inodes = std::collections::HashSet::new();
+        entries
+            .into_iter()
+            .filter(|p| {
+                std::fs::metadata(p)
+                    .map(|m| seen_inodes.insert(m.ino()))
+                    .unwrap_or(true)
+            })
+            .collect::<Vec<_>>()
+    };
 
     let mut modules: Vec<ScannedModule> = entries
         .par_iter()

@@ -1,16 +1,20 @@
 #!/system/bin/sh
 MODDIR="${0%/*}"
 
-case "$(uname -m)" in
-    aarch64) ABI=arm64-v8a ;;
-    armv7*|armv8l) ABI=armeabi-v7a ;;
-    x86_64) ABI=x86_64 ;;
-    i686|i386) ABI=x86 ;;
-    *) exit 0 ;;
-esac
+# Single-instance guard
+LOCKFILE="/dev/zeromount_lock"
+if [ -f "$LOCKFILE" ]; then
+    exit 0
+fi
+echo $$ > "$LOCKFILE"
+trap 'rm -f "$LOCKFILE"' EXIT INT TERM
 
-BIN="$MODDIR/bin/${ABI}/zeromount"
-[ -x "$BIN" ] || exit 0
+# Shell fast-fail on bootloop
+COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
+[ "$COUNT" -ge 3 ] && { echo "zeromount: bootloop guard triggered (count=$COUNT), skipping pipeline" > /dev/kmsg 2>/dev/null; exit 0; }
 
-# Post-boot tasks: UID blocking, WebUI symlink, module watcher
+. "$MODDIR/common.sh"
+[ -z "$ABI" ] && exit 1
+[ -x "$BIN" ] || exit 1
+
 "$BIN" mount --post-boot

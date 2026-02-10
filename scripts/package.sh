@@ -166,7 +166,7 @@ ui_print() { echo -e "ui_print $1\nui_print" >> $OUTFD; }
 
 # KernelSU and APatch handle installation natively.
 # This update-binary provides TWRP recovery fallback.
-MODPATH="${MODPATH:-/data/adb/modules/zeromount}"
+MODPATH="${MODPATH:-/data/adb/modules/meta-zeromount}"
 mkdir -p "$MODPATH"
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
 chmod 755 "$MODPATH"/*.sh "$MODPATH"/bin/*/zeromount 2>/dev/null || true

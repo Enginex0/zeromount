@@ -1,4 +1,5 @@
 #!/system/bin/sh
+MODDIR="${0%/*}"
 # Remove skip_mount flags we created
 if [ -f /data/adb/zeromount/.skipped_modules ]; then
     while IFS= read -r mod_id; do
