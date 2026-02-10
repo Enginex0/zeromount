@@ -17,10 +17,6 @@ pub fn handle_mount(post_boot: bool) -> Result<()> {
     if post_boot {
         tracing::info!("post-boot tasks started");
 
-        // Run pipeline once at boot before watching for changes.
-        // On KSU/APatch metamodule mode, metamount.sh already ran the pipeline
-        // at post-fs-data; cleanup_previous_mounts() makes this idempotent.
-        // On Magisk, this is the only pipeline execution path.
         let config = crate::core::config::ZeroMountConfig::load(None)?;
         let state = crate::core::pipeline::run_pipeline_with_bootloop_guard(config)?;
         tracing::info!(
@@ -28,22 +24,8 @@ pub fn handle_mount(post_boot: bool) -> Result<()> {
             rules = state.rule_count,
             modules = state.modules.len(),
             degraded = state.degraded,
-            "initial pipeline finished"
+            "pipeline finished"
         );
-
-        let modules_dir = std::path::Path::new("/data/adb/modules");
-        crate::detect::watcher::start_module_watcher(modules_dir, || {
-            tracing::debug!("module change detected, triggering re-scan");
-            let config = crate::core::config::ZeroMountConfig::load(None)?;
-            let mut state = crate::core::pipeline::run_pipeline_with_bootloop_guard(config)?;
-            tracing::debug!(
-                modules = state.modules.len(),
-                rules = state.rule_count,
-                "hot-reload complete"
-            );
-            crate::detect::watcher::touch_status_timestamp(&mut state);
-            Ok(())
-        })?;
 
         return Ok(());
     }
@@ -225,6 +207,15 @@ pub fn handle_config(action: ConfigAction) -> Result<()> {
             let restored = crate::core::config::ZeroMountConfig::restore_backup()?;
             restored.save(None)?;
             println!("config restored from backup");
+        }
+        ConfigAction::Dump { json } => {
+            if json {
+                let json_str = serde_json::to_string(&config)?;
+                println!("{json_str}");
+            } else {
+                let toml_str = toml::to_string_pretty(&config)?;
+                print!("{toml_str}");
+            }
         }
         ConfigAction::Defaults => unreachable!(),
     }

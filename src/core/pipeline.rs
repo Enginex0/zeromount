@@ -523,12 +523,24 @@ pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
 }
 
 /// Bootloop-aware pipeline entry point (ME15).
-/// Checks bootcount before running; restores backup config if threshold exceeded.
+/// Checks bootcount before running; enters safe mode if threshold exceeded.
 pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<RuntimeState> {
     if ZeroMountConfig::check_bootloop()? {
-        warn!("bootloop detected, restoring backup config");
-        let restored = ZeroMountConfig::restore_backup()?;
-        return run_full_pipeline(restored);
+        warn!("bootloop detected — safe mode (zero rules, no mounts)");
+
+        if let Ok(mgr) = crate::utils::platform::detect_root_manager() {
+            if let Err(e) = mgr.notify_module_mounted() {
+                warn!("notify-module-mounted failed in safe mode: {e}");
+            }
+        } else {
+            debug!("root manager not detected in safe mode, skipping notification");
+        }
+
+        return Ok(RuntimeState {
+            degraded: true,
+            degradation_reason: Some("bootloop detected — safe mode active".into()),
+            ..RuntimeState::default()
+        });
     }
 
     ZeroMountConfig::increment_bootcount()?;

@@ -303,6 +303,7 @@ impl ZeroMountConfig {
             .with_context(|| format!("reading {}", config_path.display()))?;
         let config: Self = toml::from_str(&content)
             .with_context(|| format!("parsing {}", config_path.display()))?;
+        tracing::debug!(path = %config_path.display(), "config loaded");
         Ok(config)
     }
 
@@ -329,6 +330,7 @@ impl ZeroMountConfig {
         let src = Path::new(DEFAULT_CONFIG_PATH);
         if src.exists() {
             std::fs::copy(src, BACKUP_CONFIG_PATH).context("backing up config.toml")?;
+            tracing::debug!("config backed up");
         }
         Ok(())
     }
@@ -342,7 +344,6 @@ impl ZeroMountConfig {
         }
         let content = std::fs::read_to_string(backup).context("reading config backup")?;
         let config: Self = toml::from_str(&content).context("parsing config backup")?;
-        Self::reset_bootcount()?;
         tracing::info!("config restored from backup");
         Ok(config)
     }
@@ -362,12 +363,14 @@ impl ZeroMountConfig {
             let _ = std::fs::create_dir_all(parent);
         }
         std::fs::write(BOOTCOUNT_PATH, count.to_string()).context("writing bootcount")?;
+        tracing::debug!(count, "bootcount incremented");
         Ok(count)
     }
 
     /// Reset bootcount to 0 (after successful boot).
     pub fn reset_bootcount() -> Result<()> {
         let _ = std::fs::remove_file(BOOTCOUNT_PATH);
+        tracing::debug!("bootcount reset");
         Ok(())
     }
 
