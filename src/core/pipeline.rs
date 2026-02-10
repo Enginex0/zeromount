@@ -183,9 +183,17 @@ impl MountController<Planned> {
                 self.execute_vfs(&self.state.modules, &self.state.plan, capabilities, config)
             }
             Scenario::SusfsFrontend | Scenario::SusfsOnly => {
+                crate::mount::executor::manage_skip_mount_flags(
+                    &self.state.modules,
+                    self.state.root_mgr.mount_mode(),
+                );
                 self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
             }
             Scenario::None => {
+                crate::mount::executor::manage_skip_mount_flags(
+                    &self.state.modules,
+                    self.state.root_mgr.mount_mode(),
+                );
                 self.execute_magic(&self.state.modules, &self.state.plan, config)
             }
         }
@@ -530,6 +538,7 @@ pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<Runti
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::types::RootMountMode;
 
     // Minimal RootManager for tests -- all operations are no-ops.
     struct TestRootManager;
@@ -541,6 +550,7 @@ mod tests {
         fn susfs_binary_paths(&self) -> Vec<std::path::PathBuf> { vec![] }
         fn update_description(&self, _text: &str) -> Result<()> { Ok(()) }
         fn notify_module_mounted(&self) -> Result<()> { Ok(()) }
+        fn mount_mode(&self) -> RootMountMode { RootMountMode::Metamodule }
     }
 
     #[test]

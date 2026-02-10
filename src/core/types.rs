@@ -245,6 +245,16 @@ pub struct DetectionResult {
     pub timestamp: u64,
 }
 
+// -- Root Mount Mode --
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootMountMode {
+    // ZeroMount is the metamodule — we own all mounting, no conflict possible
+    Metamodule,
+    // Magisk always does bind mounts — need skip_mount to prevent double-mounting
+    BindMount,
+}
+
 // -- Root Manager Trait --
 
 pub trait RootManager {
@@ -254,4 +264,5 @@ pub trait RootManager {
     fn susfs_binary_paths(&self) -> Vec<PathBuf>;
     fn update_description(&self, text: &str) -> Result<()>;
     fn notify_module_mounted(&self) -> Result<()>;
+    fn mount_mode(&self) -> RootMountMode;
 }

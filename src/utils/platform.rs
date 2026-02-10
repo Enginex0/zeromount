@@ -3,7 +3,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::core::types::RootManager;
+use crate::core::types::{RootManager, RootMountMode};
 
 const ZEROMOUNT_MODULE_DIR: &str = "/data/adb/modules/zeromount";
 
@@ -56,6 +56,12 @@ impl RootManager for KsuManager {
         }
         Ok(())
     }
+
+    // KSU uses metamodules — only one active at a time. If ZeroMount is the
+    // metamodule, we own all mounting. No other mounter can conflict.
+    fn mount_mode(&self) -> RootMountMode {
+        RootMountMode::Metamodule
+    }
 }
 
 // -- APatch --
@@ -98,6 +104,11 @@ impl RootManager for APatchManager {
         }
         Ok(())
     }
+
+    // APatch adopted KSU's metamodule system — same single-metamodule constraint.
+    fn mount_mode(&self) -> RootMountMode {
+        RootMountMode::Metamodule
+    }
 }
 
 // -- Magisk --
@@ -127,6 +138,10 @@ impl RootManager for MagiskManager {
 
     fn notify_module_mounted(&self) -> Result<()> {
         Ok(())
+    }
+
+    fn mount_mode(&self) -> RootMountMode {
+        RootMountMode::BindMount
     }
 }
 
