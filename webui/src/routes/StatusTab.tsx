@@ -29,6 +29,7 @@ export function StatusTab() {
       }
       case 'Overlay': return 'overlay' as const;
       case 'MagicMount': return 'magicmount' as const;
+      default: return 'magicmount' as const;
     }
   });
 
@@ -38,7 +39,6 @@ export function StatusTab() {
       case 'overlay': return 'OverlayFS';
       case 'magicmount': return 'Magic Mount';
       case 'susfs_only': return 'SUSFS Only';
-      case 'none': return 'Magic Mount';
     }
   });
 
@@ -47,7 +47,6 @@ export function StatusTab() {
     const mode = effectiveMode();
     if (mode === 'vfs' && (s === 'full' || s === 'kernel_only')) return 'Active';
     if (mode === 'susfs_only') return 'No Mount';
-    if (mode === 'none') return 'Default';
     if (mode === 'vfs' && !store.capabilities()?.vfs_driver) return 'Unavailable';
     return 'Selected';
   });
@@ -59,7 +58,6 @@ export function StatusTab() {
       case 'overlay': return t.colorInfo || '#3b82f6';
       case 'magicmount': return t.colorWarning;
       case 'susfs_only': return '#FF8E53';
-      case 'none': return t.colorSuccess;
     }
   });
 
@@ -71,7 +69,6 @@ export function StatusTab() {
       case 'overlay': return `OverlayFS stacked filesystem \u00b7 Storage: ${storage}`;
       case 'magicmount': return `Bind mounts (KSU default) \u00b7 Storage: ${storage}`;
       case 'susfs_only': return 'SUSFS hiding active, no mount redirection';
-      case 'none': return 'KSU default bind mounts, no additional drivers';
     }
   });
 
