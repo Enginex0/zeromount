@@ -251,6 +251,7 @@ function createAppStore() {
         if (status.engine_active !== null) setEngineActive(status.engine_active);
         if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
         if (status.susfs_version) setSystemInfo('susfsVersion', status.susfs_version);
+        setRootManager(status.root_manager);
         setStats({
           activeRules: status.rule_count,
           excludedUids: status.excluded_uid_count,

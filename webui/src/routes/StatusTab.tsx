@@ -424,7 +424,7 @@ export function StatusTab() {
               Source
             </div>
             <div class="status-mount__card-value color-text-accent">
-              {store.rootManager() ?? 'Unknown'}
+              {store.rootManager() === 'KernelSU' || store.rootManager() === 'APatch' ? 'KSU' : store.rootManager() === 'Magisk' ? 'overlay' : 'Unknown'}
             </div>
           </div>
         </div>

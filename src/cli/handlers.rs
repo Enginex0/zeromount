@@ -127,6 +127,11 @@ pub fn handle_status(json: bool) -> Result<()> {
         }
     }
 
+    // Detect root manager live rather than relying on cached state
+    if let Ok(mgr) = crate::utils::platform::detect_root_manager() {
+        state.root_manager = Some(mgr.name().to_string());
+    }
+
     if json {
         let out = serde_json::to_string_pretty(&state)?;
         println!("{out}");
