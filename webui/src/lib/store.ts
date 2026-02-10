@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy } from './types';
 import { api, shouldUseMock } from './api';
 import { listPackages, getPackagesInfo, getAppLabelViaAapt } from './ksuApi';
-import { darkTheme, lightTheme, amoledTheme, applyTheme, applyAccent, getAccentStyles, accentPresets } from './theme';
+import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets } from './theme';
 
 function createAppStore() {
   console.log('[ZM-Store] createAppStore() initializing...');
@@ -48,6 +48,7 @@ function createAppStore() {
   const [degraded, setDegraded] = createSignal(false);
   const [degradationReason, setDegradationReason] = createSignal<string | null>(null);
   const [rootManager, setRootManager] = createSignal<string | null>(null);
+  const [lastApiError, setLastApiError] = createSignal<{ operation: string; error: unknown; timestamp: Date } | null>(null);
 
   const savedTheme = typeof window !== 'undefined'
     ? (localStorage.getItem('zeromount-theme') as 'dark' | 'light' | 'auto' | 'amoled' | null)
@@ -154,11 +155,6 @@ function createAppStore() {
     applyTheme(currentTheme(), settings.accentColor);
   });
 
-  // Watch for accent color changes and apply them
-  createEffect(() => {
-    applyAccent(settings.accentColor);
-  });
-
   // Save theme preference to localStorage when it changes
   createEffect(() => {
     if (typeof window !== 'undefined') {
@@ -187,11 +183,15 @@ function createAppStore() {
 
   // Randomize accent when page becomes visible (for cached WebViews)
   if (typeof window !== 'undefined') {
+    let accentDebounce: ReturnType<typeof setTimeout> | undefined;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && settings.autoAccentColor) {
-        const colors = Object.keys(accentPresets);
-        const newRandom = colors[Math.floor(Math.random() * colors.length)];
-        setSettings({ accentColor: newRandom });
+        clearTimeout(accentDebounce);
+        accentDebounce = setTimeout(() => {
+          const colors = Object.keys(accentPresets);
+          const newRandom = colors[Math.floor(Math.random() * colors.length)];
+          setSettings({ accentColor: newRandom });
+        }, 300);
       }
     });
   }
@@ -231,6 +231,15 @@ function createAppStore() {
       const sysInfo = results[4].status === 'fulfilled' ? results[4].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
       const ksuModulesData = results[5].status === 'fulfilled' ? results[5].value : [];
       const systemColor = results[7].status === 'fulfilled' ? results[7].value : null;
+
+      // Surface first rejected read so UI can show degraded state
+      const labels = ['status', 'rules', 'uids', 'activity', 'sysInfo', 'modules', 'brene', 'color', 'mount', 'verbose'];
+      const firstFail = results.findIndex(r => r.status === 'rejected');
+      if (firstFail !== -1) {
+        setLastApiError({ operation: `loadInitialData:${labels[firstFail]}`, error: (results[firstFail] as PromiseRejectedResult).reason, timestamp: new Date() });
+      } else {
+        setLastApiError(null);
+      }
 
       // Apply runtime status (authoritative source for scenario, capabilities, engine state)
       if (status) {
@@ -272,6 +281,7 @@ function createAppStore() {
       console.log('[ZM-Store] loadInitialData() complete');
     } catch (err) {
       console.error('[ZM-Store] loadInitialData() error:', err);
+      setLastApiError({ operation: 'loadInitialData', error: err, timestamp: new Date() });
       showToast('Failed to load data', 'error');
     } finally {
       setLoading({ status: false, rules: false, activity: false });
@@ -375,9 +385,9 @@ function createAppStore() {
   const updateSettings = (updates: Partial<Settings>) => {
     console.log('[ZM-Store] updateSettings() called:', updates);
     setSettings(updates);
-    if (updates.theme) api.logActivity('THEME_CHANGED', `Theme → ${updates.theme}`);
-    if (updates.accentColor) api.logActivity('THEME_CHANGED', `Accent → ${updates.accentColor}`);
-    if (updates.fixedNav !== undefined) api.logActivity('SETTING_CHANGED', `Fixed nav → ${updates.fixedNav ? 'ON' : 'OFF'}`);
+    if (updates.theme) api.logActivity('THEME_CHANGED', `Theme → ${updates.theme}`).catch(e => console.warn('[ZM-Store] audit log failed:', e));
+    if (updates.accentColor) api.logActivity('THEME_CHANGED', `Accent → ${updates.accentColor}`).catch(e => console.warn('[ZM-Store] audit log failed:', e));
+    if (updates.fixedNav !== undefined) api.logActivity('SETTING_CHANGED', `Fixed nav → ${updates.fixedNav ? 'ON' : 'OFF'}`).catch(e => console.warn('[ZM-Store] audit log failed:', e));
   };
 
   const fetchSystemColor = async () => {
@@ -442,28 +452,61 @@ function createAppStore() {
 
   const setBreneToggle = async (key: keyof BreneSettings, value: boolean) => {
     setSettings('brene', key, value);
+    let kernelSet = false;
+    let configVarSet = false;
     try {
       await api.configSet(`brene.${key}`, String(value));
       // Chain controlled settings to SUSFS kernel + config.sh
       if (key === 'avc_log_spoofing') {
         await api.setSusfsAvcSpoofing(value);
+        kernelSet = true;
         await api.writeSusfsConfigVar('avc_log_spoofing', value ? '1' : '0');
+        configVarSet = true;
       } else if (key === 'susfs_log') {
         await api.setSusfsLog(value);
+        kernelSet = true;
         await api.writeSusfsConfigVar('susfs_log', value ? '1' : '0');
+        configVarSet = true;
       } else if (key === 'hide_sus_mounts') {
         await api.setSusfsHideMounts(value);
+        kernelSet = true;
         await api.writeSusfsConfigVar('hide_sus_mnts_for_all_or_non_su_procs', value ? '1' : '0');
+        configVarSet = true;
       } else if (key === 'emulate_vold_app_data') {
         await api.writeSusfsConfigVar('emulate_vold_app_data', value ? '1' : '0');
+        configVarSet = true;
       } else if (key === 'force_hide_lsposed') {
         await api.writeSusfsConfigVar('force_hide_lsposed', value ? '1' : '0');
+        configVarSet = true;
       }
       await api.logActivity('BRENE_TOGGLE', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error('[ZM-Store] setBreneToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('brene', key, !value);
+      // Best-effort rollback: config, kernel, config.sh
+      const old = !value;
+      api.configSet(`brene.${key}`, String(old)).catch(re => console.warn('[ZM-Store] rollback configSet failed:', re));
+      if (kernelSet) {
+        const rollbackKernel = key === 'avc_log_spoofing' ? api.setSusfsAvcSpoofing(old)
+          : key === 'susfs_log' ? api.setSusfsLog(old)
+          : key === 'hide_sus_mounts' ? api.setSusfsHideMounts(old)
+          : null;
+        rollbackKernel?.catch(re => console.warn('[ZM-Store] rollback kernel call failed:', re));
+      }
+      if (configVarSet) {
+        const varMap: Record<string, string> = {
+          avc_log_spoofing: 'avc_log_spoofing',
+          susfs_log: 'susfs_log',
+          hide_sus_mounts: 'hide_sus_mnts_for_all_or_non_su_procs',
+          emulate_vold_app_data: 'emulate_vold_app_data',
+          force_hide_lsposed: 'force_hide_lsposed',
+        };
+        const varName = varMap[key];
+        if (varName) {
+          api.writeSusfsConfigVar(varName, old ? '1' : '0').catch(re => console.warn('[ZM-Store] rollback config.sh failed:', re));
+        }
+      }
     }
   };
 
@@ -525,11 +568,13 @@ function createAppStore() {
       }
     });
     setSettings('mount', prev => ({ ...prev, ...mount }));
-    const mountSource = await api.configGet('mount.mount_source');
+    const [mountSource, overlaySource] = await Promise.all([
+      api.configGet('mount.mount_source'),
+      api.configGet('mount.overlay_source'),
+    ]);
     if (mountSource !== null) {
       setSettings('mount', 'mount_source', mountSource);
     }
-    const overlaySource = await api.configGet('mount.overlay_source');
     if (overlaySource !== null) {
       setSettings('mount', 'overlay_source', overlaySource);
     }
@@ -664,6 +709,7 @@ function createAppStore() {
       });
     } catch (e) {
       console.error('[ZM-Store] loadRuntimeStatus() error:', e);
+      setLastApiError({ operation: 'loadRuntimeStatus', error: e, timestamp: new Date() });
     }
   };
 
@@ -703,7 +749,12 @@ function createAppStore() {
       lastKnownPackages = new Set(freshApps.map(a => a.packageName));
 
       // Background: fetch labels for apps where KSU cache returned null
-      const missingLabels = freshApps.filter(a => a.appName === a.packageName);
+      const seen = new Set<string>();
+      const missingLabels = freshApps.filter(a => {
+        if (a.appName !== a.packageName || seen.has(a.packageName)) return false;
+        seen.add(a.packageName);
+        return true;
+      });
       if (missingLabels.length > 0 && missingLabels.length < 10) {
         for (const app of missingLabels) {
           getAppLabelViaAapt(app.packageName).then(label => {
@@ -712,7 +763,7 @@ function createAppStore() {
                 prev.map(a => a.packageName === app.packageName ? { ...a, appName: label } : a)
               );
             }
-          });
+          }).catch(() => {});
         }
       }
     } finally {
@@ -877,6 +928,7 @@ function createAppStore() {
     settings,
     currentTheme,
     toast,
+    lastApiError,
 
     loadInitialData,
     loadInstalledApps,

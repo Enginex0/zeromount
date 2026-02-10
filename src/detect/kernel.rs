@@ -142,15 +142,27 @@ pub fn check_erofs_support() -> Result<bool> {
     Ok(content.contains("erofs"))
 }
 
-/// Check if tmpfs supports xattr (CONFIG_TMPFS_XATTR).
-/// Attempt to mount tmpfs and set a trusted xattr.
-/// Note: stock GKI 5.10 does NOT have CONFIG_TMPFS_XATTR.
+/// Check if tmpfs supports xattr by testing setxattr on /dev (always tmpfs on Android).
 pub fn check_tmpfs_xattr() -> Result<bool> {
-    // Quick heuristic: check /proc/config.gz or just try to test.
-    // For the detection phase we use a conservative default since
-    // actually mounting tmpfs at detection time is too expensive
-    // for the 2-second budget. The mount engine re-checks at mount time.
-    //
-    // Default to false -- tmpfs xattr is rare on stock GKI.
-    Ok(false)
+    use std::ffi::CString;
+
+    let test_path = std::path::Path::new("/dev/.zm_xattr_probe");
+    let _file = std::fs::File::create(test_path);
+
+    let c_path = CString::new("/dev/.zm_xattr_probe")?;
+    let c_name = CString::new("trusted.overlay.whiteout")?;
+    let c_val = b"y";
+
+    let result = unsafe {
+        libc::setxattr(
+            c_path.as_ptr(),
+            c_name.as_ptr(),
+            c_val.as_ptr() as *const libc::c_void,
+            1,
+            0,
+        )
+    };
+
+    let _ = std::fs::remove_file(test_path);
+    Ok(result == 0)
 }

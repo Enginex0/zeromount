@@ -20,7 +20,6 @@ export function StatusTab() {
     const strategy = store.activeStrategy();
 
     if (s === 'susfs_only') return 'susfs_only' as const;
-    if (s === 'none' && strategy !== 'Vfs') return 'none' as const;
 
     switch (strategy) {
       case 'Vfs': {

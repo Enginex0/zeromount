@@ -326,46 +326,48 @@ Engine: ${store.engineActive() ? 'Active' : 'Inactive'}
             />
           </div>
 
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Overlay Mount Source</div>
-              <div class="settings__item-desc">
-                Source device for overlay mounts
-                <Show when={store.settings.mount.overlay_source === 'auto'}>
-                  <span style={{ "font-style": "italic" }}> — resolves per root manager</span>
-                </Show>
-              </div>
-            </div>
-            <select
-              class="settings__select"
-              value={['auto', 'KSU', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
-              onChange={(e) => {
-                const val = e.currentTarget.value;
-                if (val === 'custom') {
-                  setCustomOverlaySource('');
-                  store.setOverlaySource('');
-                } else {
-                  store.setOverlaySource(val);
-                }
-              }}
-            >
-              <option value="auto">Auto</option>
-              <option value="KSU">KSU</option>
-              <option value="overlay">overlay</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <Show when={!['auto', 'KSU', 'overlay'].includes(store.settings.mount.overlay_source)}>
-            <div class="settings__item settings__item--sub">
+          <Show when={store.activeStrategy() !== 'MagicMount'}>
+            <div class="settings__item">
               <div class="settings__item-content">
-                <div class="settings__item-label">Custom Source</div>
+                <div class="settings__item-label">Overlay Mount Source</div>
+                <div class="settings__item-desc">
+                  Source device for overlay mounts
+                  <Show when={store.settings.mount.overlay_source === 'auto'}>
+                    <span style={{ "font-style": "italic" }}> — resolves per root manager</span>
+                  </Show>
+                </div>
               </div>
-              <Input
-                value={store.settings.mount.overlay_source === 'custom' ? customOverlaySource() : store.settings.mount.overlay_source}
-                placeholder="e.g. my_overlay"
-                onBlur={(e) => store.setOverlaySource(e.currentTarget.value)}
-              />
+              <select
+                class="settings__select"
+                value={['auto', 'KSU', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  if (val === 'custom') {
+                    setCustomOverlaySource('');
+                    store.setOverlaySource('');
+                  } else {
+                    store.setOverlaySource(val);
+                  }
+                }}
+              >
+                <option value="auto">Auto</option>
+                <option value="KSU">KSU</option>
+                <option value="overlay">overlay</option>
+                <option value="custom">Custom</option>
+              </select>
             </div>
+            <Show when={!['auto', 'KSU', 'overlay'].includes(store.settings.mount.overlay_source)}>
+              <div class="settings__item settings__item--sub">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Custom Source</div>
+                </div>
+                <Input
+                  value={store.settings.mount.overlay_source === 'custom' ? customOverlaySource() : store.settings.mount.overlay_source}
+                  placeholder="e.g. my_overlay"
+                  onBlur={(e) => store.setOverlaySource(e.currentTarget.value)}
+                />
+              </div>
+            </Show>
           </Show>
 
           <div class="settings__item">

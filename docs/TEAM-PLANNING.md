@@ -2,13 +2,13 @@
 
 > **For:** 12 implementation agents (6 pairs)
 > **Date:** 2026-02-08
-> **Status:** Cold-start reference -- read this FIRST before writing any code
+> **Status:** Implementation complete — serves as single source of truth for the codebase
 
 ---
 
 ## 1. Project Overview
 
-ZeroMount v2 is a Rust-based KernelSU/APatch metamodule that replaces ~2500 lines of shell scripts with a single binary. It mounts modules via VFS redirection when kernel patches are present, falling back to OverlayFS or magic mount when they're not. The binary uses a typestate pipeline pattern to enforce operation ordering at compile time, eliminating race conditions from the shell implementation. SUSFS integration moves from a maintained fork to build-time patches on upstream. A SolidJS WebUI provides device management through the KSU WebView. 81 architecture decisions are locked in DECISIONS.md. 27 features are tracked in features.json.
+ZeroMount v2 is a Rust-based KernelSU/APatch metamodule that replaces ~2500 lines of shell scripts with a single binary. It mounts modules via VFS redirection when kernel patches are present, falling back to OverlayFS or magic mount when they're not. The binary uses a typestate pipeline pattern to enforce operation ordering at compile time, eliminating race conditions from the shell implementation. A 5-scenario detection engine (Full, SusfsFrontend, KernelOnly, SusfsOnly, None) drives the mount strategy cascade. SUSFS integration moves from a maintained fork to 10 build-time injection patches on upstream. An ext4 sysfs nuke (dual-path: ksud or one-shot LKM) removes loop-mount evidence from /proc/fs/ext4/. A unified verbose toggle syncs kernel sysfs, userspace marker, and config.toml in one operation. A SolidJS WebUI provides device management through the KSU WebView. 81 architecture decisions are locked in DECISIONS.md. All 27 features are implemented.
 
 ---
 
@@ -37,6 +37,7 @@ Within each pair: one agent implements, the other validates. Both read the same 
 | DESIGN.md | `/home/claudetest/metamodule-experiment/docs/DESIGN.md` | Component architecture, file structure, data flow, CLI interface |
 | GOAL.md | `/home/claudetest/metamodule-experiment/docs/GOAL.md` | Success criteria, scope boundaries |
 | features.json | `/home/claudetest/metamodule-experiment/.claude/features.json` | Feature backlog with dependencies and acceptance criteria |
+| OUTSTANDING-ISSUES.md | `/home/claudetest/metamodule-experiment/docs/OUTSTANDING-ISSUES.md` | Post-MVP issues, remaining work items |
 
 ### Per-pair additional reading:
 
@@ -44,10 +45,10 @@ Within each pair: one agent implements, the other validates. Both read the same 
 |------|------------------------------|
 | 1-2 | CONTEXT.md sections 4-5 (binary, scripts) |
 | 3-4 | CONTEXT.md section 3 (kernel implementation); `/home/claudetest/metamodule-experiment/docs/verification/kernel-verification.md` |
-| 5-6 | `/home/claudetest/metamodule-experiment/docs/verification/mount-verification.md`; CONTEXT.md section 5.2 (boot sequence) |
+| 5-6 | `/home/claudetest/metamodule-experiment/docs/verification/mount-verification.md`; CONTEXT.md section 5.2 (boot sequence); `nuke_ext4_lkm/` (LKM source) |
 | 7-8 | `/home/claudetest/metamodule-experiment/docs/verification/susfs-verification.md`; CONTEXT.md sections 3.6-3.7 (SUSFS coupling) |
 | 9-10 | `/home/claudetest/metamodule-experiment/docs/verification/webui-verification.md`; CONTEXT.md sections 6, 9 (WebUI, dead code) |
-| 11-12 | `/home/claudetest/metamodule-experiment/docs/verification/ksu-verification.md`; CONTEXT.md sections 5.2-5.3 (boot sequence, dependencies) |
+| 11-12 | `/home/claudetest/metamodule-experiment/docs/verification/ksu-verification.md`; CONTEXT.md sections 5.2-5.3 (boot sequence, dependencies); `patches/susfs/` (injection scripts); `scripts/package.sh` |
 
 ---
 
@@ -58,10 +59,12 @@ Pair 1-2 MUST define these types first. All other pairs depend on them.
 ### Scenario Enum
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Scenario {
     Full,           // /dev/zeromount present + full SUSFS capabilities
     SusfsFrontend,  // /dev/zeromount present + partial SUSFS capabilities
     KernelOnly,     // /dev/zeromount present + no SUSFS binary
+    SusfsOnly,      // No /dev/zeromount -- SUSFS available without VFS driver
     None,           // No /dev/zeromount -- use OverlayFS/magic mount
 }
 ```
@@ -155,6 +158,7 @@ pub enum SusfsCommand {
     SetAndroidDataRootPath = 0x55551,
     SetSdcardRootPath = 0x55552,
     AddSusPathLoop = 0x55553,
+    HideSusMntsForNonSuProcs = 0x55561, // mount hiding (EXCLUDED per S05)
     AddSusKstat = 0x55570,
     UpdateSusKstat = 0x55571,
     AddSusKstatStatically = 0x55572,
@@ -241,15 +245,18 @@ pub trait RootManager {
 
 Features defined in `.claude/features.json`. Ordered by phase:
 
-| Phase | Features | Description | Gate |
-|-------|----------|-------------|------|
-| **1: Foundation** | F01, F02, F03, F04 | Scaffold, CLI, config, logging | Scaffold compiles and runs on Android |
-| **2: Core** | F05, F06, F07, F08 | VFS ioctls, detection, scanner, planner | Ioctls work, modules scanned, plans generated |
-| **3: Strategies** | F09, F10, F11, F12 | OverlayFS, magic mount, VFS executor, pipeline | All 3 strategies functional, pipeline compiles |
-| **4: SUSFS** | F13, F14, F15, F16 | SUSFS supercalls, custom cmds, fonts, BRENE | Supercalls work, font redirect works |
-| **5: Platform** | F17, F18, F19, F20 | Shell launchers, platform trait, camouflage, watcher | Boot sequence works end-to-end |
-| **6: WebUI** | F21, F22, F23, F24, F25 | Cleanup, scenario, settings, toggle, status JSON | Dead code removed, all tabs functional |
-| **7: Build** | F26, F27 | CI pipeline, ZIP packaging | CI builds all targets, ZIP installs correctly |
+| Phase | Features | Description | Gate | Status |
+|-------|----------|-------------|------|--------|
+| **1: Foundation** | F01, F02, F03, F04 | Scaffold, CLI, config, logging | Scaffold compiles and runs on Android | **DONE** |
+| **2: Core** | F05, F06, F07, F08 | VFS ioctls, detection (5 scenarios), scanner, planner | Ioctls work, modules scanned, plans generated | **DONE** |
+| **3: Strategies** | F09, F10, F11, F12 | OverlayFS, magic mount, VFS executor, pipeline | All 3 strategies functional, pipeline compiles | **DONE** |
+| **4: SUSFS** | F13, F14, F15, F16 | SUSFS supercalls, custom cmds, fonts, BRENE | Supercalls work, font redirect works | **DONE** |
+| **5: Platform** | F17, F18, F19, F20 | Shell launchers, platform trait, camouflage, watcher | Boot sequence works end-to-end | **DONE** |
+| **6: WebUI** | F21, F22, F23, F24, F25 | Cleanup, scenario, settings, toggle, status JSON | Dead code removed, all tabs functional | **DONE** |
+| **7: Build** | F26, F27 | CI pipeline, ZIP packaging | CI builds all targets, ZIP installs correctly | **DONE** |
+| **8: Post-MVP** | — | LKM CI for GKI builds, nuke_ext4 Kconfig, outstanding issues | See `docs/OUTSTANDING-ISSUES.md` | Pending |
+
+All 27 MVP features completed 2026-02-08. Post-MVP items tracked in `docs/OUTSTANDING-ISSUES.md`.
 
 ---
 
@@ -261,12 +268,13 @@ Features defined in `.claude/features.json`. Ordered by phase:
 **Decision IDs:** R01-R10, ME13, ME15, CO03, KSU09
 **Features:** F01, F02, F03, F04, F12, F19
 
-**Files to create:**
+**Files created:**
 ```
 src/main.rs, src/cli/mod.rs, src/cli/handlers.rs
-src/core/config.rs, src/core/pipeline.rs, src/core/state.rs, src/core/types.rs
+src/core/mod.rs, src/core/config.rs, src/core/pipeline.rs, src/core/state.rs, src/core/types.rs
+src/logging/mod.rs, src/logging/kmsg.rs, src/logging/rotating.rs, src/logging/sysfs.rs
 src/utils/process.rs
-Cargo.toml, .cargo/config.toml
+Cargo.toml, Cargo.lock, .cargo/config.toml, .gitignore
 ```
 
 **Reference docs:** DECISIONS.md R01-R10; DESIGN.md (full file structure, data flow); CONTEXT.md section 4 (current zm binary), section 5 (scripts being replaced)
@@ -278,6 +286,11 @@ Cargo.toml, .cargo/config.toml
 - F04: Logs appear in kmsg and file, verbose toggle works
 - F12: Pipeline compiles only in valid state order, notify-module-mounted at correct point
 - F19: Both `/proc/self/comm` and `/proc/self/cmdline` camouflaged
+
+**Implementation notes:**
+- F04 expanded beyond original plan: unified verbose toggle syncs three layers — sysfs kernel debug level (`/sys/kernel/zeromount/debug`), `.verbose` marker file, `config.toml` `logging.verbose` — via `src/logging/sysfs.rs`
+- CLI subcommands added: `zeromount logging enable|disable|set-level|status`
+- Logging subsystem: `src/logging/` with dual subscribers (kmsg + rotating file) and sysfs control
 
 **Cross-domain dependencies:**
 - All other pairs import shared types FROM this pair
@@ -295,10 +308,12 @@ Cargo.toml, .cargo/config.toml
 **Decision IDs:** VFS01-VFS07, CO01, CO03
 **Features:** F05, F11
 
-**Files to create:**
+**Files created:**
 ```
-src/vfs/mod.rs, src/vfs/ioctls.rs, src/vfs/types.rs
+src/vfs/mod.rs, src/vfs/ioctls.rs, src/vfs/types.rs, src/vfs/executor.rs
 ```
+
+**Implementation note:** `executor.rs` (266 lines) separates the VFS mount pipeline (inject→SUSFS→enable→refresh) from the raw ioctl interface in `ioctls.rs`.
 
 **Reference docs:** DECISIONS.md VFS01-VFS07; CONTEXT.md section 3 (kernel ioctl table); kernel-verification.md; `/home/claudetest/zero-mount/zeromount/src/zm.c` (current C implementation)
 
@@ -328,11 +343,13 @@ src/vfs/mod.rs, src/vfs/ioctls.rs, src/vfs/types.rs
 **Decision IDs:** ME01-ME15, CO02
 **Features:** F07, F08, F09, F10
 
-**Files to create:**
+**Files created:**
 ```
-src/modules/scanner.rs, src/modules/model.rs, src/modules/rules.rs
-src/mount/planner.rs, src/mount/executor.rs, src/mount/overlay.rs
+src/modules/mod.rs, src/modules/scanner.rs, src/modules/model.rs, src/modules/rules.rs
+src/mount/mod.rs, src/mount/planner.rs, src/mount/executor.rs, src/mount/overlay.rs
 src/mount/magic.rs, src/mount/storage.rs, src/mount/umount.rs
+nuke_ext4_lkm/nuke.c, nuke_ext4_lkm/Makefile
+module/lkm/.gitkeep
 ```
 
 **Reference docs:** DECISIONS.md ME01-ME15; mount-verification.md; CONTEXT.md section 5; `/home/claudetest/zero-mount/zeromount/module/metamount.sh` (current 427-line implementation)
@@ -357,6 +374,14 @@ src/mount/magic.rs, src/mount/storage.rs, src/mount/umount.rs
 - Legacy: `mount(source, dest, "overlay", 0, "lowerdir=...")`
 - Mount source: `"KSU"` (for zygisk unmount tools, NOT for KSU try_umount which uses path registration)
 
+**Storage improvements (post-plan additions):**
+- Command timeout: `run_command_with_timeout()` wraps mkfs.erofs, dd, mkfs.ext4 with 30s deadline (poll-based via `try_wait()` at 100ms intervals)
+- Dynamic ext4 sizing: `calculate_ext4_image_size_mb()` scans `/data/adb/modules/` recursively, applies 1.5× headroom, enforces 64MB minimum (replaces hardcoded 2GB sparse image)
+- ext4 sysfs nuke: `nuke_ext4_sysfs()` removes `/proc/fs/ext4/<device>` evidence after ext4 loop mount — dual-path: (1) `ksud kernel nuke-ext4-sysfs` for KSU/APatch 22105+, (2) LKM fallback via `insmod nuke.ko mount_point=<path> symaddr=<addr>` (one-shot, returns -EAGAIN to auto-unload)
+- LKM selection: `select_nuke_ko()` reads `/proc/version`, extracts kernel major.minor, matches against `module/lkm/nuke-android<ver>-<kernel>.ko`
+- Symbol resolution: `read_kallsyms_address()` parses `/proc/kallsyms` for `ext4_unregister_sysfs` address
+- New constants: `CMD_TIMEOUT` (30s), `CMD_POLL_INTERVAL` (100ms), `MODULES_DIR_PATH`, `MIN_EXT4_SIZE_MB` (64), `LKM_DIR`
+
 ---
 
 ### Pair 7-8: SUSFS Client
@@ -365,7 +390,7 @@ src/mount/magic.rs, src/mount/storage.rs, src/mount/umount.rs
 **Decision IDs:** S01-S13
 **Features:** F13, F14, F15, F16
 
-**Files to create:**
+**Files created:**
 ```
 src/susfs/mod.rs, src/susfs/ffi.rs, src/susfs/kstat.rs
 src/susfs/paths.rs, src/susfs/fonts.rs, src/susfs/brene.rs
@@ -405,12 +430,22 @@ src/susfs/paths.rs, src/susfs/fonts.rs, src/susfs/brene.rs
 **Decision IDs:** W01-W09, CO04
 **Features:** F21, F22, F23, F24, F25
 
-**Files to modify/create:**
+**Files created:**
 ```
+webui/src/App.tsx, webui/src/app.css, webui/src/index.tsx
 webui/src/routes/StatusTab.tsx, webui/src/routes/SettingsTab.tsx
-webui/src/components/Toggle.tsx (replace), webui/src/components/ScenarioIndicator.tsx (new)
-webui/src/lib/api.ts, webui/src/lib/store.ts, webui/src/lib/types.ts
-webui/package.json, webui/vite.config.ts
+webui/src/routes/ConfigTab.tsx, webui/src/routes/ModulesTab.tsx
+webui/src/components/core/Badge.tsx, webui/src/components/core/Button.tsx
+webui/src/components/core/Card.tsx, webui/src/components/core/Input.tsx
+webui/src/components/core/ScenarioIndicator.tsx, webui/src/components/core/Skeleton.tsx
+webui/src/components/core/Toggle.tsx, webui/src/components/core/glass-toggle.css
+webui/src/components/layout/Header.tsx, webui/src/components/layout/Modal.tsx
+webui/src/components/layout/NavBar.tsx, webui/src/components/layout/Toast.tsx
+webui/src/lib/api.ts, webui/src/lib/api.mock.ts, webui/src/lib/store.ts
+webui/src/lib/types.ts, webui/src/lib/ksuApi.ts, webui/src/lib/theme.ts
+webui/src/lib/icons.ts, webui/src/lib/constants.ts, webui/src/lib/ksu.d.ts
+webui/package.json, webui/pnpm-lock.yaml, webui/vite.config.ts
+webui/tsconfig.json, webui/tsconfig.app.json, webui/tsconfig.node.json
 ```
 
 **Reference docs:** DECISIONS.md W01-W09, CO04; webui-verification.md; CONTEXT.md sections 6, 9; `/home/claudetest/zero-mount/zeromount/webui/` (current source); `/home/president/Git-repo-success/glass-toggle.css`
@@ -437,6 +472,15 @@ webui/package.json, webui/vite.config.ts
 - Property spoofing is NOT SUSFS -- separate UI section (uses resetprop)
 - `ksu.exec()` pattern: `ksu.exec(cmd, '{}', callbackName)` with global callback
 
+**Implementation additions beyond plan:**
+- ConfigTab.tsx (331 lines): mount engine storage mode, random paths, ext4 sizing config
+- ModulesTab.tsx (244 lines): module list with enable/disable/remove actions
+- ksuApi.ts (161 lines): KSU WebView `exec()` callback wrapper with promise API
+- theme.ts (214 lines): dynamic accent color theming from KSU manager
+- api.mock.ts (321 lines): mock API for offline/browser development
+- Component library split: `components/core/` (UI primitives) and `components/layout/` (structural)
+- pnpm used as package manager
+
 ---
 
 ### Pair 11-12: Detection + Platform
@@ -445,19 +489,25 @@ webui/package.json, webui/vite.config.ts
 **Decision IDs:** DET01-DET07, KSU01-KSU11, CO01-CO04, B01-B05, S01-S02, S06, S11
 **Features:** F06, F17, F18, F20, F26, F27
 
-**Files to create:**
+**Files created:**
 ```
-src/detect/mod.rs, src/detect/kernel.rs, src/detect/susfs.rs
-src/utils/platform.rs
+src/detect/mod.rs, src/detect/kernel.rs, src/detect/susfs.rs, src/detect/watcher.rs
+src/utils/mod.rs, src/utils/platform.rs
 module/metamount.sh, module/post-fs-data.sh, module/service.sh
 module/uninstall.sh, module/metainstall.sh, module/metauninstall.sh
-.github/workflows/build.yml
+module/customize.sh, module/module.prop
+scripts/package.sh
+patches/susfs/fix-susfs-safety.sh, patches/susfs/inject-susfs-custom-handlers.sh
+patches/susfs/inject-susfs-kstat-redirect.sh, patches/susfs/inject-susfs-mount-display.sh
+patches/susfs/inject-susfs-open-redirect-all.sh, patches/susfs/inject-susfs-supercall-dispatch.sh
+patches/susfs/inject-susfs-unicode-filter-func.sh, patches/susfs/inject-susfs-vfs-open-redirect-all.sh
+patches/susfs/inject-susfs-zeromount-coupling.sh, patches/susfs/unicode_filter.sh
 ```
 
 **Reference docs:** DECISIONS.md DET01-DET07, KSU01-KSU10, B01-B05; ksu-verification.md; `/home/claudetest/zero-mount/reference/kernelsu-module-guide.md`; `/home/claudetest/gki-build/METAMODULE_COMPLETE_GUIDE.md`
 
 **Acceptance criteria:**
-- F06: 4 scenarios detected correctly. Three-layer SUSFS probe works.
+- F06: 5 scenarios detected correctly (Full, SusfsFrontend, KernelOnly, SusfsOnly, None). Three-layer SUSFS probe works.
 - F17: Shell scripts under 30 lines. Boot sequence: detect -> mount -> notify.
 - F18: RootManager trait with KSU + APatch implementations.
 - F20: inotify watcher detects changes within 1s. Fallback polling works.
@@ -482,6 +532,13 @@ module/uninstall.sh, module/metainstall.sh, module/metauninstall.sh
 - APatch is ARM64-only; x86/x86_64 binaries serve KSU users (emulators, Chromebooks)
 - KSU11: `post-mount.sh` and `boot-completed.sh` are intentionally NOT used -- document in shell headers
 
+**Implementation additions beyond plan:**
+- Detection uses `(vfs_driver, susfs_available)` tuple match for 5 scenarios; `SusfsOnly` = `(false, true)`
+- Package script (`scripts/package.sh`, 205 lines) requires all 4 ABI binaries + webroot; auto-includes `module/lkm/*.ko`
+- Version sourced from `Cargo.toml` as single source of truth
+- SUSFS patches: 10 kernel injection scripts in `patches/susfs/` (1,526 total lines) for build-time patching
+- `customize.sh` (70 lines): KSU/APatch installation with arch detection and binary placement
+
 ---
 
 ## 7. Dependency Graph
@@ -494,7 +551,7 @@ Phase 1 (Foundation -- Pair 1-2 starts):
 Phase 2 (Core -- after F01):
   F01 ──> F05 (VFS ioctls, Pair 3-4)
   F03 ──> F07 (Scanner, Pair 5-6)
-  F05 ──> F06 (Detection, Pair 11-12)
+  F05 ──> F06 (Detection — 5 scenarios, Pair 11-12)
   F07 ──> F08 (BFS planner, Pair 5-6)
 
 Phase 3 (Strategies -- after Phase 2):
@@ -538,21 +595,19 @@ Phase 7 (Build -- after everything):
 
 ## 8. Pending Items
 
-9 decisions are PENDING user input. Implementation approach:
+All 9 previously-pending decisions have been resolved and implemented:
 
-| Decision | Topic | Implement Primary Approach | Blocked? |
-|----------|-------|---------------------------|----------|
-| S07 | Font OverlayFS fallback | Implement open_redirect as primary + OverlayFS fallback behind config toggle | No |
-| S08 | BRENE feature list | Implement all toggles, default ON for APK/zygisk/font hide | No |
-| S09 | kstat_redirect (0x55573) | Implement supercall with graceful fallback to add_sus_kstat_statically | No |
-| S10 | open_redirect_all (0x555c1) | Implement supercall with fallback to per-UID open_redirect | No |
-| S11 | SUSFS unicode filter | Kernel-only, include in build-time patch chain, Rust binary does nothing | No |
-| S12 | SUSFS config files | Don't write them; Rust binary calls SUSFS directly | No |
-| S13 | SUSFS fork diff | Completed by verification team (6 patch units, see susfs-verification.md) | No |
-| W08 | Glass toggle CSS | Implement with --text-accent, remove prefers-color-scheme | No |
-| W09 | BRENE WebUI toggles | Persist to config.toml, property spoofing separate from SUSFS | No |
-
-None are blocked. All have clear primary approaches.
+| Decision | Topic | Resolution | Implementation |
+|----------|-------|------------|----------------|
+| S07 | Font OverlayFS fallback | open_redirect primary + OverlayFS fallback | `src/susfs/fonts.rs` |
+| S08 | BRENE feature list | All toggles, default ON for APK/zygisk/font hide | `src/susfs/brene.rs` |
+| S09 | kstat_redirect (0x55573) | Supercall with fallback to add_sus_kstat_statically | `src/susfs/kstat.rs` |
+| S10 | open_redirect_all (0x555c1) | Supercall with fallback to per-UID open_redirect | `src/susfs/mod.rs` |
+| S11 | SUSFS unicode filter | Build-time patch chain | `patches/susfs/inject-susfs-unicode-filter-func.sh` |
+| S12 | SUSFS config files | Rust binary calls SUSFS directly, no config files | `src/susfs/mod.rs` |
+| S13 | SUSFS fork diff | 10 injection scripts for build-time patching | `patches/susfs/` |
+| W08 | Glass toggle CSS | `--text-accent`, removed `prefers-color-scheme` | `webui/src/components/core/glass-toggle.css` |
+| W09 | BRENE WebUI toggles | Persists to config.toml, property spoofing separate | `webui/src/routes/SettingsTab.tsx` |
 
 ---
 
@@ -571,6 +626,10 @@ None are blocked. All have clear primary approaches.
 | `/home/claudetest/gki-build/susfs4ksu-new/ksu_susfs/jni/main.c` | SUSFS userspace tool (787 lines) |
 | `/home/claudetest/zero-mount/susfs-module/` | SUSFS flashable module |
 | `/home/president/Git-repo-success/glass-toggle.css` | Glass morphism toggle CSS |
+| `nuke_ext4_lkm/` | One-shot LKM source for ext4 sysfs evidence removal (nuke.c + Makefile) |
+| `patches/susfs/` | 10 SUSFS kernel injection scripts for build-time patching |
+| `scripts/package.sh` | ZIP packaging script (205 lines) |
+| `module/lkm/` | Drop zone for pre-compiled GKI .ko files |
 
 ### Reference Documentation
 | Path | Contents |
@@ -590,6 +649,11 @@ None are blocked. All have clear primary approaches.
 | Path | Contents |
 |------|----------|
 | `/home/claudetest/zero-mount/context-gathering/output/` | Full context analysis output |
+
+### Project Documentation
+| Path | Contents |
+|------|----------|
+| `docs/OUTSTANDING-ISSUES.md` | Post-MVP issues, remaining work items (466 lines) |
 
 ---
 
@@ -619,4 +683,4 @@ Each feature must pass before marking complete:
 
 ---
 
-*Generated from verified analysis of 6 domain reports covering 81 architecture decisions and 27 features.*
+*Generated from verified analysis of 6 domain reports covering 81 architecture decisions and 27 features. Updated 2026-02-09 to reflect completed implementation.*

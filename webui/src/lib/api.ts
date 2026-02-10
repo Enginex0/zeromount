@@ -1,7 +1,13 @@
 import type { VfsRule, ExcludedUid, SystemInfo, ActivityItem, EngineStats, InstalledApp, KsuModule, RuntimeStatus } from './types';
 import type { KsuNativeApi } from './ksu.d.ts';
 import { PATHS, APP_VERSION } from './constants';
-import { MockAPI } from './api.mock';
+// Lazy-load mock module only in dev. The import() is behind import.meta.env.DEV
+// so Vite replaces it with `false` in prod and never emits the api.mock chunk.
+let _mockModule: typeof import('./api.mock') | undefined;
+async function getMock() {
+  if (import.meta.env.DEV && !_mockModule) _mockModule = await import('./api.mock');
+  return _mockModule!.MockAPI;
+}
 
 interface KsuExecResult {
   errno: number;
@@ -17,7 +23,7 @@ function escapeShellArg(arg: string): string {
 let execCounter = 0;
 
 export function shouldUseMock(): boolean {
-  return typeof globalThis.ksu === 'undefined';
+  return import.meta.env.DEV && typeof globalThis.ksu === 'undefined';
 }
 
 async function execCommand(cmd: string, timeoutMs = 30000): Promise<KsuExecResult> {
@@ -80,6 +86,15 @@ interface ExclusionMeta {
     appName: string;
     excludedAt: string;
   };
+}
+
+// Serialize EXCLUSION_META read-modify-write to prevent concurrent overwrites
+let metaMutex: Promise<void> = Promise.resolve();
+function withMetaLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = metaMutex;
+  let resolve: () => void;
+  metaMutex = new Promise<void>(r => { resolve = r; });
+  return prev.then(fn).finally(() => resolve!());
 }
 
 async function parseExclusionFiles(): Promise<ExcludedUid[]> {
@@ -179,7 +194,7 @@ export const api = {
   async getVersion(): Promise<string> {
     console.log('[ZM-API] getVersion() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getVersion();
+      return (await getMock()).getVersion();
     }
     try {
       const { errno, stdout } = await execCommand(`${PATHS.BINARY} version`);
@@ -199,7 +214,7 @@ export const api = {
   async getSystemInfo(): Promise<SystemInfo> {
     console.log('[ZM-API] getSystemInfo() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getSystemInfo();
+      return (await getMock()).getSystemInfo();
     }
 
     const info: SystemInfo = {
@@ -261,7 +276,7 @@ export const api = {
   async getRules(): Promise<VfsRule[]> {
     console.log('[ZM-API] getRules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getRules();
+      return (await getMock()).getRules();
     }
     try {
       const { errno, stdout } = await execCommand(`${PATHS.BINARY} vfs list`);
@@ -282,7 +297,7 @@ export const api = {
   async clearAllRules(): Promise<void> {
     console.log('[ZM-API] clearAllRules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.clearAllRules();
+      return (await getMock()).clearAllRules();
     }
 
     const cmd = `${PATHS.BINARY} vfs clear`;
@@ -299,7 +314,7 @@ export const api = {
   async getExcludedUids(): Promise<ExcludedUid[]> {
     console.log('[ZM-API] getExcludedUids() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getExcludedUids();
+      return (await getMock()).getExcludedUids();
     }
     const result = await parseExclusionFiles();
     console.log('[ZM-API] getExcludedUids() returning', result.length, 'exclusions');
@@ -309,7 +324,7 @@ export const api = {
   async excludeUid(uid: number, packageName: string, appName: string): Promise<ExcludedUid> {
     console.log('[ZM-API] excludeUid() called:', { uid, packageName, appName, mock: shouldUseMock() });
     if (shouldUseMock()) {
-      return MockAPI.excludeUid(uid, packageName, appName);
+      return (await getMock()).excludeUid(uid, packageName, appName);
     }
 
     // Validation FIRST
@@ -327,22 +342,24 @@ export const api = {
 
     await execCommand(`echo ${escapeShellArg(String(uid))} >> "${PATHS.EXCLUSION_FILE}"`).catch(e => console.error('[ZM-API] Exclusion persistence failed:', e));
 
-    try {
-      let meta: Record<string, { packageName: string; appName: string; excludedAt: string }> = {};
-      const { errno: metaErr, stdout: metaOut } = await execCommand(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
-      if (metaErr === 0 && metaOut.trim()) {
-        try {
-          meta = JSON.parse(metaOut);
-        } catch (parseErr) {
-          console.error('[ZM-API] Metadata parse error, starting fresh:', parseErr);
-          meta = {};
+    await withMetaLock(async () => {
+      try {
+        let meta: Record<string, { packageName: string; appName: string; excludedAt: string }> = {};
+        const { errno: metaErr, stdout: metaOut } = await execCommand(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
+        if (metaErr === 0 && metaOut.trim()) {
+          try {
+            meta = JSON.parse(metaOut);
+          } catch (parseErr) {
+            console.error('[ZM-API] Metadata parse error, starting fresh:', parseErr);
+            meta = {};
+          }
         }
+        meta[String(uid)] = { packageName, appName, excludedAt: new Date().toISOString() };
+        await execCommand(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
+      } catch (e) {
+        console.error('[ZM-API] Metadata save failed:', e);
       }
-      meta[String(uid)] = { packageName, appName, excludedAt: new Date().toISOString() };
-      await execCommand(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
-    } catch (e) {
-      console.error('[ZM-API] Metadata save failed:', e);
-    }
+    });
 
     await logActivity('UID_EXCLUDED', `${appName} (${uid})`);
     return {
@@ -356,7 +373,7 @@ export const api = {
   async includeUid(uid: number): Promise<void> {
     console.log('[ZM-API] includeUid() called:', { uid, mock: shouldUseMock() });
     if (shouldUseMock()) {
-      return MockAPI.includeUid(uid);
+      return (await getMock()).includeUid(uid);
     }
 
     const cmd = `${PATHS.BINARY} uid unblock ${escapeShellArg(String(uid))}`;
@@ -370,20 +387,22 @@ export const api = {
 
     await execCommand(`sed -i '/^${uid}$/d' "${PATHS.EXCLUSION_FILE}"`).catch(e => console.error('[ZM-API] Exclusion removal failed:', e));
 
-    try {
-      const { errno: metaErr, stdout: metaOut } = await execCommand(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
-      if (metaErr === 0 && metaOut.trim()) {
-        try {
-          const meta = JSON.parse(metaOut);
-          delete meta[String(uid)];
-          await execCommand(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
-        } catch (parseErr) {
-          console.error('[ZM-API] Metadata parse error during cleanup:', parseErr);
+    await withMetaLock(async () => {
+      try {
+        const { errno: metaErr, stdout: metaOut } = await execCommand(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
+        if (metaErr === 0 && metaOut.trim()) {
+          try {
+            const meta = JSON.parse(metaOut);
+            delete meta[String(uid)];
+            await execCommand(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
+          } catch (parseErr) {
+            console.error('[ZM-API] Metadata parse error during cleanup:', parseErr);
+          }
         }
+      } catch (e) {
+        console.error('[ZM-API] Metadata cleanup failed:', e);
       }
-    } catch (e) {
-      console.error('[ZM-API] Metadata cleanup failed:', e);
-    }
+    });
 
     await logActivity('UID_INCLUDED', `UID ${uid}`);
   },
@@ -391,7 +410,7 @@ export const api = {
   async getActivity(): Promise<ActivityItem[]> {
     console.log('[ZM-API] getActivity() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getActivity();
+      return (await getMock()).getActivity();
     }
     const result = await parseActivityLog();
     console.log('[ZM-API] getActivity() returning', result.length, 'items');
@@ -401,7 +420,7 @@ export const api = {
   async getStats(): Promise<EngineStats> {
     console.log('[ZM-API] getStats() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.getStats();
+      return (await getMock()).getStats();
     }
 
     const [rules, uids] = await Promise.all([
@@ -421,7 +440,7 @@ export const api = {
   async toggleEngine(enable: boolean): Promise<void> {
     console.log('[ZM-API] toggleEngine() called:', { enable, mock: shouldUseMock() });
     if (shouldUseMock()) {
-      return MockAPI.toggleEngine(enable);
+      return (await getMock()).toggleEngine(enable);
     }
 
     const cmd = enable ? `${PATHS.BINARY} vfs enable` : `${PATHS.BINARY} vfs disable`;
@@ -437,7 +456,7 @@ export const api = {
 
   async setVerboseLogging(enabled: boolean): Promise<void> {
     if (shouldUseMock()) {
-      return MockAPI.setVerboseLogging(enabled);
+      return (await getMock()).setVerboseLogging(enabled);
     }
 
     const subcmd = enabled ? 'enable' : 'disable';
@@ -462,7 +481,8 @@ export const api = {
   },
 
   async getInstalledApps(): Promise<InstalledApp[]> {
-    return MockAPI.getInstalledApps();
+    if (shouldUseMock()) return (await getMock()).getInstalledApps();
+    return [];
   },
 
   // Check if daemon has signaled a refresh (returns trigger timestamp or null)
@@ -487,7 +507,7 @@ export const api = {
   async scanKsuModules(): Promise<KsuModule[]> {
     console.log('[ZM-API] scanKsuModules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.scanKsuModules();
+      return (await getMock()).scanKsuModules();
     }
 
     try {
@@ -550,7 +570,7 @@ echo "]"
   async loadKsuModule(moduleName: string, modulePath: string): Promise<number> {
     console.log('[ZM-API] loadKsuModule() called:', { moduleName, modulePath, mock: shouldUseMock() });
     if (shouldUseMock()) {
-      return MockAPI.loadKsuModule(moduleName, modulePath);
+      return (await getMock()).loadKsuModule(moduleName, modulePath);
     }
 
     try {
@@ -591,7 +611,7 @@ echo "]"
   async unloadKsuModule(moduleName: string, modulePath: string): Promise<number> {
     console.log('[ZM-API] unloadKsuModule() called:', { moduleName, modulePath, mock: shouldUseMock() });
     if (shouldUseMock()) {
-      return MockAPI.unloadKsuModule(moduleName, modulePath);
+      return (await getMock()).unloadKsuModule(moduleName, modulePath);
     }
 
     try {
@@ -617,7 +637,7 @@ echo "]"
   async fetchSystemColor(): Promise<string | null> {
     console.log('[ZM-API] fetchSystemColor() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
-      return MockAPI.fetchSystemColor();
+      return (await getMock()).fetchSystemColor();
     }
     try {
       const { errno, stdout } = await execCommand(
@@ -643,7 +663,7 @@ echo "]"
 
   async getRuntimeStatus(): Promise<RuntimeStatus | null> {
     if (shouldUseMock()) {
-      return MockAPI.getRuntimeStatus();
+      return (await getMock()).getRuntimeStatus();
     }
     try {
       const { errno, stdout } = await execCommand(`${PATHS.BINARY} status --json`, 5000);
@@ -658,7 +678,7 @@ echo "]"
 
   async configGet(key: string): Promise<string | null> {
     if (shouldUseMock()) {
-      return MockAPI.configGet(key);
+      return (await getMock()).configGet(key);
     }
     try {
       const { errno, stdout } = await execCommand(
@@ -675,7 +695,7 @@ echo "]"
 
   async configSet(key: string, value: string): Promise<void> {
     if (shouldUseMock()) {
-      return MockAPI.configSet(key, value);
+      return (await getMock()).configSet(key, value);
     }
     const { errno, stderr } = await execCommand(
       `${PATHS.BINARY} config set ${escapeShellArg(key)} ${escapeShellArg(value)}`
