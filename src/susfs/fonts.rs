@@ -332,67 +332,11 @@ fn is_font_or_asset(path: &Path) -> bool {
     FONT_EXTENSIONS.contains(&ext.as_str()) || ASSET_EXTENSIONS.contains(&ext.as_str())
 }
 
-/// Best-effort SELinux context copy from target to replacement.
-/// Falls back to setting system_file context if target doesn't exist.
 fn copy_selinux_context(target: &str, replacement: &str) {
-    if Path::new(target).exists() {
-        // Try to copy context from original file
-        if let (Ok(target_c), Ok(replacement_c)) =
-            (CString::new(target), CString::new(replacement))
-        {
-            unsafe {
-                let mut ctx: *mut libc::c_char = std::ptr::null_mut();
-                if libc::getxattr(
-                    target_c.as_ptr(),
-                    b"security.selinux\0".as_ptr() as *const libc::c_char,
-                    &mut ctx as *mut *mut libc::c_char as *mut libc::c_void,
-                    0,
-                ) > 0
-                {
-                    // Got the size, now read and set
-                    let size = libc::getxattr(
-                        target_c.as_ptr(),
-                        b"security.selinux\0".as_ptr() as *const libc::c_char,
-                        std::ptr::null_mut(),
-                        0,
-                    );
-                    if size > 0 {
-                        let mut buf = vec![0u8; size as usize];
-                        let read = libc::getxattr(
-                            target_c.as_ptr(),
-                            b"security.selinux\0".as_ptr() as *const libc::c_char,
-                            buf.as_mut_ptr() as *mut libc::c_void,
-                            buf.len(),
-                        );
-                        if read > 0 {
-                            libc::setxattr(
-                                replacement_c.as_ptr(),
-                                b"security.selinux\0".as_ptr() as *const libc::c_char,
-                                buf.as_ptr() as *const libc::c_void,
-                                read as usize,
-                                0,
-                            );
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Fallback: set u:object_r:system_file:s0
-    if let Ok(replacement_c) = CString::new(replacement) {
-        let context = b"u:object_r:system_file:s0\0";
-        unsafe {
-            libc::setxattr(
-                replacement_c.as_ptr(),
-                b"security.selinux\0".as_ptr() as *const libc::c_char,
-                context.as_ptr() as *const libc::c_void,
-                context.len() - 1, // exclude NUL
-                0,
-            );
-        }
-    }
+    crate::utils::selinux::mirror_selinux_context(
+        Path::new(target),
+        Path::new(replacement),
+    );
 }
 
 #[cfg(test)]
