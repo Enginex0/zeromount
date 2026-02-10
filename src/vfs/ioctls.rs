@@ -317,9 +317,13 @@ impl VfsDriver {
             // Dual-read: kernel may return status in ret OR buffer (same as get_version)
             Ok(ret) => {
                 let enabled = if ret > 0 { ret != 0 } else { status_val != 0 };
+                // GET_STATUS only returns enabled flag; derive rule_count from GET_LIST
+                let rule_count = self.get_list()
+                    .map(|s| s.lines().filter(|l| !l.is_empty()).count() as u32)
+                    .unwrap_or(0);
                 Ok(Some(VfsStatus {
                     enabled,
-                    rule_count: 0,
+                    rule_count,
                 }))
             }
             Err(IoctlError::IoctlFailed { errno, .. })
