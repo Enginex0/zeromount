@@ -101,6 +101,11 @@ pub enum ConfigAction {
     Restore,
     /// Print compiled-in defaults as TOML (used by customize.sh)
     Defaults,
+    /// Dump current config (TOML default, JSON with --json)
+    Dump {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
