@@ -20,6 +20,12 @@ pub enum Commands {
         /// Run post-boot tasks instead of mount pipeline (called by service.sh)
         #[arg(long)]
         post_boot: bool,
+        /// Retry SUSFS path hiding after sdcard decryption
+        #[arg(long)]
+        susfs_retry: bool,
+        /// Block until sdcard is decrypted before running retry (inotify-driven)
+        #[arg(long, requires = "susfs_retry")]
+        wait: bool,
     },
     /// Probe kernel capabilities, write detection JSON
     Detect,

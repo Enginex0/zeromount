@@ -456,6 +456,67 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
     Ok(())
 }
 
+/// Deferred BRENE: only re-run path-hiding operations that require
+/// android_data_root_path (which isn't available at boot time).
+/// Maps, mounts, AVC, log, uname, fonts all succeed at boot — skip them.
+pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> Result<BreneResult> {
+    let mut result = BreneResult::default();
+
+    if !client.is_available() {
+        return Ok(result);
+    }
+
+    let brene = &config.brene;
+    let has_path = client.features().path;
+
+    if brene.auto_hide_rooted_folders && has_path {
+        let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: rooted folders hidden ({count})");
+    }
+
+    if brene.auto_hide_recovery && has_path {
+        let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: recovery paths hidden ({count})");
+    }
+
+    if brene.auto_hide_tmp && has_path {
+        let count = paths::hide_paths(client, TMP_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: tmp paths hidden ({count})");
+    }
+
+    if brene.auto_hide_apk && has_path {
+        let count = hide_apk_paths(client);
+        result.paths_hidden += count;
+        info!("BRENE deferred: APK paths hidden ({count})");
+    }
+
+    if brene.auto_hide_sdcard_data && has_path {
+        let count = paths::hide_paths_loop(client, SDCARD_DATA_PATTERNS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: sdcard data roots hidden ({count})");
+    }
+
+    if !brene.custom_sus_paths.is_empty() && has_path {
+        let path_refs: Vec<&str> = brene.custom_sus_paths.iter().map(|s| s.as_str()).collect();
+        let count = paths::hide_paths(client, &path_refs).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: custom sus_paths hidden ({count})");
+    }
+
+    if !brene.custom_sus_path_loops.is_empty() && has_path {
+        let path_refs: Vec<&str> = brene.custom_sus_path_loops.iter().map(|s| s.as_str()).collect();
+        let count = paths::hide_paths_loop(client, &path_refs).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE deferred: custom sus_path_loops hidden ({count})");
+    }
+
+    info!("BRENE deferred complete: {} paths hidden", result.paths_hidden);
+    Ok(result)
+}
+
 fn truncate_uname(s: &str) -> String {
     if s.len() > 64 {
         s[..64].to_string()

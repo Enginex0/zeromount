@@ -45,7 +45,13 @@ fn main() -> Result<()> {
     logging::init(cli.verbose, &config.logging)?;
 
     match cli.command {
-        Commands::Mount { post_boot } => cli::handlers::handle_mount(post_boot),
+        Commands::Mount { post_boot, susfs_retry, wait } => {
+            if susfs_retry {
+                cli::handlers::handle_susfs_retry(wait)
+            } else {
+                cli::handlers::handle_mount(post_boot)
+            }
+        }
         Commands::Detect => cli::handlers::handle_detect(),
         Commands::Status { json } => cli::handlers::handle_status(json),
         Commands::Module { action } => cli::handlers::handle_module(action),

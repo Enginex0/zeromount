@@ -174,54 +174,62 @@ impl VfsExecutor {
     /// Apply SUSFS protections for a module's injected files.
     /// Phase 2: kstat spoofing + path hiding.
     fn apply_susfs_protections(&self, susfs: &SusfsClient, module: &ScannedModule) {
-        let features = susfs.features();
+        apply_module_susfs_protections(susfs, module);
+    }
+}
 
-        for file in &module.files {
-            match file.file_type {
-                ModuleFileType::Regular
-                | ModuleFileType::Directory
-                | ModuleFileType::Symlink
-                | ModuleFileType::RedirectXattr => {}
-                _ => continue,
+/// Apply SUSFS kstat spoofing + path hiding for a single module's files.
+///
+/// This is the standalone entry point used by both the VFS pipeline (via
+/// `VfsExecutor::apply_susfs_protections`) and the CLI deferred-retry path.
+pub fn apply_module_susfs_protections(susfs: &SusfsClient, module: &ScannedModule) {
+    let features = susfs.features();
+
+    for file in &module.files {
+        match file.file_type {
+            ModuleFileType::Regular
+            | ModuleFileType::Directory
+            | ModuleFileType::Symlink
+            | ModuleFileType::RedirectXattr => {}
+            _ => continue,
+        }
+
+        let source = module.path.join(&file.relative_path);
+        let target = match resolve_target_path(&file.relative_path) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        let source_str = source.display().to_string();
+        let target_str = target.display().to_string();
+
+        // Kstat spoofing: make stat() on the VFS-redirected path return
+        // the original file's metadata instead of the module file's metadata
+        if features.kstat {
+            if let Err(e) = apply_kstat_redirect_or_static(
+                susfs,
+                &target_str,
+                &source_str,
+            ) {
+                debug!(
+                    module = %module.id,
+                    target = %target_str,
+                    error = %e,
+                    "kstat spoofing failed"
+                );
             }
+        }
 
-            let source = module.path.join(&file.relative_path);
-            let target = match resolve_target_path(&file.relative_path) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            let source_str = source.display().to_string();
-            let target_str = target.display().to_string();
-
-            // Kstat spoofing: make stat() on the VFS-redirected path return
-            // the original file's metadata instead of the module file's metadata
-            if features.kstat {
-                if let Err(e) = apply_kstat_redirect_or_static(
-                    susfs,
-                    &target_str,
-                    &source_str,
-                ) {
-                    debug!(
-                        module = %module.id,
-                        target = %target_str,
-                        error = %e,
-                        "kstat spoofing failed"
-                    );
-                }
-            }
-
-            // Path hiding: hide the module source path so it doesn't appear
-            // in directory listings
-            if features.path {
-                if let Err(e) = susfs.add_sus_path(&source_str) {
-                    debug!(
-                        module = %module.id,
-                        path = %source_str,
-                        error = %e,
-                        "path hiding failed"
-                    );
-                }
+        // Path hiding: hide the module source path so it doesn't appear
+        // in directory listings
+        if features.path {
+            if let Err(e) = susfs.add_sus_path(&source_str) {
+                debug!(
+                    module = %module.id,
+                    path = %source_str,
+                    error = %e,
+                    "path hiding failed"
+                );
             }
         }
     }

@@ -21,3 +21,6 @@ COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
 
 # Long-lived watcher — replaces monitor.sh polling loop
 "$BIN" watch &
+
+# Deferred SUSFS — waits for sdcard decryption via inotify, then retries path hiding
+"$BIN" mount --susfs-retry --wait &
