@@ -79,7 +79,7 @@ export function StatusTab() {
     switch (mode) {
       case 'vfs': return 'Kernel VFS driver handling filesystem redirection';
       case 'overlay': return `OverlayFS stacked filesystem \u00b7 Storage: ${storage}`;
-      case 'magicmount': return `Bind mounts (KSU default) \u00b7 Storage: ${storage}`;
+      case 'magicmount': return `Bind mounts \u00b7 Storage: ${storage}`;
       case 'susfs_only': return 'SUSFS hiding active, no mount redirection';
     }
   });
@@ -443,7 +443,18 @@ export function StatusTab() {
               Source
             </div>
             <div class="status-mount__card-value color-text-accent">
-              {store.rootManager() === 'KernelSU' || store.rootManager() === 'APatch' ? 'KSU' : 'overlay'}
+              {(() => {
+                const s = store.scenario?.() || 'none';
+                if (s === 'susfs_only') return '\u2014';
+                const src = store.mountSource();
+                if (src) return src;
+                const cfg = store.settings.mount.overlay_source;
+                if (cfg && cfg !== 'auto') return cfg;
+                const rm = store.rootManager();
+                if (rm === 'KernelSU' || rm === 'APatch') return 'KSU';
+                if (rm === 'Magisk') return 'magisk';
+                return 'overlay';
+              })()}
             </div>
           </div>
         </div>

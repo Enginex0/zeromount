@@ -292,6 +292,7 @@ export const MockAPI = {
       degraded: false,
       degradation_reason: null,
       root_manager: 'KernelSU',
+      mount_source: 'KSU',
     };
   },
 

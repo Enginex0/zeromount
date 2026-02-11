@@ -39,23 +39,25 @@ if [ ! -f "$ZM_DATA/config.toml" ]; then
     "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
 fi
 
-# Align SUSFS config with our defaults so both modules agree on first boot
-SUSFS_DIR="/data/adb/susfs4ksu"
-SUSFS_CONFIG="$SUSFS_DIR/config.sh"
-mkdir -p "$SUSFS_DIR"
-if [ -f "$SUSFS_CONFIG" ]; then
-    ui_print "- Syncing SUSFS config"
-    sed -i 's/^susfs_log=.*/susfs_log=0/' "$SUSFS_CONFIG"
-    sed -i 's/^avc_log_spoofing=.*/avc_log_spoofing=1/' "$SUSFS_CONFIG"
-    sed -i 's/^hide_sus_mnts_for_all_or_non_su_procs=.*/hide_sus_mnts_for_all_or_non_su_procs=1/' "$SUSFS_CONFIG"
-    sed -i 's/^emulate_vold_app_data=.*/emulate_vold_app_data=1/' "$SUSFS_CONFIG"
-    sed -i 's/^force_hide_lsposed=.*/force_hide_lsposed=0/' "$SUSFS_CONFIG"
-    # Append new keys if missing
-    grep -q '^spoof_cmdline=' "$SUSFS_CONFIG" || echo 'spoof_cmdline=0' >> "$SUSFS_CONFIG"
-    grep -q '^hide_loops=' "$SUSFS_CONFIG" || echo 'hide_loops=0' >> "$SUSFS_CONFIG"
-else
-    ui_print "- Seeding SUSFS config"
-    cat > "$SUSFS_CONFIG" << 'SUSFS_EOF'
+# SUSFS config — KSU/APatch only
+if [ -d /data/adb/ksu ] || [ -d /data/adb/ap ]; then
+    # Align SUSFS config with our defaults so both modules agree on first boot
+    SUSFS_DIR="/data/adb/susfs4ksu"
+    SUSFS_CONFIG="$SUSFS_DIR/config.sh"
+    mkdir -p "$SUSFS_DIR"
+    if [ -f "$SUSFS_CONFIG" ]; then
+        ui_print "- Syncing SUSFS config"
+        sed -i 's/^susfs_log=.*/susfs_log=0/' "$SUSFS_CONFIG"
+        sed -i 's/^avc_log_spoofing=.*/avc_log_spoofing=1/' "$SUSFS_CONFIG"
+        sed -i 's/^hide_sus_mnts_for_all_or_non_su_procs=.*/hide_sus_mnts_for_all_or_non_su_procs=1/' "$SUSFS_CONFIG"
+        sed -i 's/^emulate_vold_app_data=.*/emulate_vold_app_data=1/' "$SUSFS_CONFIG"
+        sed -i 's/^force_hide_lsposed=.*/force_hide_lsposed=0/' "$SUSFS_CONFIG"
+        # Append new keys if missing
+        grep -q '^spoof_cmdline=' "$SUSFS_CONFIG" || echo 'spoof_cmdline=0' >> "$SUSFS_CONFIG"
+        grep -q '^hide_loops=' "$SUSFS_CONFIG" || echo 'hide_loops=0' >> "$SUSFS_CONFIG"
+    else
+        ui_print "- Seeding SUSFS config"
+        cat > "$SUSFS_CONFIG" << 'SUSFS_EOF'
 susfs_log=0
 sus_su=-1
 sus_su_active=2
@@ -77,9 +79,12 @@ disable_webui_bin_update=0
 kernel_version='default'
 kernel_build='default'
 SUSFS_EOF
+    fi
 fi
 
-ksud module config set manage.kernel_umount false 2>/dev/null || true
+if command -v ksud >/dev/null 2>&1; then
+    ksud module config set manage.kernel_umount false 2>/dev/null || true
+fi
 
 echo 0 > "$ZM_DATA/.bootcount"
 

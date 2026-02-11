@@ -174,6 +174,8 @@ pub struct RuntimeState {
     pub susfs_version: Option<String>,
     #[serde(default)]
     pub active_strategy: Option<MountStrategy>,
+    #[serde(default)]
+    pub mount_source: Option<String>,
     pub modules: Vec<ModuleStatus>,
     pub font_modules: Vec<String>,
     pub timestamp: u64,
@@ -194,6 +196,7 @@ impl Default for RuntimeState {
             hidden_path_count: 0,
             susfs_version: None,
             active_strategy: None,
+            mount_source: None,
             modules: Vec::new(),
             font_modules: Vec::new(),
             timestamp: 0,

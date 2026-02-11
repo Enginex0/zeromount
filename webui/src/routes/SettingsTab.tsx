@@ -47,7 +47,7 @@ export function SettingsTab() {
       `Active Rules: ${store.stats.activeRules}`,
       `Excluded Apps: ${store.stats.excludedUids}`,
       `Engine: ${store.engineActive() ? 'Active' : 'Inactive'}`,
-      `Scenario: ${store.scenario()}`,
+      `Scenario: ${store.scenario?.()}`,
       `Device: ${store.systemInfo.deviceModel}`,
       `Android: ${store.systemInfo.androidVersion}`,
       `SELinux: ${store.systemInfo.selinuxStatus}`,
@@ -354,7 +354,7 @@ export function SettingsTab() {
               </div>
               <select
                 class="settings__select"
-                value={['auto', 'KSU', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
+                value={['auto', 'KSU', 'magisk', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
                 onChange={(e) => {
                   const val = e.currentTarget.value;
                   if (val === 'custom') {
@@ -367,11 +367,12 @@ export function SettingsTab() {
               >
                 <option value="auto">Auto</option>
                 <option value="KSU">KSU</option>
+                <option value="magisk">magisk</option>
                 <option value="overlay">overlay</option>
                 <option value="custom">Custom</option>
               </select>
             </div>
-            <Show when={!['auto', 'KSU', 'overlay'].includes(store.settings.mount.overlay_source)}>
+            <Show when={!['auto', 'KSU', 'magisk', 'overlay'].includes(store.settings.mount.overlay_source)}>
               <div class="settings__item settings__item--sub settings__item--stacked">
                 <div class="settings__item-label">Custom Source</div>
                 <Input

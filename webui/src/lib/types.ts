@@ -71,6 +71,7 @@ export interface RuntimeStatus {
   degraded: boolean;
   degradation_reason: string | null;
   root_manager: string | null;
+  mount_source: string | null;
 }
 
 export interface KsuModule {

@@ -44,6 +44,7 @@ pub struct Mounted {
     root_mgr: Box<dyn RootManager>,
     detection: DetectionResult,
     results: Vec<MountResult>,
+    overlay_source: Option<String>,
 }
 
 pub struct Finalized {
@@ -174,6 +175,10 @@ impl MountController<Planned> {
             warn!("config backup failed (non-fatal): {e}");
         });
 
+        let resolved_overlay_source = crate::mount::storage::resolve_overlay_source(
+            &self.state.config.mount.overlay_source,
+        );
+
         let scenario = self.state.detection.scenario;
         let capabilities = &self.state.detection.capabilities;
         let config = &self.state.config;
@@ -209,6 +214,7 @@ impl MountController<Planned> {
                 root_mgr: self.state.root_mgr,
                 detection: self.state.detection,
                 results,
+                overlay_source: Some(resolved_overlay_source),
             },
         })
     }
@@ -480,6 +486,7 @@ impl MountController<Mounted> {
             hidden_path_count: 0,
             susfs_version: det.capabilities.susfs_version.clone(),
             active_strategy,
+            mount_source: self.state.overlay_source.clone(),
             modules,
             font_modules: font_infos.iter().map(|f| f.id.clone()).collect(),
             timestamp,
@@ -648,6 +655,7 @@ mod tests {
                     timestamp: 0,
                 },
                 results: Vec::new(),
+                overlay_source: None,
             },
         };
 
@@ -694,6 +702,7 @@ mod tests {
                     timestamp: 0,
                 },
                 results,
+                overlay_source: None,
             },
         };
 
@@ -736,6 +745,7 @@ mod tests {
                         mount_paths: vec![],
                     },
                 ],
+                overlay_source: None,
             },
         };
 
@@ -756,6 +766,7 @@ mod tests {
                     timestamp: 0,
                 },
                 results: Vec::new(),
+                overlay_source: None,
             },
         };
 
@@ -796,6 +807,7 @@ mod tests {
                         mount_paths: vec![],
                     },
                 ],
+                overlay_source: None,
             },
         };
 
@@ -824,6 +836,7 @@ mod tests {
                     error: None,
                     mount_paths: vec![],
                 }],
+                overlay_source: None,
             },
         };
 
@@ -853,6 +866,7 @@ mod tests {
                     error: None,
                     mount_paths: vec!["/system/app".into()],
                 }],
+                overlay_source: None,
             },
         };
 
