@@ -156,7 +156,7 @@ pub struct BreneConfig {
     pub auto_hide_tmp: bool,
     #[serde(default = "default_true")]
     pub auto_hide_sdcard_data: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub avc_log_spoofing: bool,
     #[serde(default)]
     pub susfs_log: bool,
@@ -164,8 +164,12 @@ pub struct BreneConfig {
     pub hide_sus_mounts: bool,
     #[serde(default = "default_true")]
     pub emulate_vold_app_data: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub force_hide_lsposed: bool,
+    #[serde(default)]
+    pub spoof_cmdline: bool,
+    #[serde(default)]
+    pub hide_ksu_loops: bool,
     #[serde(default)]
     pub prop_spoofing: bool,
     #[serde(default)]
@@ -186,12 +190,14 @@ impl Default for BreneConfig {
             auto_hide_recovery: true,
             auto_hide_tmp: true,
             auto_hide_sdcard_data: true,
-            avc_log_spoofing: false,
+            avc_log_spoofing: true,
             susfs_log: false,
             hide_sus_mounts: true,
             emulate_vold_app_data: true,
-            force_hide_lsposed: true,
-            prop_spoofing: false,
+            force_hide_lsposed: false,
+            spoof_cmdline: false,
+            hide_ksu_loops: false,
+            prop_spoofing: true,
             custom_sus_paths: Vec::new(),
             custom_sus_maps: Vec::new(),
             custom_sus_path_loops: Vec::new(),
@@ -427,6 +433,8 @@ impl ZeroMountConfig {
             "brene.hide_sus_mounts" => Some(self.brene.hide_sus_mounts.to_string()),
             "brene.emulate_vold_app_data" => Some(self.brene.emulate_vold_app_data.to_string()),
             "brene.force_hide_lsposed" => Some(self.brene.force_hide_lsposed.to_string()),
+            "brene.spoof_cmdline" => Some(self.brene.spoof_cmdline.to_string()),
+            "brene.hide_ksu_loops" => Some(self.brene.hide_ksu_loops.to_string()),
             "brene.prop_spoofing" => Some(self.brene.prop_spoofing.to_string()),
             "brene.custom_sus_paths" => Some(self.brene.custom_sus_paths.join(",")),
             "brene.custom_sus_maps" => Some(self.brene.custom_sus_maps.join(",")),
@@ -482,6 +490,8 @@ impl ZeroMountConfig {
             "brene.hide_sus_mounts" => self.brene.hide_sus_mounts = value.parse()?,
             "brene.emulate_vold_app_data" => self.brene.emulate_vold_app_data = value.parse()?,
             "brene.force_hide_lsposed" => self.brene.force_hide_lsposed = value.parse()?,
+            "brene.spoof_cmdline" => self.brene.spoof_cmdline = value.parse()?,
+            "brene.hide_ksu_loops" => self.brene.hide_ksu_loops = value.parse()?,
             "brene.prop_spoofing" => self.brene.prop_spoofing = value.parse()?,
             "brene.custom_sus_paths" => self.brene.custom_sus_paths = parse_csv(value),
             "brene.custom_sus_maps" => self.brene.custom_sus_maps = parse_csv(value),
@@ -637,11 +647,13 @@ mod tests {
         assert!(config.brene.auto_hide_recovery);
         assert!(config.brene.auto_hide_tmp);
         assert!(config.brene.auto_hide_sdcard_data);
-        assert!(!config.brene.avc_log_spoofing);
+        assert!(config.brene.avc_log_spoofing);
         assert!(!config.brene.susfs_log);
         assert!(config.brene.hide_sus_mounts);
         assert!(config.brene.emulate_vold_app_data);
-        assert!(config.brene.force_hide_lsposed);
+        assert!(!config.brene.force_hide_lsposed);
+        assert!(!config.brene.spoof_cmdline);
+        assert!(!config.brene.hide_ksu_loops);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
         assert!(config.per_module.is_empty());
     }

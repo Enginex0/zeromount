@@ -1,10 +1,12 @@
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
+use crate::utils::command::{run_command_with_timeout, CMD_TIMEOUT};
 use super::SusfsClient;
 use super::fonts;
 use super::paths;
@@ -46,6 +48,15 @@ const ZYGISK_MAP_PATTERNS: &[&str] = &[
 
 const SYSTEM_FONTS_DIR: &str = "/system/fonts";
 const MODULES_DIR: &str = "/data/adb/modules";
+
+const DEX2OAT_UMOUNT_PATHS: &[&str] = &[
+    "/system/apex/com.android.art/bin/dex2oat",
+    "/system/apex/com.android.art/bin/dex2oat32",
+    "/system/apex/com.android.art/bin/dex2oat64",
+    "/apex/com.android.art/bin/dex2oat",
+    "/apex/com.android.art/bin/dex2oat32",
+    "/apex/com.android.art/bin/dex2oat64",
+];
 
 // /sdcard/Android/data patterns for loop hiding (re-flagged per zygote spawn)
 const SDCARD_DATA_PATTERNS: &[&str] = &[
@@ -186,11 +197,33 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
         }
     }
 
+    // -- Cmdline spoofing (kernel supercall) --
+
+    if brene.spoof_cmdline {
+        apply_spoof_cmdline(client);
+    }
+
+    // -- Hide KSU loop devices --
+
+    if brene.hide_ksu_loops && client.features().path {
+        let count = hide_ksu_loop_devices(client);
+        result.paths_hidden += count;
+        if count > 0 {
+            info!("BRENE: KSU loop devices hidden ({count})");
+        }
+    }
+
+    // -- Force hide LSPosed (dex2oat umount via ksud) --
+
+    if brene.force_hide_lsposed {
+        apply_force_hide_lsposed();
+    }
+
     // -- Uname spoofing --
 
     apply_uname(client, &config.uname, &mut result)?;
 
-    // Sync all 5 controlled settings to SUSFS config.sh
+    // Sync all 7 controlled settings to SUSFS config.sh
     if let Err(e) = sync_susfs_config(config) {
         warn!("BRENE: SUSFS config sync failed: {e}");
     }
@@ -410,12 +443,14 @@ fn build_dynamic_uname() -> Result<(String, String)> {
 const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";
 const SUSFS_CONFIG_DIR: &str = "/data/adb/susfs4ksu";
 
-const SUSFS_SHARED_KEYS: [(&str, fn(&crate::core::config::BreneConfig) -> bool); 5] = [
+const SUSFS_SHARED_KEYS: [(&str, fn(&crate::core::config::BreneConfig) -> bool); 7] = [
     ("susfs_log", |b| b.susfs_log),
     ("avc_log_spoofing", |b| b.avc_log_spoofing),
     ("hide_sus_mnts_for_all_or_non_su_procs", |b| b.hide_sus_mounts),
     ("emulate_vold_app_data", |b| b.emulate_vold_app_data),
     ("force_hide_lsposed", |b| b.force_hide_lsposed),
+    ("spoof_cmdline", |b| b.spoof_cmdline),
+    ("hide_loops", |b| b.hide_ksu_loops),
 ];
 
 fn parse_shell_bool(content: &str, key: &str) -> Option<bool> {
@@ -455,6 +490,8 @@ pub fn import_susfs_config(config: &mut ZeroMountConfig) -> Result<bool> {
                     "hide_sus_mnts_for_all_or_non_su_procs" => brene.hide_sus_mounts = file_val,
                     "emulate_vold_app_data" => brene.emulate_vold_app_data = file_val,
                     "force_hide_lsposed" => brene.force_hide_lsposed = file_val,
+                    "spoof_cmdline" => brene.spoof_cmdline = file_val,
+                    "hide_loops" => brene.hide_ksu_loops = file_val,
                     _ => {}
                 }
                 info!("imported from SUSFS: {shell_key} = {file_val}");
@@ -484,7 +521,7 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
                 content.push_str(&format!("{key}={val}\n"));
             }
             fs::write(config_path, &content).context("creating SUSFS config.sh")?;
-            info!("BRENE: created SUSFS config.sh with 5 settings");
+            info!("BRENE: created SUSFS config.sh with 7 settings");
         } else {
             debug!("SUSFS not installed, skipping config sync");
         }
@@ -509,7 +546,7 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
     }
 
     fs::write(config_path, &content).context("writing SUSFS config.sh")?;
-    info!("BRENE: synced 5 settings to SUSFS config.sh");
+    info!("BRENE: synced 7 settings to SUSFS config.sh");
     Ok(())
 }
 
@@ -570,6 +607,15 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> R
         info!("BRENE deferred: custom sus_path_loops hidden ({count})");
     }
 
+    // -- Emulate vold app data isolation --
+    if brene.emulate_vold_app_data && has_path {
+        let count = emulate_vold_app_data(client);
+        result.paths_hidden += count;
+        if count > 0 {
+            info!("BRENE deferred: vold app data isolation ({count} packages)");
+        }
+    }
+
     // Retry font replacement path hiding (fonts.rs:92 add_sus_path fails at boot due to EINVAL)
     if brene.auto_hide_fonts && has_path {
         let count = hide_font_replacement_paths(client);
@@ -581,6 +627,170 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> R
 
     info!("BRENE deferred complete: {} paths hidden", result.paths_hidden);
     Ok(result)
+}
+
+/// Hide /sdcard/Android/data/<pkg> for all third-party packages.
+/// Mimics SUSFS boot-completed.sh emulate_vold_app_data logic.
+fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
+    let output = match run_command_with_timeout(
+        Command::new("pm").args(["list", "packages", "-3"]),
+        CMD_TIMEOUT,
+    ) {
+        Ok(o) if o.status.success() => o,
+        Ok(o) => {
+            warn!("pm list packages -3 failed (exit {})", o.status.code().unwrap_or(-1));
+            return 0;
+        }
+        Err(e) => {
+            warn!("pm list packages -3 failed: {e}");
+            return 0;
+        }
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut count = 0u32;
+
+    for line in stdout.lines() {
+        let pkg = match line.strip_prefix("package:") {
+            Some(p) => p.trim(),
+            None => continue,
+        };
+        if pkg.is_empty() {
+            continue;
+        }
+
+        let path = format!("/sdcard/Android/data/{pkg}");
+        match client.add_sus_path(&path) {
+            Ok(()) => count += 1,
+            Err(e) => debug!("vold app data hide failed for {pkg}: {e}"),
+        }
+    }
+
+    count
+}
+
+fn apply_force_hide_lsposed() {
+    let ksud = if Path::new("/data/adb/ksu/bin/ksud").exists() {
+        "/data/adb/ksu/bin/ksud"
+    } else if Path::new("/data/adb/ap/bin/ksud").exists() {
+        "/data/adb/ap/bin/ksud"
+    } else {
+        "ksud"
+    };
+
+    for path in DEX2OAT_UMOUNT_PATHS {
+        match run_command_with_timeout(
+            Command::new(ksud).args(["kernel", "umount", "add", path, "--flags", "2"]),
+            CMD_TIMEOUT,
+        ) {
+            Ok(o) if o.status.success() => {
+                debug!("dex2oat umount added: {path}");
+            }
+            Ok(o) => {
+                debug!("dex2oat umount failed for {path} (exit {})", o.status.code().unwrap_or(-1));
+            }
+            Err(e) => {
+                debug!("dex2oat umount failed for {path}: {e}");
+            }
+        }
+    }
+    info!("BRENE: force_hide_lsposed applied (6 dex2oat paths)");
+}
+
+fn apply_spoof_cmdline(client: &SusfsClient) {
+    let cmdline_content = fs::read_to_string("/proc/cmdline").ok();
+    let bootconfig_content = fs::read_to_string("/proc/bootconfig").ok();
+
+    let (mut content, source) = if cmdline_content.as_ref().map_or(false, |c| c.contains("androidboot.verifiedbootstate")) {
+        (cmdline_content.unwrap(), "cmdline")
+    } else if bootconfig_content.is_some() {
+        (bootconfig_content.unwrap(), "bootconfig")
+    } else {
+        warn!("BRENE: no cmdline or bootconfig available for spoofing");
+        return;
+    };
+
+    content = content.replace("androidboot.verifiedbootstate=orange", "androidboot.verifiedbootstate=green");
+
+    // Spoof hwname and hardware.sku to match ro.product.name
+    if let Ok(output) = run_command_with_timeout(
+        Command::new("getprop").arg("ro.product.name"),
+        CMD_TIMEOUT,
+    ) {
+        if output.status.success() {
+            let product_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !product_name.is_empty() {
+                content = replace_boot_param(&content, "androidboot.hwname", &product_name);
+                content = replace_boot_param(&content, "androidboot.product.hardware.sku", &product_name);
+            }
+        }
+    }
+
+    match client.set_cmdline(&content) {
+        Ok(()) => info!("BRENE: {source} spoofed"),
+        Err(e) => warn!("BRENE: {source} spoof failed: {e}"),
+    }
+}
+
+fn replace_boot_param(content: &str, key: &str, new_value: &str) -> String {
+    let prefix = format!("{key}=");
+    if let Some(start) = content.find(&prefix) {
+        let value_start = start + prefix.len();
+        // cmdline uses spaces, bootconfig uses newlines
+        let value_end = content[value_start..]
+            .find(|c: char| c == ' ' || c == '\n' || c == '\r')
+            .map(|i| value_start + i)
+            .unwrap_or(content.len());
+        let mut result = String::with_capacity(content.len());
+        result.push_str(&content[..value_start]);
+        result.push_str(new_value);
+        result.push_str(&content[value_end..]);
+        result
+    } else {
+        content.to_string()
+    }
+}
+
+fn hide_ksu_loop_devices(client: &SusfsClient) -> u32 {
+    let jbd2_dir = Path::new("/proc/fs/jbd2");
+    if !jbd2_dir.is_dir() {
+        return 0;
+    }
+
+    let entries = match fs::read_dir(jbd2_dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    let mut count = 0u32;
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let name = match entry.file_name().into_string() {
+            Ok(n) => n,
+            Err(_) => continue,
+        };
+
+        // Match loop*-8 pattern (KSU loop devices use partition 8)
+        if !name.starts_with("loop") || !name.ends_with("-8") {
+            continue;
+        }
+
+        let device = &name[..name.len() - 2]; // strip "-8"
+
+        let jbd2_path = format!("/proc/fs/jbd2/{name}");
+        match client.add_sus_path(&jbd2_path) {
+            Ok(()) => count += 1,
+            Err(e) => debug!("hide loop jbd2 failed for {jbd2_path}: {e}"),
+        }
+
+        let ext4_path = format!("/proc/fs/ext4/{device}");
+        match client.add_sus_path(&ext4_path) {
+            Ok(()) => count += 1,
+            Err(e) => debug!("hide loop ext4 failed for {ext4_path}: {e}"),
+        }
+    }
+
+    count
 }
 
 fn truncate_uname(s: &str) -> String {

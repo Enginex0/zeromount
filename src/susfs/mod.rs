@@ -465,7 +465,6 @@ impl SusfsClient {
 
     // ---- Cmdline spoofing ----
 
-    #[allow(dead_code)] // FFI supercall wrapper
     pub fn set_cmdline(&self, fake_content: &str) -> Result<()> {
         self.ensure_available()?;
         if fake_content.len() >= SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE {

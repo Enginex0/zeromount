@@ -213,6 +213,45 @@
   font-size: 11px;
 }
 
+.settings__advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  margin-top: 20px;
+  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text-accent);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.02em;
+}
+
+.settings__advanced-toggle:active {
+  transform: scale(0.98);
+}
+
+.settings__advanced-chevron {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
+  color: var(--text-accent);
+}
+
+.settings__advanced-chevron--open {
+  transform: rotate(180deg);
+}
+
+.settings__advanced-content {
+  padding-top: 4px;
+}
+
 .settings__group-label {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   font-size: 11px;

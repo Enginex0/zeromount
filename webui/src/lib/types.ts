@@ -112,6 +112,8 @@ export interface BreneSettings {
   hide_sus_mounts: boolean;
   emulate_vold_app_data: boolean;
   force_hide_lsposed: boolean;
+  spoof_cmdline: boolean;
+  hide_ksu_loops: boolean;
   prop_spoofing: boolean;
 }
 

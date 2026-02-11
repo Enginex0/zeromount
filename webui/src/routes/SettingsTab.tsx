@@ -24,6 +24,7 @@ const accentColors = [
 
 export function SettingsTab() {
   const [showClearConfirm, setShowClearConfirm] = createSignal(false);
+  const [showAdvanced, setShowAdvanced] = createSignal(false);
   const [customOverlaySource, setCustomOverlaySource] = createSignal('');
   const [customMountSource, setCustomMountSource] = createSignal('');
   const selectedAccent = () => store.settings.accentColor;
@@ -426,7 +427,7 @@ export function SettingsTab() {
         </Show>
       </Card>
 
-      {/* SUSFS Integration -- capability-aware hierarchical toggles */}
+      {/* SUSFS Integration -- capability-aware hierarchical toggles + collapsible advanced */}
       <Card>
         <h3 class="settings__section-title">
           <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -482,181 +483,158 @@ export function SettingsTab() {
               <Toggle checked={store.settings.susfs.open_redirect} onChange={(v) => handleSusfsToggle('open_redirect', v)} disabled={!susfsEnabled()} />
             </div>
           </div>
-        </Show>
-      </Card>
 
-      {/* BRENE Automation -- persists to config.toml */}
-      <Show when={susfsAvailable()}>
-        <Card>
-          <h3 class="settings__section-title">
-            <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14z"/>
+          <button class="settings__advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced())}>
+            <svg class={`settings__advanced-chevron${showAdvanced() ? ' settings__advanced-chevron--open' : ''}`} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
             </svg>
-            BRENE Automation
-          </h3>
+            <span>Advanced Settings</span>
+          </button>
 
-          <div class="settings__group-label color-text-tertiary">Auto-Hiding</div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Injected APKs</div>
-              <div class="settings__item-desc">Hide module APKs in vendor/product/system_ext</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_apk}
-              onChange={(v) => handleBreneToggle('auto_hide_apk', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Zygisk .so in Maps</div>
-              <div class="settings__item-desc">Remove zygisk entries from /proc/maps</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_zygisk}
-              onChange={(v) => handleBreneToggle('auto_hide_zygisk', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Font Files in Maps</div>
-              <div class="settings__item-desc">Remove custom font entries from /proc/maps</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_fonts}
-              onChange={(v) => handleBreneToggle('auto_hide_fonts', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Rooted App Folders</div>
-              <div class="settings__item-desc">Hide Magisk/KSU app data directories</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_rooted_folders}
-              onChange={(v) => handleBreneToggle('auto_hide_rooted_folders', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Recovery Folders</div>
-              <div class="settings__item-desc">Hide TWRP/OrangeFox directories</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_recovery}
-              onChange={(v) => handleBreneToggle('auto_hide_recovery', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide /data/local/tmp</div>
-              <div class="settings__item-desc">Hide temp files used by detection tools</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_tmp}
-              onChange={(v) => handleBreneToggle('auto_hide_tmp', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide /sdcard/Android/data</div>
-              <div class="settings__item-desc">Hide sensitive app data on sdcard</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.auto_hide_sdcard_data}
-              onChange={(v) => handleBreneToggle('auto_hide_sdcard_data', v)}
-            />
-          </div>
+          <Show when={showAdvanced()}>
+            <div class="settings__advanced-content">
+              <div class="settings__group-label color-text-tertiary">Auto-Hiding</div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Injected APKs</div>
+                  <div class="settings__item-desc">Hide module APKs in vendor/product/system_ext</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_apk} onChange={(v) => handleBreneToggle('auto_hide_apk', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Zygisk .so in Maps</div>
+                  <div class="settings__item-desc">Remove zygisk entries from /proc/maps</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_zygisk} onChange={(v) => handleBreneToggle('auto_hide_zygisk', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Font Files in Maps</div>
+                  <div class="settings__item-desc">Remove custom font entries from /proc/maps</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_fonts} onChange={(v) => handleBreneToggle('auto_hide_fonts', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Rooted App Folders</div>
+                  <div class="settings__item-desc">Hide Magisk/KSU app data directories</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_rooted_folders} onChange={(v) => handleBreneToggle('auto_hide_rooted_folders', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Recovery Folders</div>
+                  <div class="settings__item-desc">Hide TWRP/OrangeFox directories</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_recovery} onChange={(v) => handleBreneToggle('auto_hide_recovery', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide /data/local/tmp</div>
+                  <div class="settings__item-desc">Hide temp files used by detection tools</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_tmp} onChange={(v) => handleBreneToggle('auto_hide_tmp', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide /sdcard/Android/data</div>
+                  <div class="settings__item-desc">Hide sensitive app data on sdcard</div>
+                </div>
+                <Toggle checked={store.settings.brene.auto_hide_sdcard_data} onChange={(v) => handleBreneToggle('auto_hide_sdcard_data', v)} />
+              </div>
 
-          <div class="settings__group-label color-text-tertiary">Logging</div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">SUSFS Debug Log</div>
-              <div class="settings__item-desc">Enable kernel-level SUSFS logging</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.susfs_log}
-              onChange={(v) => handleBreneToggle('susfs_log', v)}
-            />
-          </div>
+              <div class="settings__group-label color-text-tertiary">SUSFS Control</div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide Sus Mounts</div>
+                  <div class="settings__item-desc">Hide module mounts from non-root processes</div>
+                </div>
+                <Toggle checked={store.settings.brene.hide_sus_mounts} onChange={(v) => handleBreneToggle('hide_sus_mounts', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Emulate Vold App Data</div>
+                  <div class="settings__item-desc">Hide app data paths via sus_path on /sdcard/Android/data</div>
+                </div>
+                <Toggle checked={store.settings.brene.emulate_vold_app_data} onChange={(v) => handleBreneToggle('emulate_vold_app_data', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Force Hide LSPosed</div>
+                  <div class="settings__item-desc">Unmount dex2oat paths to hide LSPosed injection</div>
+                </div>
+                <Toggle checked={store.settings.brene.force_hide_lsposed} onChange={(v) => handleBreneToggle('force_hide_lsposed', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Hide KSU Loop Devices</div>
+                  <div class="settings__item-desc">Hide loop device entries in /proc/fs</div>
+                </div>
+                <Toggle checked={store.settings.brene.hide_ksu_loops} onChange={(v) => handleBreneToggle('hide_ksu_loops', v)} />
+              </div>
 
-          <div class="settings__group-label color-text-tertiary">SUSFS Control</div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Hide Sus Mounts</div>
-              <div class="settings__item-desc">Hide module mounts from non-root processes</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.hide_sus_mounts}
-              onChange={(v) => handleBreneToggle('hide_sus_mounts', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Emulate Vold App Data</div>
-              <div class="settings__item-desc">Hide app data paths via sus_path on /sdcard/Android/data</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.emulate_vold_app_data}
-              onChange={(v) => handleBreneToggle('emulate_vold_app_data', v)}
-            />
-          </div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Force Hide LSPosed</div>
-              <div class="settings__item-desc">Unmount dex2oat paths to hide LSPosed injection</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.force_hide_lsposed}
-              onChange={(v) => handleBreneToggle('force_hide_lsposed', v)}
-            />
-          </div>
+              <div class="settings__group-label color-text-tertiary">Spoofing</div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Spoof Cmdline</div>
+                  <div class="settings__item-desc">Replace verifiedbootstate and hwname in /proc/cmdline</div>
+                </div>
+                <Toggle checked={store.settings.brene.spoof_cmdline} onChange={(v) => handleBreneToggle('spoof_cmdline', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">AVC Log Spoofing</div>
+                  <div class="settings__item-desc">Suppress SELinux audit log entries</div>
+                </div>
+                <Toggle checked={store.settings.brene.avc_log_spoofing} onChange={(v) => handleBreneToggle('avc_log_spoofing', v)} />
+              </div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">Uname Spoofing</div>
+                  <div class="settings__item-desc">Spoof kernel version string</div>
+                </div>
+                <select
+                  class="settings__select"
+                  value={store.settings.uname.mode}
+                  onChange={(e) => store.setUnameMode(e.currentTarget.value as UnameMode)}
+                >
+                  <option value="disabled">Disabled</option>
+                  <option value="static">Static</option>
+                  <option value="dynamic">Dynamic</option>
+                </select>
+              </div>
+              <Show when={store.settings.uname.mode !== 'disabled'}>
+                <div class="settings__item settings__item--sub settings__item--stacked">
+                  <div class="settings__item-label">Release</div>
+                  <Input
+                    value={store.settings.uname.release}
+                    placeholder="5.10.0-android12-gki"
+                    onBlur={(e) => store.setUnameField('release', e.currentTarget.value)}
+                  />
+                </div>
+                <div class="settings__item settings__item--sub settings__item--stacked">
+                  <div class="settings__item-label">Version</div>
+                  <Input
+                    value={store.settings.uname.version}
+                    placeholder="#1 SMP PREEMPT"
+                    onBlur={(e) => store.setUnameField('version', e.currentTarget.value)}
+                  />
+                </div>
+              </Show>
 
-          <div class="settings__group-label color-text-tertiary">Spoofing</div>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">Uname Spoofing</div>
-              <div class="settings__item-desc">Spoof kernel version string</div>
-            </div>
-            <select
-              class="settings__select"
-              value={store.settings.uname.mode}
-              onChange={(e) => store.setUnameMode(e.currentTarget.value as UnameMode)}
-            >
-              <option value="disabled">Disabled</option>
-              <option value="static">Static</option>
-              <option value="dynamic">Dynamic</option>
-            </select>
-          </div>
-          <Show when={store.settings.uname.mode !== 'disabled'}>
-            <div class="settings__item settings__item--sub settings__item--stacked">
-              <div class="settings__item-label">Release</div>
-              <Input
-                value={store.settings.uname.release}
-                placeholder="5.10.0-android12-gki"
-                onBlur={(e) => store.setUnameField('release', e.currentTarget.value)}
-              />
-            </div>
-            <div class="settings__item settings__item--sub settings__item--stacked">
-              <div class="settings__item-label">Version</div>
-              <Input
-                value={store.settings.uname.version}
-                placeholder="#1 SMP PREEMPT"
-                onBlur={(e) => store.setUnameField('version', e.currentTarget.value)}
-              />
+              <div class="settings__group-label color-text-tertiary">Logging</div>
+              <div class="settings__item">
+                <div class="settings__item-content">
+                  <div class="settings__item-label">SUSFS Debug Log</div>
+                  <div class="settings__item-desc">Enable kernel-level SUSFS logging</div>
+                </div>
+                <Toggle checked={store.settings.brene.susfs_log} onChange={(v) => handleBreneToggle('susfs_log', v)} />
+              </div>
             </div>
           </Show>
-          <div class="settings__item">
-            <div class="settings__item-content">
-              <div class="settings__item-label">AVC Log Spoofing</div>
-              <div class="settings__item-desc">Suppress SELinux audit log entries</div>
-            </div>
-            <Toggle
-              checked={store.settings.brene.avc_log_spoofing}
-              onChange={(v) => handleBreneToggle('avc_log_spoofing', v)}
-            />
-          </div>
-        </Card>
-      </Show>
+        </Show>
+      </Card>
 
       {/* Property Spoofing -- separate section, uses resetprop not SUSFS */}
       <Card>

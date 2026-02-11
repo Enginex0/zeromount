@@ -89,7 +89,9 @@ function createAppStore() {
     susfs_log: false,
     hide_sus_mounts: true,
     emulate_vold_app_data: true,
-    force_hide_lsposed: true,
+    force_hide_lsposed: false,
+    spoof_cmdline: false,
+    hide_ksu_loops: false,
     prop_spoofing: true,
   };
 
@@ -449,7 +451,7 @@ function createAppStore() {
       'auto_hide_rooted_folders', 'auto_hide_recovery', 'auto_hide_tmp',
       'auto_hide_sdcard_data', 'avc_log_spoofing', 'susfs_log',
       'hide_sus_mounts', 'emulate_vold_app_data', 'force_hide_lsposed',
-      'prop_spoofing',
+      'spoof_cmdline', 'hide_ksu_loops', 'prop_spoofing',
     ];
 
     if (dump?.brene && dump?.uname) {
@@ -530,6 +532,12 @@ function createAppStore() {
       } else if (key === 'force_hide_lsposed') {
         await api.writeSusfsConfigVar('force_hide_lsposed', value ? '1' : '0');
         configVarSet = true;
+      } else if (key === 'spoof_cmdline') {
+        await api.writeSusfsConfigVar('spoof_cmdline', value ? '1' : '0');
+        configVarSet = true;
+      } else if (key === 'hide_ksu_loops') {
+        await api.writeSusfsConfigVar('hide_loops', value ? '1' : '0');
+        configVarSet = true;
       }
       pushActivity('brene_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
@@ -553,6 +561,8 @@ function createAppStore() {
           hide_sus_mounts: 'hide_sus_mnts_for_all_or_non_su_procs',
           emulate_vold_app_data: 'emulate_vold_app_data',
           force_hide_lsposed: 'force_hide_lsposed',
+          spoof_cmdline: 'spoof_cmdline',
+          hide_ksu_loops: 'hide_loops',
         };
         const varName = varMap[key];
         if (varName) {
