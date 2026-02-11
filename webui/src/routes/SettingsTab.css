@@ -214,33 +214,84 @@
 }
 
 .settings__advanced-toggle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 12px 16px;
-  margin-top: 20px;
-  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
+  padding: 14px 20px;
+  margin-top: 24px;
+  background: linear-gradient(
+    135deg,
+    rgba(var(--accent-rgb, 255, 142, 83), 0.08) 0%,
+    rgba(var(--accent-rgb, 255, 142, 83), 0.03) 100%
+  );
+  border: 1px solid rgba(var(--accent-rgb, 255, 142, 83), 0.25);
+  border-radius: 12px;
   color: var(--text-accent);
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   letter-spacing: 0.02em;
+  overflow: hidden;
+}
+
+.settings__advanced-toggle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--accent-rgb, 255, 142, 83), 0.12) 50%,
+    transparent 100%
+  );
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { left: -100%; }
+  50% { left: 100%; }
 }
 
 .settings__advanced-toggle:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+}
+
+.settings__advanced-toggle--open {
+  background: rgba(var(--accent-rgb, 255, 142, 83), 0.06);
+  border-color: rgba(var(--accent-rgb, 255, 142, 83), 0.15);
+}
+
+.settings__advanced-toggle--open::before {
+  animation: none;
+}
+
+.settings__advanced-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: rgba(var(--accent-rgb, 255, 142, 83), 0.2);
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-accent);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 .settings__advanced-chevron {
   width: 18px;
   height: 18px;
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   color: var(--text-accent);
 }
 
@@ -249,7 +300,19 @@
 }
 
 .settings__advanced-content {
-  padding-top: 4px;
+  padding-top: 8px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .settings__group-label {

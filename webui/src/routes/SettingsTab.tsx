@@ -484,11 +484,12 @@ export function SettingsTab() {
             </div>
           </div>
 
-          <button class="settings__advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced())}>
+          <button class={`settings__advanced-toggle${showAdvanced() ? ' settings__advanced-toggle--open' : ''}`} onClick={() => setShowAdvanced(!showAdvanced())}>
             <svg class={`settings__advanced-chevron${showAdvanced() ? ' settings__advanced-chevron--open' : ''}`} viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 10l5 5 5-5z"/>
             </svg>
             <span>Advanced Settings</span>
+            <span class="settings__advanced-badge">12</span>
           </button>
 
           <Show when={showAdvanced()}>
