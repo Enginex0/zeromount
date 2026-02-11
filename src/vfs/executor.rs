@@ -132,6 +132,12 @@ impl VfsExecutor {
                 }
             };
 
+            if let Some(ref susfs) = self.susfs {
+                if susfs.features().open_redirect && is_brene_owned_target(&target) {
+                    continue;
+                }
+            }
+
             match self.driver.add_rule(&source, &target, is_dir) {
                 Ok(()) => {
                     applied += 1;
@@ -178,6 +184,19 @@ impl VfsExecutor {
     }
 }
 
+// BRENE owns font/emoji/audio via open_redirect_all (zero mount fingerprint)
+const BRENE_OWNED_TARGET_PREFIXES: &[&str] = &["/system/fonts/"];
+
+fn is_brene_owned_target(target: &Path) -> bool {
+    let s = match target.to_str() {
+        Some(s) => s,
+        None => return false,
+    };
+    BRENE_OWNED_TARGET_PREFIXES
+        .iter()
+        .any(|prefix| s.starts_with(prefix) || s == &prefix[..prefix.len() - 1])
+}
+
 /// Apply SUSFS kstat spoofing + path hiding for a single module's files.
 ///
 /// This is the standalone entry point used by both the VFS pipeline (via
@@ -185,6 +204,9 @@ impl VfsExecutor {
 pub fn apply_module_susfs_protections(susfs: &SusfsClient, module: &ScannedModule) {
     let features = susfs.features();
 
+    // Pass 1: kstat for all qualifying entries.
+    // Completes before any path hiding — add_sus_path on a parent directory
+    // makes children invisible to stat(), breaking kstat_redirect.
     for file in &module.files {
         match file.file_type {
             ModuleFileType::Regular
@@ -200,12 +222,13 @@ pub fn apply_module_susfs_protections(susfs: &SusfsClient, module: &ScannedModul
             None => continue,
         };
 
-        let source_str = source.display().to_string();
-        let target_str = target.display().to_string();
+        if features.open_redirect && is_brene_owned_target(&target) {
+            continue;
+        }
 
-        // Kstat spoofing: make stat() on the VFS-redirected path return
-        // the original file's metadata instead of the module file's metadata
         if features.kstat {
+            let source_str = source.display().to_string();
+            let target_str = target.display().to_string();
             if let Err(e) = apply_kstat_redirect_or_static(
                 susfs,
                 &target_str,
@@ -219,10 +242,28 @@ pub fn apply_module_susfs_protections(susfs: &SusfsClient, module: &ScannedModul
                 );
             }
         }
+    }
 
-        // Path hiding: hide the module source path so it doesn't appear
-        // in directory listings
-        if features.path {
+    // Pass 2: path hiding for directories only.
+    // add_sus_path on a directory implicitly hides all children in the kernel,
+    // so individual file hiding is redundant.
+    if features.path {
+        for file in &module.files {
+            if file.file_type != ModuleFileType::Directory {
+                continue;
+            }
+
+            let source = module.path.join(&file.relative_path);
+            let target = match resolve_target_path(&file.relative_path) {
+                Some(t) => t,
+                None => continue,
+            };
+
+            if features.open_redirect && is_brene_owned_target(&target) {
+                continue;
+            }
+
+            let source_str = source.display().to_string();
             if let Err(e) = susfs.add_sus_path(&source_str) {
                 debug!(
                     module = %module.id,
@@ -270,5 +311,21 @@ mod tests {
     fn resolve_target_empty_returns_none() {
         let rel = PathBuf::from("");
         assert_eq!(resolve_target_path(&rel), None);
+    }
+
+    #[test]
+    fn brene_owns_system_fonts() {
+        assert!(is_brene_owned_target(Path::new("/system/fonts/Roboto.ttf")));
+        assert!(is_brene_owned_target(Path::new("/system/fonts/")));
+        assert!(is_brene_owned_target(Path::new("/system/fonts")));
+        assert!(is_brene_owned_target(Path::new("/system/fonts/NotoEmoji.ttc")));
+    }
+
+    #[test]
+    fn brene_does_not_own_non_font_paths() {
+        assert!(!is_brene_owned_target(Path::new("/system/bin/ls")));
+        assert!(!is_brene_owned_target(Path::new("/vendor/fonts/custom.ttf")));
+        assert!(!is_brene_owned_target(Path::new("/system/app/SomeApp.apk")));
+        assert!(!is_brene_owned_target(Path::new("")));
     }
 }
