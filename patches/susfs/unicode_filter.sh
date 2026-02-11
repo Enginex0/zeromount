@@ -25,7 +25,7 @@ patch_namei() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(pathname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif' "$f"
 
@@ -35,7 +35,7 @@ patch_namei() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(pathname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -46,7 +46,7 @@ patch_namei() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(newname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -57,7 +57,7 @@ patch_namei() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(newname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -68,7 +68,7 @@ patch_namei() {
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(oldname) ||\
 	    susfs_check_unicode_bypass(newname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -88,7 +88,18 @@ patch_open() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(filename)) {\
-		return -EPERM;\
+		return -ENOENT;\
+	}\
+#endif
+    }' "$f"
+
+    # do_faccessat — detectors probe paths with access() before open()
+    sed -i '/^static int do_faccessat/,/unsigned int lookup_flags/{
+        /unsigned int lookup_flags/a\
+\
+#ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
+	if (susfs_check_unicode_bypass(filename)) {\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -108,7 +119,7 @@ patch_stat() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(filename)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif
     }' "$f"
@@ -118,7 +129,7 @@ patch_stat() {
 \
 #ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER\
 	if (susfs_check_unicode_bypass(pathname)) {\
-		return -EPERM;\
+		return -ENOENT;\
 	}\
 #endif' "$f"
 }
