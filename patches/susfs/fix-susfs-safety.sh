@@ -322,4 +322,46 @@ else
     echo "[=] spoofed_size format specifier already correct"
 fi
 
+# --- 9. Null guards for susfs_is_base_dentry_* (prevents kernel panic on null base) ---
+if grep -q 'return (base->d_inode->i_mapping->flags & BIT_ANDROID_DATA_ROOT_DIR)' "$SUSFS_C"; then
+    echo "[+] Adding null guards to susfs_is_base_dentry functions"
+    sed -i 's/return (base->d_inode->i_mapping->flags & BIT_ANDROID_DATA_ROOT_DIR);/return (base \&\& !IS_ERR(base) \&\& base->d_inode \&\& (base->d_inode->i_mapping->flags \& BIT_ANDROID_DATA_ROOT_DIR));/' "$SUSFS_C"
+    sed -i 's/return (base->d_inode->i_mapping->flags & BIT_ANDROID_SDCARD_ROOT_DIR);/return (base \&\& !IS_ERR(base) \&\& base->d_inode \&\& (base->d_inode->i_mapping->flags \& BIT_ANDROID_SDCARD_ROOT_DIR));/' "$SUSFS_C"
+    ((fix_count++)) || true
+else
+    echo "[=] susfs_is_base_dentry null guards already present"
+fi
+
+# --- 10. Remove EACCES permission leak from SUS_PATH in GKI patch ---
+# Older upstream versions return ERR_PTR(-EACCES) on create/excl lookups,
+# which leaks SUSFS presence to detector apps. Replace with blank lines
+# to preserve patch hunk line counts.
+for patch_file in "$SUSFS_DIR"/50_add_susfs_in_gki-*.patch; do
+    [ -f "$patch_file" ] || continue
+    if grep -q 'ERR_PTR(-EACCES)' "$patch_file"; then
+        echo "[+] Removing EACCES permission leak from $(basename "$patch_file")"
+        awk '
+        # 5.10: if (flags & (LOOKUP_CREATE | LOOKUP_EXCL)) { return ERR_PTR(-EACCES); }
+        /^\+[[:space:]]*if \(flags & \(LOOKUP_CREATE \| LOOKUP_EXCL\)\) \{/ {
+            print "+"; getline; print "+"; getline; print "+"
+            next
+        }
+        # 6.6: if (create_flags) { dentry = ERR_PTR(-EACCES); goto unlock; }
+        /^\+[[:space:]]*if \(create_flags\) \{/ {
+            saved = $0
+            if (getline > 0 && $0 ~ /ERR_PTR\(-EACCES\)/) {
+                print "+"; print "+"
+                getline; print "+"; getline; print "+"
+                next
+            }
+            print saved
+        }
+        { print }
+        ' "$patch_file" > "$patch_file.tmp" && mv "$patch_file.tmp" "$patch_file"
+        ((fix_count++)) || true
+    else
+        echo "[=] No EACCES permission leak in $(basename "$patch_file")"
+    fi
+done
+
 echo "=== Done: $fix_count fixes applied ==="
