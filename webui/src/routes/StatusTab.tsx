@@ -14,13 +14,22 @@ export function StatusTab() {
   const [animatedExcludedUids, setAnimatedExcludedUids] = createSignal(0);
   const [showAllActivity, setShowAllActivity] = createSignal(false);
 
-  // Effective mount mode: user preference gated by detected capabilities
   const effectiveMode = createMemo(() => {
     const s = store.scenario?.() || 'none';
-    const strategy = store.activeStrategy();
-
     if (s === 'susfs_only') return 'susfs_only' as const;
 
+    // Ground truth from last boot — what the pipeline actually executed
+    const runtime = store.runtimeStrategy();
+    if (runtime) {
+      switch (runtime) {
+        case 'Vfs': return 'vfs' as const;
+        case 'Overlay': return 'overlay' as const;
+        case 'MagicMount': return 'magicmount' as const;
+      }
+    }
+
+    // No runtime data — derive from config + capabilities (pre-boot estimate)
+    const strategy = store.activeStrategy();
     switch (strategy) {
       case 'Vfs': {
         const caps = store.capabilities();
@@ -43,11 +52,14 @@ export function StatusTab() {
   });
 
   const mountModeValue = createMemo(() => {
-    const s = store.scenario?.() || 'none';
     const mode = effectiveMode();
-    if (mode === 'vfs' && (s === 'full' || s === 'kernel_only')) return 'Active';
     if (mode === 'susfs_only') return 'No Mount';
-    if (mode === 'vfs' && !store.capabilities()?.vfs_driver) return 'Unavailable';
+
+    const statuses = store.moduleStatuses();
+    if (statuses.some(m => m.strategy !== 'Font')) return 'Active';
+
+    const s = store.scenario?.() || 'none';
+    if (s === 'none') return 'Unavailable';
     return 'Selected';
   });
 
@@ -431,7 +443,7 @@ export function StatusTab() {
               Source
             </div>
             <div class="status-mount__card-value color-text-accent">
-              {store.rootManager() === 'KernelSU' || store.rootManager() === 'APatch' ? 'KSU' : store.rootManager() === 'Magisk' ? 'overlay' : 'Unknown'}
+              {store.rootManager() === 'KernelSU' || store.rootManager() === 'APatch' ? 'KSU' : 'overlay'}
             </div>
           </div>
         </div>

@@ -55,6 +55,7 @@ function createAppStore() {
   const [degraded, setDegraded] = createSignal(false);
   const [degradationReason, setDegradationReason] = createSignal<string | null>(null);
   const [rootManager, setRootManager] = createSignal<string | null>(null);
+  const [runtimeStrategy, setRuntimeStrategy] = createSignal<MountStrategy | null>(null);
   const [lastApiError, setLastApiError] = createSignal<{ operation: string; error: unknown; timestamp: Date } | null>(null);
 
   const savedTheme = typeof window !== 'undefined'
@@ -273,6 +274,7 @@ function createAppStore() {
         if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
         if (status.susfs_version) setSystemInfo('susfsVersion', status.susfs_version);
         setRootManager(status.root_manager);
+        setRuntimeStrategy(status.active_strategy ?? null);
         setStats({
           activeRules: status.rule_count,
           excludedUids: status.excluded_uid_count,
@@ -805,6 +807,7 @@ function createAppStore() {
       setDegraded(status.degraded);
       setDegradationReason(status.degradation_reason);
       setRootManager(status.root_manager);
+      setRuntimeStrategy(status.active_strategy ?? null);
 
       if (status.engine_active !== null) {
         setEngineActive(status.engine_active);
@@ -1039,6 +1042,7 @@ function createAppStore() {
     degraded,
     degradationReason,
     rootManager,
+    runtimeStrategy,
     settings,
     currentTheme,
     toast,

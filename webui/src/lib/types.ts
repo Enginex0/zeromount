@@ -64,6 +64,7 @@ export interface RuntimeStatus {
   excluded_uid_count: number;
   hidden_path_count: number;
   susfs_version: string | null;
+  active_strategy: MountStrategy | null;
   modules: ModuleStatus[];
   font_modules: string[];
   timestamp: number;

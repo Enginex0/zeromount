@@ -281,6 +281,7 @@ export const MockAPI = {
       excluded_uid_count: mockExcludedUids.length,
       hidden_path_count: 5,
       susfs_version: 'v2.0.0',
+      active_strategy: 'Vfs',
       modules: [
         { id: 'playintegrityfix', strategy: 'Vfs', rules_applied: 12, rules_failed: 0, errors: [], mount_paths: ['/system/framework'] },
         { id: 'fontmanager', strategy: 'Vfs', rules_applied: 45, rules_failed: 0, errors: [], mount_paths: ['/system/fonts', '/vendor/fonts'] },

@@ -442,6 +442,11 @@ impl MountController<Mounted> {
             });
         }
 
+        let active_strategy = modules
+            .iter()
+            .find(|m| m.strategy != MountStrategy::Font)
+            .map(|m| m.strategy);
+
         let no_vfs = matches!(det.scenario, Scenario::None | Scenario::SusfsOnly);
         let degraded = total_failed > 0 || no_vfs;
         let degradation_reason = if det.scenario == Scenario::None {
@@ -474,6 +479,7 @@ impl MountController<Mounted> {
             excluded_uid_count: 0,
             hidden_path_count: 0,
             susfs_version: det.capabilities.susfs_version.clone(),
+            active_strategy,
             modules,
             font_modules: font_infos.iter().map(|f| f.id.clone()).collect(),
             timestamp,
