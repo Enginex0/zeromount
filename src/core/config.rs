@@ -376,7 +376,8 @@ impl ZeroMountConfig {
         Ok(count)
     }
 
-    /// Reset bootcount to 0 (after successful boot).
+    /// Reset bootcount to 0 (called from service.sh after sys.boot_completed=1).
+    #[allow(dead_code)]
     pub fn reset_bootcount() -> Result<()> {
         let _ = std::fs::remove_file(BOOTCOUNT_PATH);
         tracing::debug!("bootcount reset");
