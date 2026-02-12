@@ -82,7 +82,11 @@ pub struct PlannedModule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartitionMount {
     pub partition: String,
+    /// Canonical mount target (symlinks resolved). E.g., /vendor/etc on SAR devices.
     pub mount_point: PathBuf,
+    /// Path relative to partition staging dir. E.g., vendor/etc for files staged
+    /// under <staging>/<module>/system/vendor/etc.
+    pub staging_rel: PathBuf,
     pub contributing_modules: Vec<String>,
 }
 

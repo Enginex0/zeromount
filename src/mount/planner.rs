@@ -187,30 +187,45 @@ fn insert_into_tree(
     insert_into_tree(child, &path_components[1..], module_id, file_type);
 }
 
+/// Partition-equivalent subpaths that must never be overlaid at root level.
+/// Overlaying /system/vendor (→ /vendor) masks GPU EGL drivers and other
+/// critical partition content. Both mountify and meta-hybrid_mount enforce
+/// per-subdirectory mounting for these paths.
+const SENSITIVE_SUBPATHS: &[&str] = &["vendor", "product", "system_ext", "odm"];
+
 /// BFS from partition root to find minimum mount points.
 /// ME05: Never mount at the partition root itself.
+/// Sensitive subpaths (vendor, product, etc.) always descend to per-subdir mounts.
+///
+/// Mount paths are canonicalized to resolve SAR symlinks (e.g., /system/vendor → /vendor).
+/// Staging-relative paths are tracked separately so the executor can locate staged files.
 fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
     let mut mounts = Vec::new();
 
-    // Start BFS from the partition root's children (never mount at root)
-    let mut queue: VecDeque<(PathBuf, &DirNode)> = VecDeque::new();
+    // Queue: (canonical_mount_path, staging_rel, node, force_descend)
+    let mut queue: VecDeque<(PathBuf, PathBuf, &DirNode, bool)> = VecDeque::new();
 
     for (child_name, child_node) in &root.children {
-        let mount_path = resolve_partition_path(partition, child_name);
-        queue.push_back((mount_path, child_node));
+        let raw_path = resolve_partition_path(partition, child_name);
+        let mount_path = canonicalize_or_raw(&raw_path);
+        let staging_rel = PathBuf::from(child_name);
+        let sensitive = SENSITIVE_SUBPATHS.contains(&child_name.as_str());
+        queue.push_back((mount_path, staging_rel, child_node, sensitive));
     }
 
-    while let Some((path, node)) = queue.pop_front() {
+    while let Some((path, staging_rel, node, force_descend)) = queue.pop_front() {
         let total_contributors = count_all_contributors(node);
 
-        if node.has_files || should_mount_here(node) {
-            // Mount at this level
+        let mount_here = !force_descend && (node.has_files || should_mount_here(node));
+
+        if mount_here {
             let contributors: Vec<String> = collect_all_modules(node)
                 .into_iter()
                 .collect();
 
             debug!(
                 mount_point = %path.display(),
+                staging_rel = %staging_rel.display(),
                 modules = contributors.len(),
                 "planned mount point"
             );
@@ -218,12 +233,20 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
             mounts.push(PartitionMount {
                 partition: partition.to_string(),
                 mount_point: path,
+                staging_rel,
                 contributing_modules: contributors,
             });
         } else if !total_contributors.is_empty() {
-            // No files at this level, but children have content -- descend
+            if force_descend {
+                debug!(mount_point = %path.display(), "sensitive partition path — descending to subdirs");
+            }
             for (child_name, child_node) in &node.children {
-                queue.push_back((path.join(child_name), child_node));
+                queue.push_back((
+                    path.join(child_name),
+                    staging_rel.join(child_name),
+                    child_node,
+                    false,
+                ));
             }
         }
     }
@@ -255,37 +278,20 @@ fn should_mount_here(node: &DirNode) -> bool {
     false
 }
 
-/// Resolve the actual filesystem path for a partition + subpath.
-/// Handles SAR: /product may be a symlink to /system/product (legacy)
-/// or a real mount point (modern).
+/// Build the raw filesystem path for a partition + subpath.
+/// The result is later canonicalized to resolve SAR symlinks.
 fn resolve_partition_path(partition: &str, subpath: &str) -> PathBuf {
-    let direct = PathBuf::from(format!("/{}", partition));
-
     match partition {
         "system" => Path::new("/system").join(subpath),
-        "vendor" | "product" | "system_ext" | "odm" => {
-            // SAR detection: check if /<partition> is a symlink to /system/<partition>
-            if is_sar_symlink(partition) {
-                Path::new("/system").join(partition).join(subpath)
-            } else {
-                direct.join(subpath)
-            }
-        }
-        _ => direct.join(subpath),
+        _ => PathBuf::from(format!("/{}", partition)).join(subpath),
     }
 }
 
-/// Check if a partition path is a SAR symlink (e.g., /product -> /system/product).
-fn is_sar_symlink(partition: &str) -> bool {
-    let path = PathBuf::from(format!("/{}", partition));
-    match std::fs::read_link(&path) {
-        Ok(target) => {
-            let expected = PathBuf::from(format!("/system/{}", partition));
-            let alt = PathBuf::from(format!("system/{}", partition));
-            target == expected || target == alt
-        }
-        Err(_) => false,
-    }
+/// Canonicalize a path, resolving all symlinks. Falls back to the raw path
+/// if the target doesn't exist (e.g., during cross-compilation or if the
+/// device path isn't reachable).
+fn canonicalize_or_raw(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// Collect all unique module IDs from a node and all its descendants.
