@@ -212,9 +212,6 @@ pub fn apply_module_susfs_protections(
 ) {
     let features = susfs.features();
 
-    // Pass 1: kstat for all qualifying entries.
-    // Completes before any path hiding — add_sus_path on a parent directory
-    // makes children invisible to stat(), breaking kstat_redirect.
     if !skip_kstat && features.kstat {
         for file in &module.files {
             match file.file_type {
@@ -237,11 +234,8 @@ pub fn apply_module_susfs_protections(
 
             let source_str = source.display().to_string();
             let target_str = target.display().to_string();
-            if let Err(e) = apply_kstat_redirect_or_static(
-                susfs,
-                &target_str,
-                &source_str,
-            ) {
+
+            if let Err(e) = apply_kstat_redirect_or_static(susfs, &target_str, &source_str) {
                 debug!(
                     module = %module.id,
                     target = %target_str,
@@ -289,7 +283,7 @@ pub fn apply_module_susfs_protections(
 ///
 /// The relative_path from ScannedModule starts with the partition name
 /// (system, vendor, etc.), so we prepend "/" to get the real path.
-fn resolve_target_path(relative: &Path) -> Option<PathBuf> {
+pub(crate) fn resolve_target_path(relative: &Path) -> Option<PathBuf> {
     let s = relative.to_str()?;
     if s.is_empty() {
         return None;

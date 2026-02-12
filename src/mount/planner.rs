@@ -18,6 +18,7 @@ pub fn plan_mounts(
     modules: &[ScannedModule],
     scenario: Scenario,
     capabilities: &CapabilityFlags,
+    user_override: Option<MountStrategy>,
 ) -> Result<MountPlan> {
     if modules.is_empty() {
         return Ok(MountPlan {
@@ -27,7 +28,7 @@ pub fn plan_mounts(
         });
     }
 
-    let strategy = select_strategy(scenario, capabilities);
+    let strategy = select_strategy(scenario, capabilities, user_override);
 
     // For VFS mode, no mount planning needed -- the VFS executor handles per-file rules
     if strategy == MountStrategy::Vfs {
@@ -78,14 +79,23 @@ pub fn plan_mounts(
     })
 }
 
-fn select_strategy(scenario: Scenario, capabilities: &CapabilityFlags) -> MountStrategy {
+fn select_strategy(
+    scenario: Scenario,
+    capabilities: &CapabilityFlags,
+    user_override: Option<MountStrategy>,
+) -> MountStrategy {
     match scenario {
-        Scenario::Full | Scenario::SusfsFrontend | Scenario::KernelOnly => MountStrategy::Vfs,
+        Scenario::Full | Scenario::SusfsFrontend | Scenario::KernelOnly => {
+            match user_override {
+                Some(s @ MountStrategy::Overlay) | Some(s @ MountStrategy::MagicMount) => s,
+                _ => MountStrategy::Vfs,
+            }
+        }
         Scenario::SusfsOnly | Scenario::None => {
-            if capabilities.overlay_supported {
-                MountStrategy::Overlay
-            } else {
-                MountStrategy::MagicMount
+            match user_override {
+                Some(MountStrategy::MagicMount) => MountStrategy::MagicMount,
+                _ if capabilities.overlay_supported => MountStrategy::Overlay,
+                _ => MountStrategy::MagicMount,
             }
         }
     }

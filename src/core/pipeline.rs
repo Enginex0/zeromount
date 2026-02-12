@@ -115,11 +115,12 @@ impl MountController<Detected> {
 
         info!(count = modules.len(), "modules scanned");
 
-        // Plan
+        // Plan — pass user strategy override so planner skips BFS when not needed
         let plan = crate::mount::planner::plan_mounts(
             &modules,
             self.state.detection.scenario,
             &self.state.detection.capabilities,
+            self.state.config.user_strategy_override(),
         )
         .context("mount planning failed")?;
 
@@ -160,17 +161,14 @@ impl MountController<Planned> {
 
     /// Execute mount operations: dispatch to VFS, overlay, or magic mount.
     ///
-    /// Strategy selection based on scenario:
-    ///   Full / KernelOnly     -> VFS default, user can override to overlay/magic
-    ///   SusfsFrontend/SusfsOnly -> overlay preferred, magic fallback
-    ///   None                  -> overlay preferred, magic fallback
+    /// Strategy selection:
+    ///   Full / SusfsFrontend / KernelOnly -> VFS default, user can override
+    ///   SusfsOnly / None                  -> overlay default, user can force magic
     pub fn execute(self) -> Result<MountController<Mounted>> {
         info!("pipeline: execute phase");
 
-        // Clean up previous mounts before re-mounting (hot-reload safety)
         cleanup_previous_mounts();
 
-        // Backup config before destructive mount operations
         ZeroMountConfig::backup().unwrap_or_else(|e| {
             warn!("config backup failed (non-fatal): {e}");
         });
@@ -180,14 +178,15 @@ impl MountController<Planned> {
         );
 
         let scenario = self.state.detection.scenario;
-        let capabilities = &self.state.detection.capabilities;
         let config = &self.state.config;
+        let user_override = config.user_strategy_override();
 
         let results = match scenario {
-            Scenario::Full | Scenario::KernelOnly => {
-                match config.user_strategy_override() {
+            // VFS-capable kernels: default VFS, user can override to overlay/magic
+            Scenario::Full | Scenario::SusfsFrontend | Scenario::KernelOnly => {
+                match user_override {
                     Some(MountStrategy::Overlay) => {
-                        info!("user override: overlay strategy on VFS-capable kernel");
+                        info!("user override: overlay on VFS-capable kernel");
                         crate::mount::executor::manage_skip_mount_flags(
                             &self.state.modules,
                             self.state.root_mgr.mount_mode(),
@@ -200,26 +199,29 @@ impl MountController<Planned> {
                             &self.state.modules,
                             self.state.root_mgr.mount_mode(),
                         );
-                        self.execute_magic(&self.state.modules, &self.state.plan, config)
+                        self.execute_magic(&self.state.modules, &self.state.plan, config, false)
                     }
                     _ => {
+                        let capabilities = &self.state.detection.capabilities;
                         self.execute_vfs(&self.state.modules, &self.state.plan, capabilities, config)
                     }
                 }
             }
-            Scenario::SusfsFrontend | Scenario::SusfsOnly => {
+            // No VFS driver: overlay or magic mount based on user config
+            Scenario::SusfsOnly | Scenario::None => {
                 crate::mount::executor::manage_skip_mount_flags(
                     &self.state.modules,
                     self.state.root_mgr.mount_mode(),
                 );
-                self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
-            }
-            Scenario::None => {
-                crate::mount::executor::manage_skip_mount_flags(
-                    &self.state.modules,
-                    self.state.root_mgr.mount_mode(),
-                );
-                self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
+                match user_override {
+                    Some(MountStrategy::MagicMount) => {
+                        info!("user preference: magic mount (no VFS available)");
+                        self.execute_magic(&self.state.modules, &self.state.plan, config, false)
+                    }
+                    _ => {
+                        self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
+                    }
+                }
             }
         }
         .context("mount execution failed")?;
@@ -227,6 +229,33 @@ impl MountController<Planned> {
         let succeeded = results.iter().filter(|r| r.success).count();
         let failed = results.iter().filter(|r| !r.success).count();
         info!(succeeded, failed, "execution complete");
+
+        // Register non-VFS mount paths with KSU try_umount so detection apps
+        // see the original unmodified filesystem instead of tmpfs/bind mounts
+        let non_vfs_paths: Vec<String> = results.iter()
+            .filter(|r| r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font))
+            .flat_map(|r| r.mount_paths.iter().cloned())
+            .collect();
+        if !non_vfs_paths.is_empty() {
+            crate::mount::try_umount::register_unmountable(
+                &non_vfs_paths,
+                self.state.root_mgr.name(),
+            );
+        }
+
+        // Per-module SUSFS kstat spoofing for non-VFS strategies (font kstat, etc.)
+        let has_non_vfs = results.iter().any(|r| {
+            r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font)
+        });
+        if has_non_vfs && config.susfs.enabled {
+            if let Ok(client) = crate::susfs::SusfsClient::probe() {
+                for module in &self.state.modules {
+                    crate::vfs::executor::apply_module_susfs_protections(
+                        &client, module, false, true,
+                    );
+                }
+            }
+        }
 
         Ok(MountController {
             state: Mounted {
@@ -316,18 +345,22 @@ impl MountController<Planned> {
             }
         }
 
-        self.execute_magic(modules, plan, config)
+        self.execute_magic(modules, plan, config, true)
     }
 
-    // Magic mount fallback
     fn execute_magic(
         &self,
         modules: &[ScannedModule],
         plan: &MountPlan,
         config: &ZeroMountConfig,
+        is_fallback: bool,
     ) -> Result<Vec<MountResult>> {
         let caps = &self.state.detection.capabilities;
-        info!("executing via magic mount (fallback)");
+        if is_fallback {
+            info!("executing via magic mount (fallback)");
+        } else {
+            info!("executing via magic mount (user preference)");
+        }
         crate::mount::executor::execute_plan(
             plan, modules, MountStrategy::MagicMount, caps, &config.mount,
         )
@@ -583,6 +616,7 @@ fn cleanup_previous_mounts() {
 
     info!(modules = prev_state.modules.len(), "previous mounts cleaned up");
 }
+
 
 // ME07: Atomic write -- write to .tmp then rename to avoid partial reads
 fn write_status_json_atomic(state: &RuntimeState) {

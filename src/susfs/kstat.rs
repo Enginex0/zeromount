@@ -216,4 +216,5 @@ mod tests {
         let client = SusfsClient::new_for_test(false, SusfsFeatures::default());
         assert!(!client.is_available());
     }
+
 }
