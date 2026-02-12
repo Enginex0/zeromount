@@ -1,8 +1,7 @@
 use std::ffi::CString;
-use std::fs;
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use tracing::{debug, info};
 
 use crate::core::types::{MountResult, MountStrategy};
@@ -47,13 +46,14 @@ const FSCONFIG_CMD_CREATE: libc::c_uint = 6;
 // move_mount flags
 const MOVE_MOUNT_F_EMPTY_PATH: libc::c_uint = 0x00000004;
 
-/// Mount an overlay filesystem at `target` with the given lower/work directories.
+/// Mount a read-only overlay filesystem at `target` with the given lower directories.
 ///
 /// Tries the new mount API first (fsopen/fsconfig/fsmount/move_mount), falling
 /// back to legacy mount(2) if the syscalls aren't available (ME02).
+/// Uses lowerdir-only mode (no upperdir/workdir) — module content merges
+/// on top of the original filesystem without write support.
 pub fn mount_overlay(
     lower_dirs: &[&Path],
-    work: &Path,
     target: &Path,
     module_id: &str,
     overlay_source: &str,
@@ -70,20 +70,22 @@ pub fn mount_overlay(
         });
     }
 
-    // Ensure work directory exists
-    fs::create_dir_all(work)
-        .with_context(|| format!("cannot create overlay work dir: {}", work.display()))?;
-
-    // Ensure target exists
     if !target.exists() {
-        fs::create_dir_all(target)
-            .with_context(|| format!("cannot create overlay target: {}", target.display()))?;
+        return Ok(MountResult {
+            module_id: module_id.to_string(),
+            strategy_used: MountStrategy::Overlay,
+            success: false,
+            rules_applied: 0,
+            rules_failed: 1,
+            error: Some(format!("overlay target does not exist: {}", target.display())),
+            mount_paths: Vec::new(),
+        });
     }
 
     let lowerdir = build_lowerdir_string(lower_dirs, target);
 
     // Try new mount API first, fall back to legacy
-    let result = match mount_overlay_new_api(&lowerdir, work, target, overlay_source) {
+    let result = match mount_overlay_new_api(&lowerdir, target, overlay_source) {
         Ok(()) => {
             info!(
                 target = %target.display(),
@@ -98,7 +100,7 @@ pub fn mount_overlay(
                 error = %e,
                 "new mount API failed, trying legacy mount(2)"
             );
-            mount_overlay_legacy(&lowerdir, work, target, overlay_source)
+            mount_overlay_legacy(&lowerdir, target, overlay_source)
                 .map(|()| {
                     info!(
                         target = %target.display(),
@@ -153,7 +155,7 @@ fn escape_overlay_path(path: &str) -> String {
 
 /// New mount API: fsopen -> fsconfig -> fsmount -> move_mount (Linux 5.2+).
 /// Provides structured error reporting vs the legacy single-call approach.
-fn mount_overlay_new_api(lowerdir: &str, work: &Path, target: &Path, overlay_source: &str) -> Result<()> {
+fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) -> Result<()> {
     let c_fstype = CString::new("overlay")?;
 
     // fsopen("overlay", 0)
@@ -174,8 +176,7 @@ fn mount_overlay_new_api(lowerdir: &str, work: &Path, target: &Path, overlay_sou
         // fsconfig(fs_fd, FSCONFIG_SET_STRING, "lowerdir", lowerdir, 0)
         fsconfig_set_string(fs_fd, "lowerdir", lowerdir)?;
 
-        // fsconfig(fs_fd, FSCONFIG_SET_STRING, "workdir", work, 0)
-        fsconfig_set_string(fs_fd, "workdir", &work.to_string_lossy())?;
+        // lowerdir-only overlay: no upperdir/workdir needed (read-only merge)
 
         // fsconfig(fs_fd, FSCONFIG_CMD_CREATE, NULL, NULL, 0) -- finalize
         let ret = unsafe {
@@ -254,16 +255,12 @@ fn fsconfig_set_string(fs_fd: libc::c_int, key: &str, value: &str) -> Result<()>
 }
 
 /// Legacy mount(2) fallback for kernels without the new mount API.
-fn mount_overlay_legacy(lowerdir: &str, work: &Path, target: &Path, overlay_source: &str) -> Result<()> {
+fn mount_overlay_legacy(lowerdir: &str, target: &Path, overlay_source: &str) -> Result<()> {
     let c_source = CString::new(overlay_source)?;
     let c_target = CString::new(target.as_os_str().as_encoded_bytes())?;
     let c_fstype = CString::new("overlay")?;
 
-    let data = format!(
-        "lowerdir={},workdir={}",
-        lowerdir,
-        work.to_string_lossy()
-    );
+    let data = format!("lowerdir={}", lowerdir);
     let c_data = CString::new(data)?;
 
     let ret = unsafe {
