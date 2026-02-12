@@ -19,6 +19,20 @@ COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
 
 "$BIN" mount --post-boot
 
+# Reset bootloop counter only after the system actually finishes booting.
+# Pipeline no longer resets it — catches post-pipeline deadlocks.
+(
+    i=0
+    while [ "$i" -lt 180 ]; do
+        [ "$(getprop sys.boot_completed)" = "1" ] && {
+            rm -f /data/adb/zeromount/.bootcount
+            exit 0
+        }
+        sleep 1
+        i=$((i + 1))
+    done
+) &
+
 # Long-lived watcher — replaces monitor.sh polling loop
 "$BIN" watch &
 
