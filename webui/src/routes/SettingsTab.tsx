@@ -307,7 +307,7 @@ export function SettingsTab() {
         </div>
 
         {/* Storage + random paths only apply to overlay/magic — VFS uses kernel driver */}
-        <Show when={store.activeStrategy() !== 'Vfs'}>
+        <Show when={store.effectiveStrategy() !== 'Vfs'}>
           <div class="settings__item" style={{ "margin-top": "16px" }}>
             <div class="settings__item-content">
               <div class="settings__item-label">Storage Backend</div>
@@ -341,7 +341,7 @@ export function SettingsTab() {
             />
           </div>
 
-          <Show when={store.activeStrategy() !== 'MagicMount'}>
+          <Show when={store.effectiveStrategy() !== 'MagicMount'}>
             <div class="settings__item">
               <div class="settings__item-content">
                 <div class="settings__item-label">Overlay Mount Source</div>
