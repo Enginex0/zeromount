@@ -260,13 +260,25 @@ fn build_results(modules: &[ScannedModule], stats: &MountStats) -> Vec<MountResu
                 .mount_paths
                 .iter()
                 .filter(|p| {
-                    // A path belongs to this module if it was sourced from it.
-                    // Since the tree merges modules, attribute all paths to every module
-                    // that contributed files; the tree's first-module-wins means each
-                    // path was actually produced by one module.
-                    m.files
-                        .iter()
-                        .any(|f| p.ends_with(f.relative_path.to_string_lossy().as_ref()))
+                    m.files.iter().any(|f| {
+                        let rel = f.relative_path.to_string_lossy();
+                        if p.ends_with(rel.as_ref()) {
+                            return true;
+                        }
+                        // SAR: modules ship system/vendor/x but mount at /vendor/x
+                        if let Some(stripped) = rel.strip_prefix("system/") {
+                            if p.ends_with(stripped) {
+                                debug!(
+                                    path = %p,
+                                    rel = %rel,
+                                    stripped = stripped,
+                                    "SAR fallback matched"
+                                );
+                                return true;
+                            }
+                        }
+                        false
+                    })
                 })
                 .cloned()
                 .collect();
@@ -408,9 +420,15 @@ fn apply_node_recursive(
                 return Ok(());
             }
 
-            if need_tmpfs {
+            if need_tmpfs && !inside_tmpfs {
                 debug!(path = %real_path.display(), "directory needs tmpfs");
                 apply_tmpfs_directory(node, real_path, workdir, stats)?;
+            } else if need_tmpfs && inside_tmpfs {
+                // Already inside a parent tmpfs — no nested tmpfs needed.
+                // Create directory in workdir, mirror stock, recurse children.
+                // The parent's MS_MOVE will carry everything into place.
+                debug!(path = %real_path.display(), "directory inline in parent tmpfs (no nested mount)");
+                apply_inline_directory(node, real_path, workdir, stats)?;
             } else {
                 debug!(path = %real_path.display(), inside_tmpfs, "directory passthrough");
                 let child_names: Vec<String> = node.children.keys().cloned().collect();
@@ -528,6 +546,56 @@ fn apply_tmpfs_directory(
 }
 
 // ---------------------------------------------------------------------------
+// Inline directory: writable surface already exists (inside parent tmpfs)
+// ---------------------------------------------------------------------------
+
+fn apply_inline_directory(
+    node: &mut Node,
+    real_path: &Path,
+    workdir: &Path,
+    stats: &mut MountStats,
+) -> Result<()> {
+    let wpath = workdir.join(real_path.strip_prefix("/").unwrap_or(real_path));
+
+    fs::create_dir_all(&wpath)
+        .with_context(|| format!("mkdir inline: {}", wpath.display()))?;
+
+    let reference = if real_path.exists() {
+        real_path.to_path_buf()
+    } else {
+        node.module_path.clone().unwrap_or_else(|| real_path.to_path_buf())
+    };
+
+    if let Ok(meta) = fs::metadata(&reference) {
+        let c_wpath = path_to_cstring(&wpath)?;
+        unsafe {
+            libc::chmod(c_wpath.as_ptr(), meta.permissions().mode() as libc::mode_t);
+            libc::chown(c_wpath.as_ptr(), meta.uid(), meta.gid());
+        }
+    }
+    copy_selinux_context(&reference, &wpath);
+
+    if !node.replace {
+        if let Err(e) = mirror_stock_entries(real_path, &wpath, node) {
+            warn!(path = %real_path.display(), error = %e, "inline mirror failed");
+            bail!("inline mirror failed for {}: {e}", real_path.display());
+        }
+    }
+
+    let child_names: Vec<String> = node.children.keys().cloned().collect();
+    for name in &child_names {
+        let child_real = real_path.join(name);
+        if let Some(child) = node.children.get_mut(name) {
+            apply_node_recursive(child, &child_real, workdir, true, stats)?;
+        }
+    }
+
+    stats.applied += 1;
+    debug!(path = %real_path.display(), "directory inlined in parent tmpfs");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Mirror stock filesystem entries
 // ---------------------------------------------------------------------------
 
@@ -602,4 +670,105 @@ fn mirror_stock_entries(real_path: &Path, wpath: &Path, node: &Node) -> Result<(
 
 fn workdir_dest(workdir: &Path, real_path: &Path) -> PathBuf {
     workdir.join(real_path.strip_prefix("/").unwrap_or(real_path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::types::{ModuleFile, ModuleFileType, ModuleProp};
+
+    fn make_module(id: &str, files: Vec<(&str, ModuleFileType)>) -> ScannedModule {
+        ScannedModule {
+            id: id.to_string(),
+            path: PathBuf::from(format!("/data/adb/modules/{}", id)),
+            files: files
+                .into_iter()
+                .map(|(path, ft)| ModuleFile {
+                    relative_path: PathBuf::from(path),
+                    file_type: ft,
+                    source_module: id.to_string(),
+                })
+                .collect(),
+            has_service_sh: false,
+            has_post_fs_data_sh: false,
+            prop: ModuleProp {
+                id: id.to_string(),
+                ..Default::default()
+            },
+        }
+    }
+
+    #[test]
+    fn build_results_direct_vendor_paths() {
+        let modules = vec![make_module(
+            "viper",
+            vec![
+                ("vendor/lib64/soundfx/libv4a.so", ModuleFileType::Regular),
+                ("vendor/lib64/soundfx", ModuleFileType::Directory),
+            ],
+        )];
+        let stats = MountStats {
+            applied: 2,
+            failed: 0,
+            whiteouts: 0,
+            errors: Vec::new(),
+            mount_paths: vec![
+                "/vendor/lib64/soundfx".to_string(),
+                "/vendor/lib64/soundfx/libv4a.so".to_string(),
+            ],
+        };
+        let results = build_results(&modules, &stats);
+        assert_eq!(results[0].mount_paths.len(), 2);
+    }
+
+    #[test]
+    fn build_results_sar_promoted_paths() {
+        let modules = vec![make_module(
+            "mtk_mod",
+            vec![
+                ("system/vendor/lib/libmtk_drvb.so", ModuleFileType::Regular),
+                ("system/vendor/lib/soundfx", ModuleFileType::Directory),
+                ("system/vendor/lib", ModuleFileType::Directory),
+            ],
+        )];
+        let stats = MountStats {
+            applied: 3,
+            failed: 0,
+            whiteouts: 0,
+            errors: Vec::new(),
+            mount_paths: vec![
+                "/vendor/lib".to_string(),
+                "/vendor/lib/libmtk_drvb.so".to_string(),
+                "/vendor/lib/soundfx".to_string(),
+            ],
+        };
+        let results = build_results(&modules, &stats);
+        assert_eq!(
+            results[0].mount_paths.len(),
+            3,
+            "SAR-promoted paths must be attributed: {:?}",
+            results[0].mount_paths
+        );
+        assert!(results[0].mount_paths.contains(&"/vendor/lib".to_string()));
+        assert!(results[0].mount_paths.contains(&"/vendor/lib/libmtk_drvb.so".to_string()));
+        assert!(results[0].mount_paths.contains(&"/vendor/lib/soundfx".to_string()));
+    }
+
+    #[test]
+    fn build_results_no_false_positives_on_system_paths() {
+        let modules = vec![make_module(
+            "clean",
+            vec![("system/bin/sh", ModuleFileType::Regular)],
+        )];
+        let stats = MountStats {
+            applied: 1,
+            failed: 0,
+            whiteouts: 0,
+            errors: Vec::new(),
+            mount_paths: vec!["/system/bin/sh".to_string()],
+        };
+        let results = build_results(&modules, &stats);
+        assert_eq!(results[0].mount_paths.len(), 1);
+        assert_eq!(results[0].mount_paths[0], "/system/bin/sh");
+    }
 }

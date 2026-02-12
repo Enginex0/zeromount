@@ -232,10 +232,17 @@ impl MountController<Planned> {
 
         // Register non-VFS mount paths with KSU try_umount so detection apps
         // see the original unmodified filesystem instead of tmpfs/bind mounts
-        let non_vfs_paths: Vec<String> = results.iter()
+        let mut non_vfs_paths: Vec<String> = results.iter()
             .filter(|r| r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font))
             .flat_map(|r| r.mount_paths.iter().cloned())
             .collect();
+        non_vfs_paths.sort_unstable();
+        non_vfs_paths.dedup();
+        debug!(
+            count = non_vfs_paths.len(),
+            paths = ?non_vfs_paths,
+            "try_umount paths collected (deduped)"
+        );
         if !non_vfs_paths.is_empty() {
             crate::mount::try_umount::register_unmountable(
                 &non_vfs_paths,
