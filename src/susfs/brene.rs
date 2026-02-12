@@ -9,6 +9,7 @@ use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
 use crate::utils::command::{run_command_with_timeout, CMD_TIMEOUT};
 use super::SusfsClient;
 use super::fonts;
+use super::kstat;
 use super::paths;
 
 // S05: Mount hiding is NEVER invoked. It causes LSPosed module failure
@@ -86,7 +87,7 @@ pub struct FontModuleInfo {
 /// Property spoofing uses resetprop (not SUSFS) and is handled separately.
 /// `skip_path_hide`: true at boot (sdcard not decrypted, all add_sus_path calls EINVAL).
 /// apply_brene_deferred handles path hiding after sdcard is available.
-pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool) -> Result<BreneResult> {
+pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, fonts_overlay_mounted: bool) -> Result<BreneResult> {
     let mut result = BreneResult::default();
 
     if !client.is_available() {
@@ -142,8 +143,12 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
     // -- Font redirect (delegates to F15) --
 
     if brene.auto_hide_fonts {
-        let fonts = process_font_modules(client, &config.mount.overlay_source);
-        info!("BRENE: processed {} font modules: {:?}", fonts.len(), fonts);
+        let fonts = if fonts_overlay_mounted {
+            hide_font_modules_overlay(client)
+        } else {
+            process_font_modules(client, &config.mount.overlay_source)
+        };
+        info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
         result.font_modules = fonts;
     }
 
@@ -339,6 +344,94 @@ fn process_font_modules(client: &SusfsClient, overlay_source: &str) -> Vec<FontM
         }
     }
 
+    results
+}
+
+/// Overlay-mode font hiding: kstat + path_hide only, no open_redirect_all.
+/// When overlay already mounted /system/fonts, SUSFS open_redirect would conflict.
+fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
+    let modules_dir = Path::new(MODULES_DIR);
+    if !modules_dir.is_dir() {
+        warn!("BRENE: overlay font hide skipped — {} not found", MODULES_DIR);
+        return Vec::new();
+    }
+
+    let entries = match fs::read_dir(modules_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            warn!("BRENE: overlay font hide failed to read {}: {e}", MODULES_DIR);
+            return Vec::new();
+        }
+    };
+
+    let mut results = Vec::new();
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let module_path = entry.path();
+        if !module_path.is_dir() { continue; }
+        if module_path.join("disable").exists() || module_path.join("remove").exists() {
+            continue;
+        }
+
+        let font_dir = module_path.join("system/fonts");
+        if !font_dir.is_dir() { continue; }
+
+        let module_id = match module_path.file_name().and_then(|n| n.to_str()) {
+            Some(id) => id.to_string(),
+            None => continue,
+        };
+
+        let mut hidden_count = 0u32;
+        let font_entries = match fs::read_dir(&font_dir) {
+            Ok(e) => e,
+            Err(e) => {
+                warn!("BRENE: overlay font hide failed to read {}: {e}", font_dir.display());
+                continue;
+            }
+        };
+
+        for fe in font_entries.filter_map(|e| e.ok()) {
+            let path = fe.path();
+            if !path.is_file() { continue; }
+
+            let filename = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            let target = format!("{}/{}", SYSTEM_FONTS_DIR, filename);
+            let replacement = path.to_string_lossy().to_string();
+
+            crate::utils::selinux::mirror_selinux_context(
+                Path::new(&target), Path::new(&replacement)
+            );
+
+            if client.features().kstat {
+                match kstat::build_kstat_values_from_paths(&target, &replacement) {
+                    Ok(spoof) => {
+                        if let Err(e) = client.add_sus_kstat_redirect(&target, &replacement, &spoof) {
+                            debug!("overlay font kstat failed for {filename}: {e}");
+                        }
+                    }
+                    Err(e) => debug!("overlay font kstat build failed for {filename}: {e}"),
+                }
+            }
+
+            if client.features().path {
+                if let Err(e) = client.add_sus_path(&replacement) {
+                    debug!("overlay font path hide failed for {filename}: {e}");
+                }
+            }
+
+            hidden_count += 1;
+        }
+
+        if hidden_count > 0 {
+            info!("font module '{}': overlay-mounted, {} files hidden via kstat+path", module_id, hidden_count);
+        }
+
+        results.push(FontModuleInfo { id: module_id, redirect_count: hidden_count });
+    }
     results
 }
 
@@ -829,7 +922,7 @@ mod tests {
     fn brene_skips_when_susfs_unavailable() {
         let client = SusfsClient::new_for_test(false, SusfsFeatures::default());
         let config = ZeroMountConfig::default();
-        let result = apply_brene(&client, &config, false).expect("should not error");
+        let result = apply_brene(&client, &config, false, false).expect("should not error");
         assert_eq!(result.paths_hidden, 0);
         assert_eq!(result.maps_hidden, 0);
         assert!(!result.uname_spoofed);

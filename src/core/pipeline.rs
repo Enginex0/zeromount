@@ -387,7 +387,12 @@ impl MountController<Mounted> {
         match crate::susfs::SusfsClient::probe() {
             Ok(client) => {
                 client.ensure_root_paths();
-                match crate::susfs::brene::apply_brene(&client, &self.state.config, true) {
+
+                let fonts_overlay_mounted = self.state.results.iter().any(|r| {
+                    r.success && r.mount_paths.iter().any(|p| p.contains("/system/fonts"))
+                });
+
+                match crate::susfs::brene::apply_brene(&client, &self.state.config, true, fonts_overlay_mounted) {
                     Ok(brene) => {
                         debug!(
                             paths = brene.paths_hidden,

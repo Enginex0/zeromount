@@ -197,14 +197,23 @@ export function StatusTab() {
         if (!prefix.startsWith('/[BLOCKED]')) prefixes.add(prefix);
       }
     });
+    // Overlay mount paths aren't VFS rules — pull from status
+    store.moduleStatuses().forEach(mod => {
+      mod.mount_paths.forEach(mp => {
+        const parts = mp.split('/').filter(Boolean);
+        if (parts.length >= 2) prefixes.add('/' + parts[0] + '/' + parts[1]);
+      });
+    });
     return Array.from(prefixes).sort();
   });
 
   const loadedModulesCount = createMemo(() => {
     const fontIds = new Set(store.fontModules());
-    return store.ksuModules().filter(m =>
-      m.isLoaded || fontIds.has(m.path.split('/').pop() || '')
-    ).length;
+    const statusIds = new Set(store.moduleStatuses().map(s => s.id));
+    return store.ksuModules().filter(m => {
+      const name = m.path.split('/').pop() || '';
+      return m.isLoaded || fontIds.has(name) || statusIds.has(name);
+    }).length;
   });
 
   const isInitialLoad = () => store.loading.status && !store.systemInfo.driverVersion;
