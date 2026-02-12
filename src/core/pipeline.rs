@@ -243,10 +243,32 @@ impl MountController<Planned> {
             paths = ?non_vfs_paths,
             "try_umount paths collected (deduped)"
         );
+        let mut umount_registered = 0u32;
+        let mut umount_failed = 0u32;
         if !non_vfs_paths.is_empty() {
-            crate::mount::try_umount::register_unmountable(
+            let stats = crate::mount::try_umount::register_unmountable(
                 &non_vfs_paths,
                 self.state.root_mgr.name(),
+            );
+            umount_registered += stats.registered;
+            umount_failed += stats.failed;
+        }
+
+        // Register KSU's own infrastructure mounts (ART jar injection, etc.)
+        // so detection apps in the deny list don't see them either
+        {
+            let infra = crate::mount::try_umount::register_ksu_infra_mounts(
+                self.state.root_mgr.name(),
+            );
+            umount_registered += infra.registered;
+            umount_failed += infra.failed;
+        }
+
+        if umount_registered > 0 || umount_failed > 0 {
+            info!(
+                registered = umount_registered,
+                failed = umount_failed,
+                "try_umount total"
             );
         }
 

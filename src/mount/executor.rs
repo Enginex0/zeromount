@@ -155,7 +155,7 @@ fn execute_magic_mount(
         }
     }
 
-    let results = mount_magic(modules, &storage.base_path)?;
+    let results = mount_magic(modules, &storage.base_path, &storage.overlay_source)?;
 
     storage.suppress_cleanup();
 

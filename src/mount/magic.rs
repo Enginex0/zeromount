@@ -204,6 +204,7 @@ impl MountStats {
 pub fn mount_magic(
     modules: &[ScannedModule],
     staging_dir: &Path,
+    source_label: &str,
 ) -> Result<Vec<MountResult>> {
     info!(module_count = modules.len(), "magic mount starting");
 
@@ -212,7 +213,7 @@ pub fn mount_magic(
     let workdir = staging_dir.join("workdir");
     fs::create_dir_all(&workdir)
         .with_context(|| format!("create workdir: {}", workdir.display()))?;
-    mount_tmpfs(&workdir, "ZeroMount")?;
+    mount_tmpfs(&workdir, source_label)?;
     mount_private(&workdir)?;
 
     let mut stats = MountStats::new();
