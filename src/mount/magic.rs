@@ -1,345 +1,605 @@
-use std::collections::HashSet;
 use std::ffi::CString;
-use std::fs;
-use std::os::unix::fs as unix_fs;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use anyhow::{bail, Context, Result};
 use tracing::{debug, info, warn};
 
-use crate::core::types::{ModuleFileType, MountResult, MountStrategy, ScannedModule};
+use crate::core::types::{MountResult, MountStrategy, ScannedModule};
+use crate::utils::selinux::copy_selinux_context;
 
-fn is_on_readonly_fs(path: &Path) -> bool {
-    let check = nearest_existing_ancestor(path);
-    let c_path = match CString::new(check.as_os_str().as_encoded_bytes()) {
-        Ok(p) => p,
-        Err(_) => return false,
-    };
-    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
-    let ret = unsafe { libc::statvfs(c_path.as_ptr(), stat.as_mut_ptr()) };
-    if ret != 0 {
-        return false;
-    }
-    let stat = unsafe { stat.assume_init() };
-    (stat.f_flag & libc::ST_RDONLY) != 0
+use super::node::{build_node_tree, needs_tmpfs, Node, NodeFileType};
+
+// ---------------------------------------------------------------------------
+// Mount helpers
+// ---------------------------------------------------------------------------
+
+fn path_to_cstring(path: &Path) -> Result<CString> {
+    CString::new(path.as_os_str().as_encoded_bytes())
+        .with_context(|| format!("path contains null byte: {}", path.display()))
 }
 
-fn nearest_existing_ancestor(path: &Path) -> PathBuf {
-    let mut current = path.to_path_buf();
-    while !current.exists() {
-        match current.parent() {
-            Some(p) => current = p.to_path_buf(),
-            None => break,
-        }
-    }
-    current
-}
-
-fn mount_tmpfs_over(dir: &Path) -> Result<()> {
-    let staging = PathBuf::from("/dev/.zm_magic_stage");
-    let stage_key = dir.strip_prefix("/").unwrap_or(dir);
-    let stage_sub = staging.join(stage_key);
-    fs::create_dir_all(&stage_sub)?;
-
-    if dir.is_dir() {
-        let _ = copy_dir_recursive(dir, &stage_sub);
-    }
-
-    let c_source = CString::new("tmpfs")?;
-    let c_target = CString::new(dir.as_os_str().as_encoded_bytes())?;
-    let c_fstype = CString::new("tmpfs")?;
-    let c_data = CString::new("mode=0755")?;
-
+fn bind_mount(source: &Path, target: &Path) -> Result<()> {
+    let c_src = path_to_cstring(source)?;
+    let c_tgt = path_to_cstring(target)?;
     let ret = unsafe {
         libc::mount(
-            c_source.as_ptr(),
-            c_target.as_ptr(),
-            c_fstype.as_ptr(),
-            0,
-            c_data.as_ptr() as *const libc::c_void,
-        )
-    };
-    if ret != 0 {
-        let _ = fs::remove_dir_all(&staging);
-        bail!("tmpfs mount at {} failed: {}", dir.display(), std::io::Error::last_os_error());
-    }
-
-    // Restore stock contents + SELinux context
-    if stage_sub.is_dir() {
-        let _ = copy_dir_recursive(&stage_sub, dir);
-        crate::utils::selinux::mirror_selinux_context(&stage_sub, dir);
-    }
-
-    let _ = fs::remove_dir_all(&staging);
-    debug!(path = %dir.display(), "tmpfs mounted over read-only ancestor");
-    Ok(())
-}
-
-fn ensure_writable(path: &Path, tmpfs_ancestors: &mut HashSet<PathBuf>) -> Result<()> {
-    if !is_on_readonly_fs(path) {
-        return Ok(());
-    }
-
-    let ancestor = nearest_existing_ancestor(path);
-
-    if tmpfs_ancestors.iter().any(|a| ancestor.starts_with(a)) {
-        return Ok(());
-    }
-
-    mount_tmpfs_over(&ancestor)?;
-    tmpfs_ancestors.insert(ancestor);
-    Ok(())
-}
-
-/// Magic mount: per-file bind mounts with a tmpfs skeleton for new directories.
-///
-/// Limitations vs overlay:
-/// - No whiteout support (cannot delete stock files)
-/// - No opaque directories
-/// - Every file creates a visible /proc/mounts entry
-/// - Redirect xattrs ignored
-///
-/// Used when OverlayFS is unavailable (ME03) or as per-module fallback (ME04).
-pub fn mount_magic(
-    module: &ScannedModule,
-    staging_dir: &Path,
-) -> Result<MountResult> {
-    let mut mount_paths = Vec::new();
-    let mut applied = 0u32;
-    let mut failed = 0u32;
-    let mut errors = Vec::new();
-    let mut tmpfs_ancestors = HashSet::new();
-
-    for file in &module.files {
-        let source = module.path.join(&file.relative_path);
-        let target = PathBuf::from("/").join(&file.relative_path);
-
-        match file.file_type {
-            ModuleFileType::Regular | ModuleFileType::Symlink => {
-                match bind_mount_file(&source, &target, &mut tmpfs_ancestors) {
-                    Ok(()) => {
-                        mount_paths.push(target.to_string_lossy().to_string());
-                        applied += 1;
-                    }
-                    Err(e) => {
-                        let msg = format!(
-                            "bind mount {} -> {}: {e}",
-                            source.display(),
-                            target.display()
-                        );
-                        warn!(module = %module.id, "{}", msg);
-                        errors.push(msg);
-                        failed += 1;
-                    }
-                }
-            }
-
-            ModuleFileType::Directory => {
-                // Only bind-mount directories that don't already exist on the target.
-                // For existing directories, files inside will be individually mounted.
-                if !target.exists() {
-                    let skel = staging_dir.join(&module.id).join(&file.relative_path);
-                    match create_skeleton_dir(&skel, &source, &target, &mut tmpfs_ancestors) {
-                        Ok(()) => {
-                            mount_paths.push(target.to_string_lossy().to_string());
-                            applied += 1;
-                        }
-                        Err(e) => {
-                            let msg = format!("skeleton dir {}: {e}", target.display());
-                            warn!(module = %module.id, "{}", msg);
-                            errors.push(msg);
-                            failed += 1;
-                        }
-                    }
-                }
-            }
-
-            // Magic mount cannot handle whiteouts or opaque dirs
-            ModuleFileType::WhiteoutCharDev
-            | ModuleFileType::WhiteoutXattr
-            | ModuleFileType::WhiteoutAufs
-            | ModuleFileType::OpaqueDir => {
-                debug!(
-                    module = %module.id,
-                    path = %file.relative_path.display(),
-                    file_type = ?file.file_type,
-                    "magic mount cannot handle this file type, skipping"
-                );
-            }
-
-            // Redirect xattrs: bind-mount the file as-is (no redirect resolution)
-            ModuleFileType::RedirectXattr => {
-                match bind_mount_file(&source, &target, &mut tmpfs_ancestors) {
-                    Ok(()) => {
-                        mount_paths.push(target.to_string_lossy().to_string());
-                        applied += 1;
-                    }
-                    Err(e) => {
-                        let msg = format!("bind mount redirect {}: {e}", target.display());
-                        warn!(module = %module.id, "{}", msg);
-                        errors.push(msg);
-                        failed += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    let success = failed == 0 && applied > 0;
-    let error = if errors.is_empty() {
-        None
-    } else {
-        Some(errors.join("; "))
-    };
-
-    if applied > 0 {
-        info!(
-            module = %module.id,
-            applied,
-            failed,
-            "magic mount complete"
-        );
-    }
-
-    Ok(MountResult {
-        module_id: module.id.clone(),
-        strategy_used: MountStrategy::MagicMount,
-        success,
-        rules_applied: applied,
-        rules_failed: failed,
-        error,
-        mount_paths,
-    })
-}
-
-fn bind_mount_file(source: &Path, target: &Path, tmpfs_ancestors: &mut HashSet<PathBuf>) -> Result<()> {
-    if let Some(parent) = target.parent() {
-        if !parent.exists() {
-            if fs::create_dir_all(parent).is_err() {
-                ensure_writable(parent, tmpfs_ancestors)?;
-                fs::create_dir_all(parent)
-                    .with_context(|| format!("cannot create parent: {}", parent.display()))?;
-            }
-        }
-    }
-
-    if !target.exists() {
-        if source.is_dir() {
-            if fs::create_dir_all(target).is_err() {
-                ensure_writable(target, tmpfs_ancestors)?;
-                fs::create_dir_all(target)?;
-            }
-        } else {
-            if fs::File::create(target).is_err() {
-                ensure_writable(target, tmpfs_ancestors)?;
-                fs::File::create(target)
-                    .with_context(|| format!("cannot create mount point: {}", target.display()))?;
-            }
-        }
-    }
-
-    let c_source = CString::new(source.as_os_str().as_encoded_bytes())?;
-    let c_target = CString::new(target.as_os_str().as_encoded_bytes())?;
-
-    let ret = unsafe {
-        libc::mount(
-            c_source.as_ptr(),
-            c_target.as_ptr(),
+            c_src.as_ptr(),
+            c_tgt.as_ptr(),
             std::ptr::null(),
             libc::MS_BIND,
             std::ptr::null(),
         )
     };
-
     if ret != 0 {
         bail!(
-            "bind mount failed: {}",
-            std::io::Error::last_os_error()
+            "bind mount {} -> {} failed: {}",
+            source.display(),
+            target.display(),
+            io::Error::last_os_error()
         );
     }
-
-    debug!(
-        source = %source.display(),
-        target = %target.display(),
-        "bind mounted"
-    );
-
+    debug!(src = %source.display(), tgt = %target.display(), "bind mount");
     Ok(())
 }
 
-fn create_skeleton_dir(skeleton: &Path, source: &Path, target: &Path, tmpfs_ancestors: &mut HashSet<PathBuf>) -> Result<()> {
-    fs::create_dir_all(skeleton)
-        .with_context(|| format!("cannot create skeleton: {}", skeleton.display()))?;
-
-    copy_dir_recursive(source, skeleton)?;
-
-    if let Some(parent) = target.parent() {
-        if !parent.exists() {
-            if fs::create_dir_all(parent).is_err() {
-                ensure_writable(parent, tmpfs_ancestors)?;
-                fs::create_dir_all(parent)?;
-            }
-        }
-    }
-
-    if !target.exists() {
-        if fs::create_dir_all(target).is_err() {
-            ensure_writable(target, tmpfs_ancestors)?;
-            fs::create_dir_all(target)?;
-        }
-    }
-
-    // Bind mount the skeleton to the target
-    let c_source = CString::new(skeleton.as_os_str().as_encoded_bytes())?;
-    let c_target = CString::new(target.as_os_str().as_encoded_bytes())?;
-
+fn bind_mount_recursive(source: &Path, target: &Path) -> Result<()> {
+    let c_src = path_to_cstring(source)?;
+    let c_tgt = path_to_cstring(target)?;
     let ret = unsafe {
         libc::mount(
-            c_source.as_ptr(),
-            c_target.as_ptr(),
+            c_src.as_ptr(),
+            c_tgt.as_ptr(),
             std::ptr::null(),
             libc::MS_BIND | libc::MS_REC,
             std::ptr::null(),
         )
     };
-
     if ret != 0 {
         bail!(
-            "bind mount skeleton dir failed: {}",
-            std::io::Error::last_os_error()
+            "recursive bind mount {} -> {} failed: {}",
+            source.display(),
+            target.display(),
+            io::Error::last_os_error()
         );
+    }
+    debug!(src = %source.display(), tgt = %target.display(), "recursive bind mount");
+    Ok(())
+}
+
+fn mount_tmpfs(target: &Path, source_label: &str) -> Result<()> {
+    let c_src = CString::new(source_label)?;
+    let c_tgt = path_to_cstring(target)?;
+    let c_fs = CString::new("tmpfs")?;
+    let c_data = CString::new("mode=0755")?;
+    let ret = unsafe {
+        libc::mount(
+            c_src.as_ptr(),
+            c_tgt.as_ptr(),
+            c_fs.as_ptr(),
+            0,
+            c_data.as_ptr() as *const libc::c_void,
+        )
+    };
+    if ret != 0 {
+        bail!(
+            "tmpfs mount at {} failed: {}",
+            target.display(),
+            io::Error::last_os_error()
+        );
+    }
+    debug!(target = %target.display(), label = source_label, "tmpfs mounted");
+    Ok(())
+}
+
+fn mount_move(source: &Path, target: &Path) -> Result<()> {
+    let c_src = path_to_cstring(source)?;
+    let c_tgt = path_to_cstring(target)?;
+    let ret = unsafe {
+        libc::mount(
+            c_src.as_ptr(),
+            c_tgt.as_ptr(),
+            std::ptr::null(),
+            libc::MS_MOVE,
+            std::ptr::null(),
+        )
+    };
+    if ret != 0 {
+        bail!(
+            "MS_MOVE {} -> {} failed: {}",
+            source.display(),
+            target.display(),
+            io::Error::last_os_error()
+        );
+    }
+    debug!(src = %source.display(), tgt = %target.display(), "mount moved");
+    Ok(())
+}
+
+fn remount_readonly(target: &Path) -> Result<()> {
+    let c_tgt = path_to_cstring(target)?;
+    let ret = unsafe {
+        libc::mount(
+            std::ptr::null(),
+            c_tgt.as_ptr(),
+            std::ptr::null(),
+            libc::MS_REMOUNT | libc::MS_BIND | libc::MS_RDONLY,
+            std::ptr::null(),
+        )
+    };
+    if ret != 0 {
+        bail!(
+            "remount readonly {} failed: {}",
+            target.display(),
+            io::Error::last_os_error()
+        );
+    }
+    Ok(())
+}
+
+fn mount_private(target: &Path) -> Result<()> {
+    let c_tgt = path_to_cstring(target)?;
+    let ret = unsafe {
+        libc::mount(
+            std::ptr::null(),
+            c_tgt.as_ptr(),
+            std::ptr::null(),
+            libc::MS_REC | libc::MS_PRIVATE,
+            std::ptr::null(),
+        )
+    };
+    if ret != 0 {
+        bail!(
+            "MS_PRIVATE {} failed: {}",
+            target.display(),
+            io::Error::last_os_error()
+        );
+    }
+    Ok(())
+}
+
+fn lazy_unmount(target: &Path) -> Result<()> {
+    let c_tgt = path_to_cstring(target)?;
+    let ret = unsafe { libc::umount2(c_tgt.as_ptr(), libc::MNT_DETACH) };
+    if ret != 0 {
+        bail!(
+            "lazy unmount {} failed: {}",
+            target.display(),
+            io::Error::last_os_error()
+        );
+    }
+    debug!(target = %target.display(), "lazy unmount");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+
+struct MountStats {
+    applied: u32,
+    failed: u32,
+    whiteouts: u32,
+    errors: Vec<String>,
+    mount_paths: Vec<String>,
+}
+
+impl MountStats {
+    fn new() -> Self {
+        Self {
+            applied: 0,
+            failed: 0,
+            whiteouts: 0,
+            errors: Vec::new(),
+            mount_paths: Vec::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+pub fn mount_magic(
+    modules: &[ScannedModule],
+    staging_dir: &Path,
+) -> Result<Vec<MountResult>> {
+    info!(module_count = modules.len(), "magic mount starting");
+
+    let mut root = build_node_tree(modules);
+
+    let workdir = staging_dir.join("workdir");
+    fs::create_dir_all(&workdir)
+        .with_context(|| format!("create workdir: {}", workdir.display()))?;
+    mount_tmpfs(&workdir, "ZeroMount")?;
+    mount_private(&workdir)?;
+
+    let mut stats = MountStats::new();
+
+    // Collect child names first to avoid borrow conflict
+    let child_names: Vec<String> = root.children.keys().cloned().collect();
+    for name in child_names {
+        let real_path = Path::new("/").join(&name);
+        if let Some(child) = root.children.get_mut(&name) {
+            if let Err(e) = apply_node_recursive(child, &real_path, &workdir, false, &mut stats) {
+                let msg = format!("top-level /{}: {e}", name);
+                warn!("{}", msg);
+                stats.errors.push(msg);
+                stats.failed += 1;
+            }
+        }
+    }
+
+    if let Err(e) = lazy_unmount(&workdir) {
+        warn!(error = %e, "workdir lazy unmount failed");
+    }
+    let _ = fs::remove_dir(&workdir);
+
+    info!(
+        applied = stats.applied,
+        failed = stats.failed,
+        whiteouts = stats.whiteouts,
+        "magic mount complete"
+    );
+
+    Ok(build_results(modules, &stats))
+}
+
+// ---------------------------------------------------------------------------
+// Result aggregation
+// ---------------------------------------------------------------------------
+
+fn build_results(modules: &[ScannedModule], stats: &MountStats) -> Vec<MountResult> {
+    // Group mount paths by module (best-effort: paths don't carry module info,
+    // so we emit a single aggregate result per module that participated).
+    modules
+        .iter()
+        .map(|m| {
+            let paths: Vec<String> = stats
+                .mount_paths
+                .iter()
+                .filter(|p| {
+                    // A path belongs to this module if it was sourced from it.
+                    // Since the tree merges modules, attribute all paths to every module
+                    // that contributed files; the tree's first-module-wins means each
+                    // path was actually produced by one module.
+                    m.files
+                        .iter()
+                        .any(|f| p.ends_with(f.relative_path.to_string_lossy().as_ref()))
+                })
+                .cloned()
+                .collect();
+            let applied = paths.len() as u32;
+            let module_errors: Vec<String> = stats
+                .errors
+                .iter()
+                .filter(|e| e.contains(&m.id))
+                .cloned()
+                .collect();
+            let failed = module_errors.len() as u32;
+
+            MountResult {
+                module_id: m.id.clone(),
+                strategy_used: MountStrategy::MagicMount,
+                success: failed == 0 && (applied > 0 || stats.applied > 0),
+                rules_applied: applied,
+                rules_failed: failed,
+                error: if module_errors.is_empty() {
+                    None
+                } else {
+                    Some(module_errors.join("; "))
+                },
+                mount_paths: paths,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Recursive traversal
+// ---------------------------------------------------------------------------
+
+fn apply_node_recursive(
+    node: &mut Node,
+    real_path: &Path,
+    workdir: &Path,
+    inside_tmpfs: bool,
+    stats: &mut MountStats,
+) -> Result<()> {
+    match node.file_type {
+        NodeFileType::Whiteout => {
+            debug!(path = %real_path.display(), "whiteout (handled by parent tmpfs)");
+            stats.whiteouts += 1;
+        }
+
+        NodeFileType::Symlink => {
+            if !inside_tmpfs {
+                warn!(
+                    path = %real_path.display(),
+                    "symlink outside tmpfs context, skipping"
+                );
+                return Ok(());
+            }
+            let module_path = match &node.module_path {
+                Some(p) => p.clone(),
+                None => bail!("symlink node without module_path: {}", real_path.display()),
+            };
+            let link_target = fs::read_link(&module_path)
+                .with_context(|| format!("read_link: {}", module_path.display()))?;
+            let wdest = workdir_dest(workdir, real_path);
+            if let Some(parent) = wdest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            std::os::unix::fs::symlink(&link_target, &wdest)
+                .with_context(|| format!("symlink {} -> {}", wdest.display(), link_target.display()))?;
+            copy_selinux_context(&module_path, &wdest);
+            debug!(
+                path = %real_path.display(),
+                target = %link_target.display(),
+                "symlink created in workdir"
+            );
+            stats.applied += 1;
+        }
+
+        NodeFileType::RegularFile => {
+            let module_path = match &node.module_path {
+                Some(p) => p.clone(),
+                None => bail!("file node without module_path: {}", real_path.display()),
+            };
+
+            if inside_tmpfs {
+                let wdest = workdir_dest(workdir, real_path);
+                if let Some(parent) = wdest.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::File::create(&wdest)
+                    .with_context(|| format!("touch: {}", wdest.display()))?;
+                bind_mount(&module_path, &wdest)?;
+                remount_readonly(&wdest)?;
+                debug!(
+                    src = %module_path.display(),
+                    dest = %wdest.display(),
+                    "file bind-mounted inside tmpfs"
+                );
+            } else {
+                // Ensure mount point exists
+                if let Some(parent) = real_path.parent() {
+                    if !parent.exists() {
+                        fs::create_dir_all(parent)?;
+                    }
+                }
+                if !real_path.exists() {
+                    fs::File::create(real_path)
+                        .with_context(|| format!("create mount point: {}", real_path.display()))?;
+                }
+                bind_mount(&module_path, real_path)?;
+                remount_readonly(real_path)?;
+                stats.mount_paths.push(real_path.to_string_lossy().to_string());
+                debug!(
+                    src = %module_path.display(),
+                    dest = %real_path.display(),
+                    "file bind-mounted directly"
+                );
+            }
+            stats.applied += 1;
+        }
+
+        NodeFileType::Directory => {
+            if node.skip {
+                debug!(path = %real_path.display(), "directory skipped");
+                return Ok(());
+            }
+
+            let need_tmpfs = needs_tmpfs(node, real_path);
+
+            if need_tmpfs && !inside_tmpfs && node.module_path.is_none() && !real_path.exists() {
+                // Graceful degradation: tmpfs needed but directory doesn't exist
+                // on stock and no module provides it. Skip children that triggered
+                // tmpfs to avoid certain failure.
+                warn!(
+                    path = %real_path.display(),
+                    "needs tmpfs but dir not on stock and no module_path, skipping children"
+                );
+                for child in node.children.values_mut() {
+                    child.skip = true;
+                }
+                stats.failed += 1;
+                return Ok(());
+            }
+
+            if need_tmpfs {
+                debug!(path = %real_path.display(), "directory needs tmpfs");
+                apply_tmpfs_directory(node, real_path, workdir, stats)?;
+            } else {
+                debug!(path = %real_path.display(), inside_tmpfs, "directory passthrough");
+                let child_names: Vec<String> = node.children.keys().cloned().collect();
+                for name in child_names {
+                    let child_real = real_path.join(&name);
+                    if let Some(child) = node.children.get_mut(&name) {
+                        let result = apply_node_recursive(
+                            child,
+                            &child_real,
+                            workdir,
+                            inside_tmpfs,
+                            stats,
+                        );
+                        if inside_tmpfs {
+                            result?;
+                        } else if let Err(e) = result {
+                            let msg = format!("{}: {e}", child_real.display());
+                            warn!("{}", msg);
+                            stats.errors.push(msg);
+                            stats.failed += 1;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
 }
 
-/// Recursively copy directory contents. Preserves symlinks.
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
-    let entries = fs::read_dir(src)
-        .with_context(|| format!("cannot read dir: {}", src.display()))?;
+// ---------------------------------------------------------------------------
+// Tmpfs directory: self-bind, mirror, recurse, ro, MS_MOVE
+// ---------------------------------------------------------------------------
 
-    for entry in entries.flatten() {
-        let src_path = entry.path();
-        let file_name = match src_path.file_name() {
-            Some(n) => n,
-            None => continue,
-        };
-        let dst_path = dst.join(file_name);
+fn apply_tmpfs_directory(
+    node: &mut Node,
+    real_path: &Path,
+    workdir: &Path,
+    stats: &mut MountStats,
+) -> Result<()> {
+    let wpath = workdir.join(real_path.strip_prefix("/").unwrap_or(real_path));
 
-        let metadata = fs::symlink_metadata(&src_path)?;
+    // Create dir in workdir preserving permissions from real_path or module_path
+    fs::create_dir_all(&wpath)
+        .with_context(|| format!("mkdir workdir: {}", wpath.display()))?;
 
-        if metadata.is_symlink() {
-            let link_target = fs::read_link(&src_path)?;
-            unix_fs::symlink(&link_target, &dst_path)
-                .with_context(|| format!("symlink {} -> {}", dst_path.display(), link_target.display()))?;
-        } else if metadata.is_dir() {
-            fs::create_dir_all(&dst_path)?;
-            copy_dir_recursive(&src_path, &dst_path)?;
+    let reference = if real_path.exists() {
+        real_path.to_path_buf()
+    } else {
+        node.module_path.clone().unwrap_or_else(|| real_path.to_path_buf())
+    };
+
+    if let Ok(meta) = fs::metadata(&reference) {
+        let c_wpath = path_to_cstring(&wpath)?;
+        unsafe {
+            libc::chmod(c_wpath.as_ptr(), meta.permissions().mode() as libc::mode_t);
+            libc::chown(c_wpath.as_ptr(), meta.uid(), meta.gid());
+        }
+    }
+    copy_selinux_context(&reference, &wpath);
+
+    // Self-bind to create independent mount point
+    bind_mount(&wpath, &wpath)?;
+
+    // Mirror stock entries (unless this is a full replacement)
+    if !node.replace {
+        if let Err(e) = mirror_stock_entries(real_path, &wpath, node) {
+            warn!(
+                path = %real_path.display(),
+                error = %e,
+                "mirror_stock_entries failed, aborting tmpfs directory"
+            );
+            let _ = lazy_unmount(&wpath);
+            bail!("mirror failed for {}: {e}", real_path.display());
+        }
+    }
+
+    // Recurse children inside tmpfs
+    let child_names: Vec<String> = node.children.keys().cloned().collect();
+    for name in &child_names {
+        let child_real = real_path.join(name);
+        if let Some(child) = node.children.get_mut(name) {
+            if let Err(e) = apply_node_recursive(child, &child_real, workdir, true, stats) {
+                warn!(
+                    path = %child_real.display(),
+                    error = %e,
+                    "child failed inside tmpfs, aborting directory"
+                );
+                let _ = lazy_unmount(&wpath);
+                bail!("child {} failed inside tmpfs: {e}", child_real.display());
+            }
+        }
+    }
+
+    // Seal and move
+    remount_readonly(&wpath)?;
+
+    if let Err(e) = mount_move(&wpath, real_path) {
+        warn!(
+            wpath = %wpath.display(),
+            real_path = %real_path.display(),
+            error = %e,
+            "MS_MOVE failed, cleaning up orphaned tmpfs"
+        );
+        let _ = lazy_unmount(&wpath);
+        bail!("MS_MOVE failed for {}: {e}", real_path.display());
+    }
+
+    mount_private(real_path)?;
+    stats.mount_paths.push(real_path.to_string_lossy().to_string());
+    stats.applied += 1;
+
+    debug!(path = %real_path.display(), "tmpfs directory mounted and moved");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Mirror stock filesystem entries
+// ---------------------------------------------------------------------------
+
+fn mirror_stock_entries(real_path: &Path, wpath: &Path, node: &Node) -> Result<()> {
+    let entries = match fs::read_dir(real_path) {
+        Ok(e) => e,
+        Err(e) => {
+            debug!(
+                path = %real_path.display(),
+                error = %e,
+                "cannot read dir for mirror (may not exist on stock)"
+            );
+            return Ok(());
+        }
+    };
+
+    for entry in entries {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        // Skip entries the module tree handles
+        if node.children.contains_key(name_str.as_ref()) {
+            continue;
+        }
+
+        // Skip entries hidden by a whiteout
+        let hidden = node.children.values().any(|c| {
+            c.file_type == NodeFileType::Whiteout && c.name == name_str.as_ref()
+        });
+        if hidden {
+            debug!(name = %name_str, "skipping whiteout-hidden entry in mirror");
+            continue;
+        }
+
+        let src = real_path.join(&name);
+        let dst = wpath.join(&name);
+        let meta = fs::symlink_metadata(&src)
+            .with_context(|| format!("symlink_metadata: {}", src.display()))?;
+
+        if meta.is_symlink() {
+            let link_target = fs::read_link(&src)?;
+            std::os::unix::fs::symlink(&link_target, &dst)
+                .with_context(|| format!("mirror symlink: {}", dst.display()))?;
+            copy_selinux_context(&src, &dst);
+            debug!(name = %name_str, "mirrored symlink");
+        } else if meta.is_dir() {
+            fs::create_dir_all(&dst)?;
+            let c_dst = path_to_cstring(&dst)?;
+            unsafe {
+                libc::chmod(c_dst.as_ptr(), meta.permissions().mode() as libc::mode_t);
+                libc::chown(c_dst.as_ptr(), meta.uid(), meta.gid());
+            }
+            bind_mount_recursive(&src, &dst)?;
+            copy_selinux_context(&src, &dst);
+            debug!(name = %name_str, "mirrored directory via recursive bind");
         } else {
-            fs::copy(&src_path, &dst_path)
-                .with_context(|| format!("copy {} -> {}", src_path.display(), dst_path.display()))?;
+            fs::File::create(&dst)
+                .with_context(|| format!("touch mirror: {}", dst.display()))?;
+            bind_mount(&src, &dst)?;
+            copy_selinux_context(&src, &dst);
+            debug!(name = %name_str, "mirrored file via bind mount");
         }
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+fn workdir_dest(workdir: &Path, real_path: &Path) -> PathBuf {
+    workdir.join(real_path.strip_prefix("/").unwrap_or(real_path))
 }

@@ -338,7 +338,7 @@ fn is_font_or_asset(path: &Path) -> bool {
 }
 
 fn copy_selinux_context(target: &str, replacement: &str) {
-    crate::utils::selinux::mirror_selinux_context(
+    crate::utils::selinux::copy_selinux_context(
         Path::new(target),
         Path::new(replacement),
     );

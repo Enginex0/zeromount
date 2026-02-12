@@ -155,15 +155,11 @@ fn execute_magic_mount(
         }
     }
 
-    let mut results = Vec::new();
-    for module in modules {
-        let result = mount_magic(module, &storage.base_path)?;
-        results.push(result);
-    }
+    let results = mount_magic(modules, &storage.base_path)?;
 
     storage.suppress_cleanup();
 
-    info!(modules = results.len(), "magic mount execution complete");
+    info!(mounts = results.len(), "magic mount execution complete");
     Ok(results)
 }
 
@@ -194,7 +190,7 @@ fn prepare_lower_dir(
 
         if src.is_dir() {
             fs::create_dir_all(&dst)?;
-            crate::utils::selinux::mirror_selinux_context(&src, &dst);
+            crate::utils::selinux::copy_selinux_context(&src, &dst);
         } else {
             if let Some(parent) = dst.parent() {
                 ensure_parent_dirs_with_context(lower_dir, parent, partition)?;
@@ -203,7 +199,7 @@ fn prepare_lower_dir(
                 fs::copy(&src, &dst).with_context(|| {
                     format!("copy {} -> {}", src.display(), dst.display())
                 })?;
-                crate::utils::selinux::mirror_selinux_context(&src, &dst);
+                crate::utils::selinux::copy_selinux_context(&src, &dst);
             }
         }
     }
@@ -237,7 +233,7 @@ fn ensure_parent_dirs_with_context(
                 current.strip_prefix(lower_dir).unwrap_or(Path::new("")),
             );
             if real_path.exists() {
-                crate::utils::selinux::mirror_selinux_context(&real_path, &current);
+                crate::utils::selinux::copy_selinux_context(&real_path, &current);
             }
         }
     }

@@ -402,7 +402,7 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
             let target = format!("{}/{}", SYSTEM_FONTS_DIR, filename);
             let replacement = path.to_string_lossy().to_string();
 
-            crate::utils::selinux::mirror_selinux_context(
+            crate::utils::selinux::copy_selinux_context(
                 Path::new(&target), Path::new(&replacement)
             );
 
