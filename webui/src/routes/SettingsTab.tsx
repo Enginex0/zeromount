@@ -650,6 +650,13 @@ export function SettingsTab() {
           </div>
           <Toggle checked={store.settings.brene.prop_spoofing} onChange={(v) => handleBreneToggle('prop_spoofing', v)} />
         </div>
+        <div class="settings__item">
+          <div class="settings__item-content">
+            <div class="settings__item-label">Hide Stock Overlays</div>
+            <div class="settings__item-desc">Hide OEM overlay mounts (Xiaomi mi_ext, Samsung prism) via try_umount</div>
+          </div>
+          <Toggle checked={store.settings.mount.hide_stock_overlays} onChange={(v) => store.setMountToggle('hide_stock_overlays', v)} />
+        </div>
       </Card>
 
       <Card>

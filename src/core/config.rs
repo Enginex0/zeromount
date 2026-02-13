@@ -80,7 +80,7 @@ pub struct MountConfig {
     pub mount_source: String,
     #[serde(default = "default_auto")]
     pub overlay_source: String,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub hide_stock_overlays: bool,
 }
 
@@ -108,7 +108,7 @@ impl Default for MountConfig {
             random_mount_paths: true,
             mount_source: default_auto(),
             overlay_source: default_auto(),
-            hide_stock_overlays: true,
+            hide_stock_overlays: false,
         }
     }
 }
