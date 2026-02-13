@@ -4,6 +4,8 @@ import { Button } from '../components/core/Button';
 import { Toggle } from '../components/core/Toggle';
 import { Input } from '../components/core/Input';
 import { Modal } from '../components/layout/Modal';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { ChipSelect } from '../components/ui/ChipSelect';
 import { store } from '../lib/store';
 import { GITHUB_URL, PATHS } from '../lib/constants';
 import { ksuExec } from '../lib/ksuApi';
@@ -27,6 +29,8 @@ export function SettingsTab() {
   const [showAdvanced, setShowAdvanced] = createSignal(false);
   const [customOverlaySource, setCustomOverlaySource] = createSignal('');
   const [customMountSource, setCustomMountSource] = createSignal('');
+  const [showOverlaySheet, setShowOverlaySheet] = createSignal(false);
+  const [showStagingSheet, setShowStagingSheet] = createSignal(false);
   const selectedAccent = () => store.settings.accentColor;
 
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'auto' | 'amoled') => {
@@ -308,26 +312,22 @@ export function SettingsTab() {
 
         {/* Storage + random paths only apply to overlay/magic — VFS uses kernel driver */}
         <Show when={store.effectiveStrategy() !== 'Vfs'}>
-          <div class="settings__item" style={{ "margin-top": "16px" }}>
-            <div class="settings__item-content">
-              <div class="settings__item-label">Storage Backend</div>
-              <div class="settings__item-desc">
-                Filesystem for staging module content
-                {caps()?.tmpfs_xattr ? '' : ' (tmpfs lacks xattr — overlay whiteouts unavailable)'}
-              </div>
+          <div class="settings__group" style={{ "margin-top": "16px" }}>
+            <div class="settings__item-label">Storage Backend</div>
+            <div class="settings__item-desc" style={{ "margin-bottom": "10px" }}>
+              Filesystem for staging module content
+              {caps()?.tmpfs_xattr ? '' : ' (tmpfs lacks xattr — overlay whiteouts unavailable)'}
             </div>
-            <select
-              class="settings__select"
+            <ChipSelect
               value={store.settings.mount.storage_mode}
-              onChange={(e) => store.setMountStorageMode(e.currentTarget.value as StorageMode)}
-            >
-              <option value="auto">Auto</option>
-              <option value="erofs" disabled={!caps()?.erofs_supported}>
-                EROFS{!caps()?.erofs_supported ? ' (unavailable)' : ''}
-              </option>
-              <option value="tmpfs">tmpfs</option>
-              <option value="ext4">ext4</option>
-            </select>
+              onChange={(v) => store.setMountStorageMode(v as StorageMode)}
+              options={[
+                { value: 'auto', label: 'Auto' },
+                { value: 'erofs', label: 'EROFS', disabled: !caps()?.erofs_supported },
+                { value: 'tmpfs', label: 'tmpfs' },
+                { value: 'ext4', label: 'ext4' },
+              ]}
+            />
           </div>
 
           <div class="settings__item">
@@ -347,41 +347,39 @@ export function SettingsTab() {
                 <div class="settings__item-label">Overlay Mount Source</div>
                 <div class="settings__item-desc">
                   Source device for overlay mounts
-                  <Show when={store.settings.mount.overlay_source === 'auto'}>
-                    <span style={{ "font-style": "italic" }}> — resolves per root manager</span>
-                  </Show>
                 </div>
               </div>
-              <select
-                class="settings__select"
-                value={['auto', 'KSU', 'magisk', 'overlay', 'custom'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
-                  if (val === 'custom') {
-                    setCustomOverlaySource('');
-                    store.setOverlaySource('');
-                  } else {
-                    store.setOverlaySource(val);
-                  }
-                }}
-              >
-                <option value="auto">Auto</option>
-                <option value="KSU">KSU</option>
-                <option value="magisk">magisk</option>
-                <option value="overlay">overlay</option>
-                <option value="custom">Custom</option>
-              </select>
+              <button class="settings__select-trigger" onClick={() => setShowOverlaySheet(true)}>
+                <span>{['auto', 'KSU', 'magisk', 'overlay'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'Custom'}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+              </button>
             </div>
-            <Show when={!['auto', 'KSU', 'magisk', 'overlay'].includes(store.settings.mount.overlay_source)}>
-              <div class="settings__item settings__item--sub settings__item--stacked">
-                <div class="settings__item-label">Custom Source</div>
-                <Input
-                  value={store.settings.mount.overlay_source === 'custom' ? customOverlaySource() : store.settings.mount.overlay_source}
-                  placeholder="e.g. my_overlay"
-                  onBlur={(e) => store.setOverlaySource(e.currentTarget.value)}
-                />
-              </div>
-            </Show>
+            <BottomSheet
+              open={showOverlaySheet()}
+              onClose={() => setShowOverlaySheet(false)}
+              title="Overlay Mount Source"
+              value={['auto', 'KSU', 'magisk', 'overlay'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : 'custom'}
+              onChange={(val) => {
+                if (val !== 'custom') {
+                  store.setOverlaySource(val);
+                } else {
+                  setCustomOverlaySource('');
+                }
+              }}
+              options={[
+                { value: 'auto', label: 'Auto', description: 'Resolves per root manager (KSU/Magisk)' },
+                { value: 'KSU', label: 'KSU', description: 'KernelSU device label' },
+                { value: 'magisk', label: 'magisk', description: 'Magisk device label' },
+                { value: 'overlay', label: 'overlay', description: 'Generic overlay device' },
+                { value: 'custom', label: 'Custom', description: 'Enter a custom device label' },
+              ]}
+              customInput={{
+                placeholder: 'e.g. my_overlay',
+                value: customOverlaySource(),
+                onInput: setCustomOverlaySource,
+                onConfirm: (v) => store.setOverlaySource(v),
+              }}
+            />
           </Show>
 
           <div class="settings__item">
@@ -389,42 +387,40 @@ export function SettingsTab() {
               <div class="settings__item-label">Staging Mount Source</div>
               <div class="settings__item-desc">
                 Source device for staging mounts
-                <Show when={store.settings.mount.mount_source === 'auto'}>
-                  <span style={{ "font-style": "italic" }}> — random selection per boot</span>
-                </Show>
               </div>
             </div>
-            <select
-              class="settings__select"
-              value={['auto', 'tmpfs', 'none', 'shmem', 'shm', 'custom'].includes(store.settings.mount.mount_source) ? store.settings.mount.mount_source : 'custom'}
-              onChange={(e) => {
-                const val = e.currentTarget.value;
-                if (val === 'custom') {
-                  setCustomMountSource('');
-                  store.setMountSource('');
-                } else {
-                  store.setMountSource(val);
-                }
-              }}
-            >
-              <option value="auto">Auto</option>
-              <option value="tmpfs">tmpfs</option>
-              <option value="none">none</option>
-              <option value="shmem">shmem</option>
-              <option value="shm">shm</option>
-              <option value="custom">Custom</option>
-            </select>
+            <button class="settings__select-trigger" onClick={() => setShowStagingSheet(true)}>
+              <span>{['auto', 'tmpfs', 'none', 'shmem', 'shm'].includes(store.settings.mount.mount_source) ? store.settings.mount.mount_source : 'Custom'}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+            </button>
           </div>
-          <Show when={!['auto', 'tmpfs', 'none', 'shmem', 'shm'].includes(store.settings.mount.mount_source)}>
-            <div class="settings__item settings__item--sub settings__item--stacked">
-              <div class="settings__item-label">Custom Source</div>
-              <Input
-                value={store.settings.mount.mount_source === 'custom' ? customMountSource() : store.settings.mount.mount_source}
-                placeholder="e.g. my_source"
-                onBlur={(e) => store.setMountSource(e.currentTarget.value)}
-              />
-            </div>
-          </Show>
+          <BottomSheet
+            open={showStagingSheet()}
+            onClose={() => setShowStagingSheet(false)}
+            title="Staging Mount Source"
+            value={['auto', 'tmpfs', 'none', 'shmem', 'shm'].includes(store.settings.mount.mount_source) ? store.settings.mount.mount_source : 'custom'}
+            onChange={(val) => {
+              if (val !== 'custom') {
+                store.setMountSource(val);
+              } else {
+                setCustomMountSource('');
+              }
+            }}
+            options={[
+              { value: 'auto', label: 'Auto', description: 'Random selection per boot' },
+              { value: 'tmpfs', label: 'tmpfs', description: 'RAM-backed temporary filesystem' },
+              { value: 'none', label: 'none', description: 'VFS tmpfs mount' },
+              { value: 'shmem', label: 'shmem', description: 'Shared memory mount' },
+              { value: 'shm', label: 'shm', description: 'POSIX shared memory' },
+              { value: 'custom', label: 'Custom', description: 'Enter a custom device source' },
+            ]}
+            customInput={{
+              placeholder: 'e.g. my_source',
+              value: customMountSource(),
+              onInput: setCustomMountSource,
+              onConfirm: (v) => store.setMountSource(v),
+            }}
+          />
         </Show>
       </Card>
 
@@ -591,20 +587,18 @@ export function SettingsTab() {
                 </div>
                 <Toggle checked={store.settings.brene.avc_log_spoofing} onChange={(v) => handleBreneToggle('avc_log_spoofing', v)} />
               </div>
-              <div class="settings__item">
-                <div class="settings__item-content">
-                  <div class="settings__item-label">Uname Spoofing</div>
-                  <div class="settings__item-desc">Spoof kernel version string</div>
-                </div>
-                <select
-                  class="settings__select"
+              <div class="settings__group" style={{ "margin-top": "20px" }}>
+                <div class="settings__item-label">Uname Spoofing</div>
+                <div class="settings__item-desc" style={{ "margin-bottom": "10px" }}>Spoof kernel version string</div>
+                <ChipSelect
                   value={store.settings.uname.mode}
-                  onChange={(e) => store.setUnameMode(e.currentTarget.value as UnameMode)}
-                >
-                  <option value="disabled">Disabled</option>
-                  <option value="static">Static</option>
-                  <option value="dynamic">Dynamic</option>
-                </select>
+                  onChange={(v) => store.setUnameMode(v as UnameMode)}
+                  options={[
+                    { value: 'disabled', label: 'Disabled' },
+                    { value: 'static', label: 'Static' },
+                    { value: 'dynamic', label: 'Dynamic' },
+                  ]}
+                />
               </div>
               <Show when={store.settings.uname.mode !== 'disabled'}>
                 <div class="settings__item settings__item--sub settings__item--stacked">
