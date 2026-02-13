@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use tracing::{debug, info};
 
+use crate::core::config::SusfsConfig;
 use crate::core::types::{
     ModuleFileType, MountPlan, MountResult, MountStrategy, ScannedModule,
 };
@@ -21,11 +22,12 @@ use super::VfsDriver;
 pub struct VfsExecutor {
     driver: VfsDriver,
     susfs: Option<SusfsClient>,
+    susfs_config: SusfsConfig,
 }
 
 impl VfsExecutor {
-    pub fn new(driver: VfsDriver, susfs: Option<SusfsClient>) -> Self {
-        Self { driver, susfs }
+    pub fn new(driver: VfsDriver, susfs: Option<SusfsClient>, susfs_config: SusfsConfig) -> Self {
+        Self { driver, susfs, susfs_config }
     }
 
     /// Execute the full VFS pipeline for a set of scanned modules.
@@ -180,7 +182,7 @@ impl VfsExecutor {
     /// Apply SUSFS protections for a module's injected files.
     /// Phase 2: kstat only — path hiding deferred until sdcard is decrypted.
     fn apply_susfs_protections(&self, susfs: &SusfsClient, module: &ScannedModule) {
-        apply_module_susfs_protections(susfs, module, false, true);
+        apply_module_susfs_protections(susfs, module, Some(&self.susfs_config), false, true);
     }
 }
 
@@ -202,17 +204,21 @@ fn is_brene_owned_target(target: &Path) -> bool {
 /// This is the standalone entry point used by both the VFS pipeline (via
 /// `VfsExecutor::apply_susfs_protections`) and the CLI deferred-retry path.
 ///
+/// `susfs_config`: user config sub-toggles (kstat, path_hide). None = all enabled (legacy callers).
 /// `skip_kstat`: skip kstat spoofing (deferred retry — already done at boot)
 /// `skip_path_hide`: skip add_sus_path (boot — sdcard not decrypted, always EINVAL)
 pub fn apply_module_susfs_protections(
     susfs: &SusfsClient,
     module: &ScannedModule,
+    susfs_config: Option<&SusfsConfig>,
     skip_kstat: bool,
     skip_path_hide: bool,
 ) {
     let features = susfs.features();
+    let kstat_enabled = susfs_config.map_or(true, |c| c.kstat);
+    let path_hide_enabled = susfs_config.map_or(true, |c| c.path_hide);
 
-    if !skip_kstat && features.kstat {
+    if !skip_kstat && features.kstat && kstat_enabled {
         for file in &module.files {
             match file.file_type {
                 ModuleFileType::Regular
@@ -249,7 +255,7 @@ pub fn apply_module_susfs_protections(
     // Pass 2: path hiding for directories only.
     // add_sus_path on a directory implicitly hides all children in the kernel,
     // so individual file hiding is redundant.
-    if !skip_path_hide && features.path {
+    if !skip_path_hide && features.path && path_hide_enabled {
         for file in &module.files {
             if file.file_type != ModuleFileType::Directory {
                 continue;

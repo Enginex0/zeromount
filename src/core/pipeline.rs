@@ -269,7 +269,7 @@ impl MountController<Planned> {
             if let Ok(client) = crate::susfs::SusfsClient::probe() {
                 for module in &self.state.modules {
                     crate::vfs::executor::apply_module_susfs_protections(
-                        &client, module, false, true,
+                        &client, module, Some(&config.susfs), false, true,
                     );
                 }
             }
@@ -318,7 +318,7 @@ impl MountController<Planned> {
             None
         };
 
-        let executor = crate::vfs::VfsExecutor::new(driver, susfs);
+        let executor = crate::vfs::VfsExecutor::new(driver, susfs, config.susfs.clone());
         executor.execute(plan, modules)
     }
 

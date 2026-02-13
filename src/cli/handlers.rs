@@ -345,6 +345,11 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
         warn!("SUSFS config import failed: {e}");
     }
 
+    if !config.susfs.enabled {
+        tracing::info!("SUSFS disabled in config, skipping deferred retry");
+        return Ok(());
+    }
+
     let client = match crate::susfs::SusfsClient::probe() {
         Ok(c) if c.is_available() => c,
         Ok(_) => {
@@ -373,7 +378,7 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
             for module in &modules {
                 if !module.files.is_empty() && boot_module_ids.contains(&module.id) {
                     crate::vfs::executor::apply_module_susfs_protections(
-                        &client, module, true, false,
+                        &client, module, Some(&config.susfs), true, false,
                     );
                 }
             }

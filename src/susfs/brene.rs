@@ -96,36 +96,43 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
     }
 
     let brene = &config.brene;
+    let susfs_cfg = &config.susfs;
+
+    // Effective feature flags: kernel capability AND user config sub-toggle
+    let has_path = client.features().path && susfs_cfg.path_hide;
+    let has_maps = client.features().maps && susfs_cfg.maps_hide;
+    let has_open_redirect = client.features().open_redirect && susfs_cfg.open_redirect;
+    let has_kstat = client.features().kstat && susfs_cfg.kstat;
 
     // -- Auto-hide toggles (path-based) --
     // Skipped at boot — deferred retry handles all path hiding after sdcard decryption
 
     if !skip_path_hide {
-        if brene.auto_hide_rooted_folders && client.features().path {
+        if brene.auto_hide_rooted_folders && has_path {
             let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
             result.paths_hidden += count;
             info!("BRENE: rooted folders hidden ({count})");
         }
 
-        if brene.auto_hide_recovery && client.features().path {
+        if brene.auto_hide_recovery && has_path {
             let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
             result.paths_hidden += count;
             info!("BRENE: recovery paths hidden ({count})");
         }
 
-        if brene.auto_hide_tmp && client.features().path {
+        if brene.auto_hide_tmp && has_path {
             let count = paths::hide_paths(client, TMP_PATHS).unwrap_or(0);
             result.paths_hidden += count;
             info!("BRENE: tmp paths hidden ({count})");
         }
 
-        if brene.auto_hide_apk && client.features().path {
+        if brene.auto_hide_apk && has_path {
             let count = hide_apk_paths(client);
             result.paths_hidden += count;
             info!("BRENE: APK paths hidden ({count})");
         }
 
-        if brene.auto_hide_sdcard_data && client.features().path {
+        if brene.auto_hide_sdcard_data && has_path {
             let count = paths::hide_paths_loop(client, SDCARD_DATA_PATTERNS).unwrap_or(0);
             result.paths_hidden += count;
             info!("BRENE: sdcard data roots hidden ({count})");
@@ -134,15 +141,16 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
 
     // -- Maps hiding --
 
-    if brene.auto_hide_zygisk && client.features().maps {
+    if brene.auto_hide_zygisk && has_maps {
         let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
         result.maps_hidden += count;
         info!("BRENE: zygisk maps hidden ({count})");
     }
 
     // -- Font redirect (delegates to F15) --
+    // Font redirect uses open_redirect (when available) and kstat — gate on those sub-toggles
 
-    if brene.auto_hide_fonts {
+    if brene.auto_hide_fonts && (has_open_redirect || has_kstat) {
         let fonts = if fonts_overlay_mounted {
             hide_font_modules_overlay(client)
         } else {
@@ -155,14 +163,14 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
     // -- Custom user-defined lists --
 
     if !skip_path_hide {
-        if !brene.custom_sus_paths.is_empty() && client.features().path {
+        if !brene.custom_sus_paths.is_empty() && has_path {
             let path_refs: Vec<&str> = brene.custom_sus_paths.iter().map(|s| s.as_str()).collect();
             let count = paths::hide_paths(client, &path_refs).unwrap_or(0);
             result.paths_hidden += count;
             info!("BRENE: custom sus_paths hidden ({count}/{})", path_refs.len());
         }
 
-        if !brene.custom_sus_path_loops.is_empty() && client.features().path {
+        if !brene.custom_sus_path_loops.is_empty() && has_path {
             let path_refs: Vec<&str> = brene.custom_sus_path_loops.iter().map(|s| s.as_str()).collect();
             let count = paths::hide_paths_loop(client, &path_refs).unwrap_or(0);
             result.paths_hidden += count;
@@ -170,7 +178,7 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
         }
     }
 
-    if !brene.custom_sus_maps.is_empty() && client.features().maps {
+    if !brene.custom_sus_maps.is_empty() && has_maps {
         let path_refs: Vec<&str> = brene.custom_sus_maps.iter().map(|s| s.as_str()).collect();
         let count = paths::hide_maps(client, &path_refs).unwrap_or(0);
         result.maps_hidden += count;
@@ -662,7 +670,8 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> R
     }
 
     let brene = &config.brene;
-    let has_path = client.features().path;
+    // Combine kernel capability with user config sub-toggle
+    let has_path = client.features().path && config.susfs.path_hide;
 
     if brene.auto_hide_rooted_folders && has_path {
         let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
