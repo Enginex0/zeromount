@@ -89,8 +89,11 @@ impl ModuleWatcher {
 
         let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
         if ret < 0 {
-            return Err(io::Error::last_os_error())
-                .context("poll on inotify fd");
+            let err = io::Error::last_os_error();
+            if err.raw_os_error() == Some(libc::EINTR) {
+                return Ok(Vec::new());
+            }
+            return Err(err).context("poll on inotify fd");
         }
         if ret == 0 || (pfd.revents & libc::POLLIN) == 0 {
             return Ok(Vec::new());
@@ -174,6 +177,10 @@ impl ModuleWatcher {
         debug!(dir = %self.modules_dir.display(), "module watcher loop started");
 
         loop {
+            if crate::utils::signal::shutdown_requested() {
+                debug!("shutdown requested, exiting watcher loop");
+                return Ok(());
+            }
             let events = self.poll(10_000)?;
             if events.is_empty() {
                 continue;
@@ -223,6 +230,10 @@ pub fn start_watcher_fallback(
     let mut last_mtime = dir_mtime(modules_dir);
 
     loop {
+        if crate::utils::signal::shutdown_requested() {
+            debug!("shutdown requested, exiting fallback watcher");
+            return Ok(());
+        }
         std::thread::sleep(std::time::Duration::from_secs(interval_secs));
 
         let current_mtime = dir_mtime(modules_dir);
