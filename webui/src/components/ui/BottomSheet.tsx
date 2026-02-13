@@ -29,9 +29,11 @@ interface BottomSheetProps {
 export function BottomSheet(props: BottomSheetProps) {
   const [visible, setVisible] = createSignal(false);
   const [animating, setAnimating] = createSignal(false);
+  const [customMode, setCustomMode] = createSignal(false);
 
   createEffect(() => {
     if (props.open) {
+      setCustomMode(false);
       setVisible(true);
       requestAnimationFrame(() => setAnimating(true));
       document.body.style.overflow = 'hidden';
@@ -46,14 +48,16 @@ export function BottomSheet(props: BottomSheetProps) {
 
   const handleSelect = (value: string) => {
     if (value === 'custom') {
+      setCustomMode(true);
       props.onChange(value);
       return;
     }
+    setCustomMode(false);
     props.onChange(value);
     props.onClose();
   };
 
-  const isCustomActive = () => props.value === 'custom' || (
+  const isCustomActive = () => customMode() || props.value === 'custom' || (
     props.customInput && !props.options.some(o => o.value === props.value && o.value !== 'custom')
   );
 
@@ -62,44 +66,51 @@ export function BottomSheet(props: BottomSheetProps) {
       <Portal>
         <div class={`sheet-backdrop${animating() ? ' sheet-backdrop--visible' : ''}`} onClick={props.onClose} />
 
-        <div class={`sheet${animating() ? ' sheet--visible' : ''}`}>
+        <div class={`sheet${animating() ? ' sheet--visible' : ''}${isCustomActive() ? ' sheet--input-mode' : ''}`}>
           <div class="sheet__handle" />
 
           <div class="sheet__title">{props.title}</div>
 
-          <div class="sheet__options">
-            <For each={props.options}>
-              {(option) => {
-                const selected = () => option.value === 'custom' ? isCustomActive() : props.value === option.value;
-                return (
-                  <button
-                    class={`sheet__option${selected() ? ' sheet__option--selected' : ''}${option.disabled ? ' sheet__option--disabled' : ''}`}
-                    onClick={() => !option.disabled && handleSelect(option.value)}
-                    disabled={option.disabled}
-                  >
-                    <Show when={option.icon}>
-                      <div class="sheet__option-icon">{option.icon}</div>
-                    </Show>
-                    <div class="sheet__option-content">
-                      <div class="sheet__option-label">{option.label}</div>
-                      <Show when={option.description}>
-                        <div class="sheet__option-desc">{option.description}</div>
+          <Show when={!isCustomActive()}>
+            <div class="sheet__options">
+              <For each={props.options}>
+                {(option) => {
+                  const selected = () => option.value === 'custom' ? false : props.value === option.value;
+                  return (
+                    <button
+                      class={`sheet__option${selected() ? ' sheet__option--selected' : ''}${option.disabled ? ' sheet__option--disabled' : ''}`}
+                      onClick={() => !option.disabled && handleSelect(option.value)}
+                      disabled={option.disabled}
+                    >
+                      <Show when={option.icon}>
+                        <div class="sheet__option-icon">{option.icon}</div>
                       </Show>
-                    </div>
-                    <div class={`sheet__option-check${selected() ? ' sheet__option-check--visible' : ''}`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </div>
-                  </button>
-                );
-              }}
-            </For>
-          </div>
+                      <div class="sheet__option-content">
+                        <div class="sheet__option-label">{option.label}</div>
+                        <Show when={option.description}>
+                          <div class="sheet__option-desc">{option.description}</div>
+                        </Show>
+                      </div>
+                      <div class={`sheet__option-check${selected() ? ' sheet__option-check--visible' : ''}`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+          </Show>
 
           <Show when={props.customInput && isCustomActive()}>
+            <button class="sheet__back" onClick={() => setCustomMode(false)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+              Back to options
+            </button>
             <div class="sheet__custom">
               <input
+                ref={(el) => setTimeout(() => el.focus(), 100)}
                 class="sheet__custom-input"
                 type="text"
                 placeholder={props.customInput!.placeholder}

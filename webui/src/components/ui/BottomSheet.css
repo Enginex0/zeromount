@@ -168,6 +168,41 @@
   color: var(--bg-primary, #111);
 }
 
+.sheet--input-mode {
+  bottom: auto;
+  top: 0;
+  border-radius: 0 0 20px 20px;
+  border-top: none;
+  border-bottom: 1px solid var(--glass-border);
+  transform: translateY(-100%);
+  max-height: none;
+}
+
+.sheet--input-mode.sheet--visible {
+  transform: translateY(0);
+}
+
+.sheet__back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  margin-bottom: 8px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet__back svg {
+  color: var(--text-accent);
+}
+
 .sheet__custom {
   display: flex;
   gap: 8px;
