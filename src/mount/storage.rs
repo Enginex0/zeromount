@@ -44,7 +44,19 @@ impl StorageHandle {
 
     /// Keep staging alive — overlay lowerdirs and magic skeleton bind mounts
     /// reference data inside this tmpfs for the lifetime of the mounts.
+    #[allow(dead_code)]
     pub fn suppress_cleanup(&mut self) {
+        self.cleaned_up = true;
+    }
+
+    /// Lazy-unmount staging: disappears from mountinfo, kernel keeps inodes
+    /// alive via overlay/bind mount references. Matches Mountify's approach.
+    pub fn detach_staging(&mut self) {
+        if let Some((ref versioned, ref facade)) = self.apex_mounts {
+            let _ = do_umount(facade);
+            let _ = do_umount(versioned);
+        }
+        let _ = do_umount(&self.base_path);
         self.cleaned_up = true;
     }
 }

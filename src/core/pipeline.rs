@@ -230,27 +230,34 @@ impl MountController<Planned> {
         let failed = results.iter().filter(|r| !r.success).count();
         info!(succeeded, failed, "execution complete");
 
-        // Register non-VFS mount paths with KSU try_umount
-        let mut non_vfs_paths: Vec<String> = results.iter()
-            .filter(|r| r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font))
-            .flat_map(|r| r.mount_paths.iter().cloned())
-            .collect();
-        non_vfs_paths.sort_unstable();
-        non_vfs_paths.dedup();
-        debug!(
-            count = non_vfs_paths.len(),
-            paths = ?non_vfs_paths,
-            "try_umount paths collected (deduped)"
-        );
         let mut umount_registered = 0u32;
         let mut umount_failed = 0u32;
-        if !non_vfs_paths.is_empty() {
-            let stats = crate::mount::try_umount::register_unmountable(
-                &non_vfs_paths,
-                self.state.root_mgr.name(),
+
+        // Bare kernel: lowerdir-only overlays don't need try_umount hiding.
+        // Registering them is counterproductive — unmounting in deny-list
+        // namespaces releases peer group IDs, creating detectable gaps.
+        if scenario != Scenario::None {
+            let mut non_vfs_paths: Vec<String> = results.iter()
+                .filter(|r| r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font))
+                .flat_map(|r| r.mount_paths.iter().cloned())
+                .collect();
+            non_vfs_paths.sort_unstable();
+            non_vfs_paths.dedup();
+            debug!(
+                count = non_vfs_paths.len(),
+                paths = ?non_vfs_paths,
+                "try_umount paths collected (deduped)"
             );
-            umount_registered += stats.registered;
-            umount_failed += stats.failed;
+            if !non_vfs_paths.is_empty() {
+                let stats = crate::mount::try_umount::register_unmountable(
+                    &non_vfs_paths,
+                    self.state.root_mgr.name(),
+                );
+                umount_registered += stats.registered;
+                umount_failed += stats.failed;
+            }
+        } else {
+            debug!("try_umount skipped: bare kernel overlay doesn't need hiding");
         }
 
         if umount_registered > 0 || umount_failed > 0 {

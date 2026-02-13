@@ -122,7 +122,7 @@ fn execute_overlay(
         results.push(result);
     }
 
-    storage.suppress_cleanup();
+    storage.detach_staging();
 
     info!(mounts = results.len(), "overlay execution complete");
     Ok(results)
@@ -157,7 +157,7 @@ fn execute_magic_mount(
 
     let results = mount_magic(modules, &storage.base_path, &storage.overlay_source)?;
 
-    storage.suppress_cleanup();
+    storage.detach_staging();
 
     info!(mounts = results.len(), "magic mount execution complete");
     Ok(results)
