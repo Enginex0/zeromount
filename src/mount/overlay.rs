@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::core::types::{MountResult, MountStrategy};
 
@@ -113,15 +113,20 @@ pub fn mount_overlay(
     };
 
     match result {
-        Ok(()) => Ok(MountResult {
-            module_id: module_id.to_string(),
-            strategy_used: MountStrategy::Overlay,
-            success: true,
-            rules_applied: 1,
-            rules_failed: 0,
-            error: None,
-            mount_paths: vec![target.to_string_lossy().to_string()],
-        }),
+        Ok(()) => {
+            if let Err(e) = mount_private(target) {
+                warn!(target = %target.display(), error = %e, "MS_PRIVATE on overlay (non-fatal)");
+            }
+            Ok(MountResult {
+                module_id: module_id.to_string(),
+                strategy_used: MountStrategy::Overlay,
+                success: true,
+                rules_applied: 1,
+                rules_failed: 0,
+                error: None,
+                mount_paths: vec![target.to_string_lossy().to_string()],
+            })
+        }
         Err(e) => Ok(MountResult {
             module_id: module_id.to_string(),
             strategy_used: MountStrategy::Overlay,
@@ -251,6 +256,29 @@ fn fsconfig_set_string(fs_fd: libc::c_int, key: &str, value: &str) -> Result<()>
         );
     }
 
+    Ok(())
+}
+
+// Drop overlay out of the parent's shared peer group so it doesn't
+// contribute a peer ID visible in /proc/self/mountinfo (mount gap detection).
+fn mount_private(target: &Path) -> Result<()> {
+    let c_tgt = CString::new(target.as_os_str().as_encoded_bytes())?;
+    let ret = unsafe {
+        libc::mount(
+            std::ptr::null(),
+            c_tgt.as_ptr(),
+            std::ptr::null(),
+            libc::MS_REC | libc::MS_PRIVATE,
+            std::ptr::null(),
+        )
+    };
+    if ret != 0 {
+        bail!(
+            "MS_PRIVATE {} failed: {}",
+            target.display(),
+            std::io::Error::last_os_error()
+        );
+    }
     Ok(())
 }
 

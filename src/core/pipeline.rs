@@ -261,6 +261,8 @@ impl MountController<Planned> {
             );
         }
 
+        crate::mount::gap_filler::fill_peer_group_gaps();
+
         // Per-module SUSFS kstat spoofing for non-VFS strategies (font kstat, etc.)
         let has_non_vfs = results.iter().any(|r| {
             r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font)
