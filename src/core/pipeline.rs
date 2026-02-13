@@ -230,8 +230,7 @@ impl MountController<Planned> {
         let failed = results.iter().filter(|r| !r.success).count();
         info!(succeeded, failed, "execution complete");
 
-        // Register non-VFS mount paths with KSU try_umount so detection apps
-        // see the original unmodified filesystem instead of tmpfs/bind mounts
+        // Register non-VFS mount paths with KSU try_umount
         let mut non_vfs_paths: Vec<String> = results.iter()
             .filter(|r| r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font))
             .flat_map(|r| r.mount_paths.iter().cloned())
@@ -252,16 +251,6 @@ impl MountController<Planned> {
             );
             umount_registered += stats.registered;
             umount_failed += stats.failed;
-        }
-
-        // Register KSU's own infrastructure mounts (ART jar injection, etc.)
-        // so detection apps in the deny list don't see them either
-        {
-            let infra = crate::mount::try_umount::register_ksu_infra_mounts(
-                self.state.root_mgr.name(),
-            );
-            umount_registered += infra.registered;
-            umount_failed += infra.failed;
         }
 
         if umount_registered > 0 || umount_failed > 0 {
