@@ -222,48 +222,24 @@ function createAppStore() {
 
   const loadInitialData = async () => {
     console.log('[ZM-Store] loadInitialData() starting...');
-    setLoading({ status: true, rules: true, activity: true });
+    setLoading({ status: true, rules: true, activity: true, modules: true });
 
     try {
-      // Primary: single zeromount status --json call for bulk data
-      const results = await Promise.allSettled([
+      // Phase A (critical path): status + sysInfo + config dump + accent color
+      // These populate the StatusTab and settings — render ASAP
+      const criticalResults = await Promise.allSettled([
         api.getRuntimeStatus(),
-        api.getRules(),
-        api.getExcludedUids(),
-        api.getActivity(),
         api.getSystemInfoBatched(),
-        api.scanKsuModules(),
         api.configDump(),
         settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
       ]);
 
-      const status = results[0].status === 'fulfilled' ? results[0].value : null;
-      const rulesData = results[1].status === 'fulfilled' ? results[1].value : [];
-      const uidsData = results[2].status === 'fulfilled' ? results[2].value : [];
-      const activityData = results[3].status === 'fulfilled' ? results[3].value : [];
-      const sysInfo = results[4].status === 'fulfilled' ? results[4].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
-      const ksuModulesData = results[5].status === 'fulfilled' ? results[5].value : [];
-      const dump = results[6].status === 'fulfilled' ? results[6].value : null;
-      const systemColor = results[7].status === 'fulfilled' ? results[7].value : null;
+      const status = criticalResults[0].status === 'fulfilled' ? criticalResults[0].value : null;
+      const sysInfo = criticalResults[1].status === 'fulfilled' ? criticalResults[1].value : { driverVersion: '', kernelVersion: '', susfsVersion: '', uptime: '', deviceModel: '', androidVersion: '', selinuxStatus: '' };
+      const dump = criticalResults[2].status === 'fulfilled' ? criticalResults[2].value : null;
+      const systemColor = criticalResults[3].status === 'fulfilled' ? criticalResults[3].value : null;
 
-      // Config-dependent loads use dump when available, fall back to individual calls
-      await Promise.allSettled([
-        loadBreneSettings(dump),
-        loadSusfsSettings(dump),
-        loadMountSettings(dump),
-        loadVerboseState(dump),
-      ]);
-
-      // Surface first rejected read so UI can show degraded state
-      const labels = ['status', 'rules', 'uids', 'activity', 'sysInfo', 'modules', 'configDump', 'color'];
-      const firstFail = results.findIndex(r => r.status === 'rejected');
-      if (firstFail !== -1) {
-        setLastApiError({ operation: `loadInitialData:${labels[firstFail]}`, error: (results[firstFail] as PromiseRejectedResult).reason, timestamp: new Date() });
-      } else {
-        setLastApiError(null);
-      }
-
-      // Apply runtime status (authoritative source for scenario, capabilities, engine state)
+      // Apply critical data immediately so StatusTab exits skeleton state
       if (status) {
         setScenario(status.scenario as Scenario);
         setCapabilities(status.capabilities);
@@ -283,11 +259,42 @@ function createAppStore() {
           hiddenPaths: status.hidden_path_count,
         });
       }
+      setSystemInfo('kernelVersion', sysInfo.kernelVersion);
+      setSystemInfo('uptime', sysInfo.uptime);
+      setSystemInfo('deviceModel', sysInfo.deviceModel);
+      setSystemInfo('androidVersion', sysInfo.androidVersion);
+      setSystemInfo('selinuxStatus', sysInfo.selinuxStatus);
+      if (!status) {
+        setSystemInfo('driverVersion', sysInfo.driverVersion);
+        setSystemInfo('susfsVersion', sysInfo.susfsVersion);
+      }
+      if (systemColor) setSettings({ accentColor: systemColor });
+      setLoading('status', false);
 
-      // Apply supplementary data (rules list, UIDs, device info, modules)
+      // Config-dependent loads (essentially free when dump exists — just parses the dump object)
+      const configLoads = Promise.allSettled([
+        loadBreneSettings(dump),
+        loadSusfsSettings(dump),
+        loadMountSettings(dump),
+        loadVerboseState(dump),
+      ]);
+
+      // Phase B (deferred): rules, UIDs, activity, modules — needed for secondary tabs
+      const deferredResults = await Promise.allSettled([
+        api.getRules(),
+        api.getExcludedUids(),
+        api.getActivity(),
+        api.scanKsuModules(),
+      ]);
+
+      const rulesData = deferredResults[0].status === 'fulfilled' ? deferredResults[0].value : [];
+      const uidsData = deferredResults[1].status === 'fulfilled' ? deferredResults[1].value : [];
+      const activityData = deferredResults[2].status === 'fulfilled' ? deferredResults[2].value : [];
+      const ksuModulesData = deferredResults[3].status === 'fulfilled' ? deferredResults[3].value : [];
+
+      // Apply deferred data
       setRules(rulesData);
       setExcludedUids(uidsData);
-      // Merge file data with runtime pushActivity items, dedup by message
       setActivity(prev => {
         const runtimeItems = prev.filter(item => item.id.startsWith('rt-'));
         const rtMessages = new Set(runtimeItems.map(item => item.message));
@@ -296,29 +303,34 @@ function createAppStore() {
         merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
         return merged.slice(0, 10);
       });
-      setSystemInfo('kernelVersion', sysInfo.kernelVersion);
-      setSystemInfo('uptime', sysInfo.uptime);
-      setSystemInfo('deviceModel', sysInfo.deviceModel);
-      setSystemInfo('androidVersion', sysInfo.androidVersion);
-      setSystemInfo('selinuxStatus', sysInfo.selinuxStatus);
-      // Backfill from sysInfo if status JSON was unavailable
       if (!status) {
-        setSystemInfo('driverVersion', sysInfo.driverVersion);
-        setSystemInfo('susfsVersion', sysInfo.susfsVersion);
         setStats({
           activeRules: rulesData.length,
           excludedUids: uidsData.length,
         });
       }
       setKsuModules(ksuModulesData);
-      if (systemColor) setSettings({ accentColor: systemColor });
+
+      // Wait for config loads to finish (usually already done by now)
+      await configLoads;
+
+      // Surface first rejected read so UI can show degraded state
+      const allResults = [...criticalResults, ...deferredResults];
+      const labels = ['status', 'sysInfo', 'configDump', 'color', 'rules', 'uids', 'activity', 'modules'];
+      const firstFail = allResults.findIndex(r => r.status === 'rejected');
+      if (firstFail !== -1) {
+        setLastApiError({ operation: `loadInitialData:${labels[firstFail]}`, error: (allResults[firstFail] as PromiseRejectedResult).reason, timestamp: new Date() });
+      } else {
+        setLastApiError(null);
+      }
+
       console.log('[ZM-Store] loadInitialData() complete');
     } catch (err) {
       console.error('[ZM-Store] loadInitialData() error:', err);
       setLastApiError({ operation: 'loadInitialData', error: err, timestamp: new Date() });
       showToast('Failed to load data', 'error');
     } finally {
-      setLoading({ status: false, rules: false, activity: false });
+      setLoading({ status: false, rules: false, activity: false, modules: false });
     }
   };
 
