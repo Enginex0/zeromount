@@ -162,6 +162,11 @@ package_zip() {
         exit 1
     fi
 
+    # Banner
+    if [ -f "$MODULE_DIR/banner.png" ]; then
+        cp "$MODULE_DIR/banner.png" "$staging/banner.png"
+    fi
+
     # LKM
     if [ -d "$MODULE_DIR/lkm" ] && ls "$MODULE_DIR/lkm"/*.ko >/dev/null 2>&1; then
         mkdir -p "$staging/lkm"

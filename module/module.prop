@@ -4,5 +4,6 @@ version=v2.0.0-dev
 versionCode=200
 author=Enginex0
 description=Mountless module loading via VFS redirection with SUSFS integration. Supports OverlayFS and magic mount fallback. GHOST👻
-updateJson=
+updateJson=https://raw.githubusercontent.com/Enginex0/zeromount/master/update.json
 metamodule=1
+banner=banner.png
