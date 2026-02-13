@@ -7,7 +7,8 @@ if [ -f "$LOCKFILE" ]; then
     exit 0
 fi
 echo $$ > "$LOCKFILE"
-trap 'rm -f "$LOCKFILE"' EXIT INT TERM
+trap 'kill 0 2>/dev/null; rm -f "$LOCKFILE"' EXIT
+trap 'exit 0' INT TERM
 
 # Shell fast-fail on bootloop
 COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
@@ -22,6 +23,7 @@ COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
 # Reset bootloop counter only after the system actually finishes booting.
 # Pipeline no longer resets it — catches post-pipeline deadlocks.
 (
+    trap 'exit 0' TERM INT
     i=0
     while [ "$i" -lt 180 ]; do
         [ "$(getprop sys.boot_completed)" = "1" ] && {
@@ -32,9 +34,6 @@ COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
         i=$((i + 1))
     done
 ) &
-
-# Long-lived watcher — replaces monitor.sh polling loop
-"$BIN" watch &
 
 # Deferred SUSFS — waits for sdcard decryption via inotify, then retries path hiding
 "$BIN" mount --susfs-retry --wait &
