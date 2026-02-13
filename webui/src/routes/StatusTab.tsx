@@ -73,7 +73,7 @@ export function StatusTab() {
     switch (effectiveMode()) {
       case 'vfs': return t.colorSuccess;
       case 'overlay': return t.colorInfo || '#3b82f6';
-      case 'magicmount': return t.colorWarning;
+      case 'magicmount': return t.colorInfo || '#3b82f6';
       case 'susfs_only': return '#FF8E53';
     }
   });
@@ -87,6 +87,19 @@ export function StatusTab() {
       case 'magicmount': return `Bind mounts \u00b7 Storage: ${storage}`;
       case 'susfs_only': return 'SUSFS hiding active, no mount redirection';
     }
+  });
+
+  const isVfsMode = createMemo(() => effectiveMode() === 'vfs');
+
+  // VFS uses ioctl engine state; mount-based modes are active when modules are mounted
+  const isModuleActive = createMemo(() => {
+    if (isVfsMode()) return store.engineActive();
+    return store.moduleStatuses().some(m => m.strategy !== 'Font');
+  });
+
+  const heroStatusLabel = createMemo(() => {
+    if (isVfsMode()) return store.engineActive() ? 'Engine Active' : 'Engine Inactive';
+    return isModuleActive() ? 'Mounts Active' : 'No Modules Loaded';
   });
 
   createEffect(() => {
@@ -233,36 +246,36 @@ export function StatusTab() {
           </Card>
         }
       >
-        <Card variant="gradient-border" padding="large" style={store.engineActive() ? 'animation: glowPulse 3s ease-in-out infinite;' : ''}>
+        <Card variant="gradient-border" padding="large" style={isModuleActive() ? 'animation: glowPulse 3s ease-in-out infinite;' : ''}>
           <div class="status-hero">
             <div
               class="status-hero__indicator"
               style={{
-                color: store.engineActive()
+                color: isModuleActive()
                   ? store.currentTheme().textOnAccent
                   : store.currentTheme().textTertiary
               }}
             >
               <span
-                class={`status-hero__dot ${store.engineActive() ? 'status-hero__dot--active' : ''}`}
+                class={`status-hero__dot ${isModuleActive() ? 'status-hero__dot--active' : ''}`}
                 style={{
-                  background: store.engineActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary,
-                  'box-shadow': store.engineActive() ? `0 0 12px rgba(${store.currentTheme().accentRgb}, 0.5)` : 'none'
+                  background: isModuleActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary,
+                  'box-shadow': isModuleActive() ? `0 0 12px rgba(${store.currentTheme().accentRgb}, 0.5)` : 'none'
                 }}
               />
-              {store.engineActive() ? 'Engine Active' : 'Engine Inactive'}
+              {heroStatusLabel()}
             </div>
 
             <ScenarioIndicator />
 
             <div
-              class={`status-hero__shield ${store.engineActive() ? 'status-hero__shield--active' : ''}`}
+              class={`status-hero__shield ${isModuleActive() ? 'status-hero__shield--active' : ''}`}
               style={{ transform: `scale(${pulseScale()})` }}
             >
               <div
-                class={`status-hero__glow ${store.engineActive() ? 'status-hero__glow--active' : 'status-hero__glow--inactive'}`}
+                class={`status-hero__glow ${isModuleActive() ? 'status-hero__glow--active' : 'status-hero__glow--inactive'}`}
                 style={{
-                  background: store.engineActive()
+                  background: isModuleActive()
                     ? `radial-gradient(circle, ${store.currentTheme().colorSuccessGlow} 0%, transparent 70%)`
                     : 'transparent'
                 }}
@@ -274,26 +287,28 @@ export function StatusTab() {
                 viewBox="0 0 24 24"
                 class="status-hero__shield-svg"
                 style={{
-                  filter: store.engineActive() ? `drop-shadow(0 0 20px ${store.currentTheme().colorSuccessGlow})` : 'none'
+                  filter: isModuleActive() ? `drop-shadow(0 0 20px ${store.currentTheme().colorSuccessGlow})` : 'none'
                 }}
               >
                 <path
-                  fill={store.engineActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary}
-                  opacity={store.engineActive() ? 0.9 : 0.5}
+                  fill={isModuleActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary}
+                  opacity={isModuleActive() ? 0.9 : 0.5}
                   d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
                 />
               </svg>
             </div>
 
-            <Button
-              variant={store.engineActive() ? 'primary' : 'secondary'}
-              size="large"
-              onClick={() => store.toggleEngine()}
-              loading={store.loading.engine}
-              style="min-width: 200px;"
-            >
-              {store.engineActive() ? 'DISABLE ENGINE' : 'ENABLE ENGINE'}
-            </Button>
+            <Show when={isVfsMode()}>
+              <Button
+                variant={store.engineActive() ? 'primary' : 'secondary'}
+                size="large"
+                onClick={() => store.toggleEngine()}
+                loading={store.loading.engine}
+                style="min-width: 200px;"
+              >
+                {store.engineActive() ? 'DISABLE ENGINE' : 'ENABLE ENGINE'}
+              </Button>
+            </Show>
           </div>
         </Card>
       </Show>
@@ -529,7 +544,11 @@ export function StatusTab() {
               </span>
             </div>
             <div class="status-health__message color-text-secondary">
-              SUSFS integration active
+              {store.settings.susfs.enabled
+                ? 'SUSFS integration active'
+                : store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
+                  ? 'SUSFS available but disabled'
+                  : 'Running without SUSFS'}
             </div>
           </div>
           <Show when={store.rules().length === 0}>
