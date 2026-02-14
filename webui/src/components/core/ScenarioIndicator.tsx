@@ -80,7 +80,7 @@ function getMissingCapabilities(caps: CapabilityFlags | null): string[] {
 
 export function ScenarioIndicator() {
   const scenario = () => store.scenario?.() || 'none';
-  const activeStrategy = () => store.runtimeStrategy() || store.activeStrategy();
+  const activeStrategy = () => store.runtimeStrategy() || store.effectiveStrategy();
   const susfsEnabled = () => (store.capabilities?.()?.susfs_available ?? false) && store.settings.susfs.enabled;
   const config = createMemo(() => buildConfig(scenario(), activeStrategy(), susfsEnabled()));
   const missing = () => getMissingCapabilities(store.capabilities?.() || null);

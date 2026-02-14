@@ -16,7 +16,7 @@ export function StatusTab() {
   const [showAllModules, setShowAllModules] = createSignal(false);
 
   const displayStrategy = createMemo(() => {
-    return store.runtimeStrategy() || store.activeStrategy();
+    return store.runtimeStrategy() || store.effectiveStrategy();
   });
 
   const effectiveMode = createMemo(() => {
@@ -33,14 +33,9 @@ export function StatusTab() {
       }
     }
 
-    // No runtime data — derive from config + capabilities (pre-boot estimate)
-    const strategy = store.activeStrategy();
-    switch (strategy) {
-      case 'Vfs': {
-        const caps = store.capabilities();
-        if (caps?.vfs_driver) return 'vfs' as const;
-        return caps?.overlay_supported ? 'overlay' as const : 'magicmount' as const;
-      }
+    // No runtime data — derive from capabilities-aware effective strategy
+    switch (store.effectiveStrategy()) {
+      case 'Vfs': return 'vfs' as const;
       case 'Overlay': return 'overlay' as const;
       case 'MagicMount': return 'magicmount' as const;
       default: return 'magicmount' as const;

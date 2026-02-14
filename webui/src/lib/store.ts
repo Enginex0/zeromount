@@ -9,7 +9,7 @@ function createAppStore() {
   console.log('[ZM-Store] createAppStore() initializing...');
   const [activeTab, setActiveTab] = createSignal<Tab>('status');
 
-  const [engineActive, setEngineActive] = createSignal(true);
+  const [engineActive, setEngineActive] = createSignal(false);
 
   // Granular loading states for precise UI feedback
   const [loading, setLoading] = createStore({
@@ -249,7 +249,7 @@ function createAppStore() {
         setFontModules(status.font_modules || []);
         setDegraded(status.degraded);
         setDegradationReason(status.degradation_reason);
-        if (status.engine_active !== null) setEngineActive(status.engine_active);
+        setEngineActive(status.engine_active ?? false);
         if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
         if (status.susfs_version) setSystemInfo('susfsVersion', status.susfs_version);
         setRootManager(status.root_manager);
@@ -430,7 +430,9 @@ function createAppStore() {
       showToast('All rules cleared', 'success');
     } catch (err) {
       console.error('[ZM-Store] clearAllRules() error:', err);
-      showToast('Failed to clear rules', 'error');
+      const msg = String(err).includes('errno') || String(err).includes('No such')
+        ? 'ZeroMount VFS unavailable' : 'Failed to clear rules';
+      showToast(msg, 'error');
     } finally {
       setLoading('rules', false);
     }
@@ -842,9 +844,7 @@ function createAppStore() {
       _setMountSource(status.mount_source ?? null);
       setResolvedStorageMode(status.resolved_storage_mode ?? null);
 
-      if (status.engine_active !== null) {
-        setEngineActive(status.engine_active);
-      }
+      setEngineActive(status.engine_active ?? false);
       if (status.driver_version !== null) {
         setSystemInfo('driverVersion', `v${status.driver_version}`);
       }

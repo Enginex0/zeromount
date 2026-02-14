@@ -62,16 +62,18 @@ zm_print "  ✅ Binary ready"
 ZM_DATA="/data/adb/zeromount"
 zm_print "📁 Preparing Data" 0.3 "h"
 
+# Clean install — wipe previous state so every install starts fresh
+if [ -d "$ZM_DATA" ]; then
+    rm -rf "$ZM_DATA"
+    zm_print "  🧹 Previous installation cleaned"
+fi
+
 mkdir -p "$ZM_DATA"
 mkdir -p "$ZM_DATA/logs"
 zm_print "  ✅ Data directory ready"
 
-if [ ! -f "$ZM_DATA/config.toml" ]; then
-    zm_print "  🔧 Writing default config"
-    "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
-else
-    zm_print "  ✅ Existing config preserved"
-fi
+zm_print "  🔧 Writing default config"
+"$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
 
 # Xiaomi/Redmi/POCO devices have mi_ext overlay mounts that trigger detection
 BRAND=$(getprop ro.product.brand 2>/dev/null | tr '[:upper:]' '[:lower:]')
@@ -85,9 +87,32 @@ case "$BRAND$MANUFACTURER" in
         ;;
 esac
 
-if [ -d /data/adb/ksu ] || [ -d /data/adb/ap ]; then
-    zm_print "🛡️ SUSFS Configuration" 0.3 "h"
+zm_print "🛡️ SUSFS Detection" 0.3 "h"
 
+# Kernel-first detection — probe the actual kernel, not userspace dirs
+SUSFS_DETECTED=false
+
+# Method 1: ksu_susfs binary probe (fastest, authoritative)
+for susfs_bin in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs; do
+    if [ -x "$susfs_bin" ]; then
+        SUSFS_VER=$("$susfs_bin" show version 2>/dev/null)
+        if [ -n "$SUSFS_VER" ]; then
+            SUSFS_DETECTED=true
+            zm_print "  ✅ SUSFS detected via binary: $SUSFS_VER"
+            break
+        fi
+    fi
+done
+
+# Method 2: /proc/config.gz kernel config check
+if [ "$SUSFS_DETECTED" = false ] && [ -f /proc/config.gz ]; then
+    if zcat /proc/config.gz 2>/dev/null | grep -q 'CONFIG_KSU_SUSFS=y'; then
+        SUSFS_DETECTED=true
+        zm_print "  ✅ SUSFS detected via kernel config"
+    fi
+fi
+
+if [ "$SUSFS_DETECTED" = true ]; then
     SUSFS_DIR="/data/adb/susfs4ksu"
     SUSFS_CONFIG="$SUSFS_DIR/config.sh"
     mkdir -p "$SUSFS_DIR"
@@ -127,6 +152,8 @@ kernel_build='default'
 SUSFS_EOF
         zm_print "  ✅ SUSFS config created"
     fi
+else
+    zm_print "  ⚠️ SUSFS not detected in kernel — skipping config"
 fi
 
 if command -v ksud >/dev/null 2>&1; then

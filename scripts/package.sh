@@ -9,25 +9,46 @@ MODULE_DIR="$PROJECT_ROOT/module"
 WEBUI_DIR="$PROJECT_ROOT/webui"
 RELEASE_DIR="$PROJECT_ROOT/release"
 
-VERSION="v$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+CURRENT_VERSION="$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+VERSION=""
 BUILD=false
-CLEAN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) VERSION="$2"; shift 2 ;;
         --build)   BUILD=true; shift ;;
-        --clean)   CLEAN=true; shift ;;
         *)         echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
 
+# Auto-bump patch version unless explicitly provided
+if [ -z "$VERSION" ]; then
+    IFS='.-' read -r major minor patch pre <<< "$CURRENT_VERSION"
+    patch=$((patch + 1))
+    if [ -n "$pre" ]; then
+        NEW_VERSION="${major}.${minor}.${patch}-${pre}"
+    else
+        NEW_VERSION="${major}.${minor}.${patch}"
+    fi
+
+    sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$PROJECT_ROOT/Cargo.toml"
+
+    vcode="${NEW_VERSION%%-*}"
+    vcode="${vcode//./}"
+    sed -i "s/^version=.*/version=v${NEW_VERSION}/" "$MODULE_DIR/module.prop"
+    sed -i "s/^versionCode=.*/versionCode=${vcode}/" "$MODULE_DIR/module.prop"
+
+    VERSION="v${NEW_VERSION}"
+    echo "==> Version bumped: v${CURRENT_VERSION} → ${VERSION}"
+else
+    VERSION="${VERSION#v}"
+    VERSION="v${VERSION}"
+fi
+
 mkdir -p "$RELEASE_DIR/debug" "$RELEASE_DIR/release"
 
-if [ "$CLEAN" = true ]; then
-    echo "==> Cleaning old releases"
-    rm -f "$RELEASE_DIR"/debug/zeromount-*.zip "$RELEASE_DIR"/release/zeromount-*.zip
-fi
+echo "==> Cleaning old releases"
+rm -f "$RELEASE_DIR"/debug/zeromount-*.zip "$RELEASE_DIR"/release/zeromount-*.zip
 
 SCRIPTS=(
     common.sh

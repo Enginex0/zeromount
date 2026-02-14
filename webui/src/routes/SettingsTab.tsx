@@ -231,9 +231,10 @@ export function SettingsTab() {
           <Button
             variant="danger"
             fullWidth
+            disabled={!caps()?.vfs_driver}
             onClick={() => setShowClearConfirm(true)}
           >
-            CLEAR ALL RULES
+            {caps()?.vfs_driver ? 'CLEAR ALL RULES' : 'VFS UNAVAILABLE'}
           </Button>
         </div>
       </Card>
