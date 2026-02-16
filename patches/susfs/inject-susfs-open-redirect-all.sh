@@ -1,8 +1,8 @@
 #!/bin/bash
 # inject-susfs-open-redirect-all.sh
 # Injects CMD_SUSFS_ADD_OPEN_REDIRECT_ALL (0x555c1), AS_FLAGS_OPEN_REDIRECT_ALL,
-# BIT_OPEN_REDIRECT_ALL, st_susfs_open_redirect_all_hlist struct, hash table,
-# and 3 functions into upstream SUSFS source.
+# st_susfs_open_redirect_all_hlist struct, hash table, and 3 functions into
+# upstream SUSFS source.
 #
 # Usage: ./inject-susfs-open-redirect-all.sh <SUSFS_KERNEL_PATCHES_DIR>
 
@@ -38,7 +38,7 @@ else
     ((inject_count++)) || true
 fi
 
-# --- 2. AS_FLAGS and BIT in susfs_def.h ---
+# --- 2. AS_FLAGS in susfs_def.h ---
 if grep -q 'AS_FLAGS_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
     echo "[=] AS_FLAGS_OPEN_REDIRECT_ALL already present in susfs_def.h"
 else
@@ -47,13 +47,10 @@ else
     ((inject_count++)) || true
 fi
 
-if grep -q 'BIT_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
-    echo "[=] BIT_OPEN_REDIRECT_ALL already present in susfs_def.h"
-else
-    echo "[+] Injecting BIT_OPEN_REDIRECT_ALL into susfs_def.h"
-    sed -i '/^#define AS_FLAGS_OPEN_REDIRECT_ALL/a #define BIT_OPEN_REDIRECT_ALL BIT(40)' "$SUSFS_DEF_H"
-    ((inject_count++)) || true
-fi
+# NOTE: BIT_OPEN_REDIRECT_ALL is intentionally omitted. Upstream SUSFS does not
+# use BIT() macros for any AS_FLAGS — all versions use test_bit(AS_FLAGS_*, ...)
+# with plain integer bit positions. The VFS hook in inject-susfs-vfs-open-redirect-all.sh
+# uses test_bit(AS_FLAGS_OPEN_REDIRECT_ALL, ...) directly, so no BIT() wrapper is needed.
 
 # Validate
 if ! grep -q 'CMD_SUSFS_ADD_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
@@ -62,10 +59,6 @@ if ! grep -q 'CMD_SUSFS_ADD_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
 fi
 if ! grep -q 'AS_FLAGS_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
     echo "FATAL: AS_FLAGS_OPEN_REDIRECT_ALL injection failed"
-    exit 1
-fi
-if ! grep -q 'BIT_OPEN_REDIRECT_ALL' "$SUSFS_DEF_H"; then
-    echo "FATAL: BIT_OPEN_REDIRECT_ALL injection failed"
     exit 1
 fi
 

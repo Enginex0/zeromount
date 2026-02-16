@@ -28,7 +28,7 @@ fi
 echo "=== fix-susfs-safety ==="
 fix_count=0
 
-# --- 1. (removed: fsnotify_backend.h is required for sdcard monitor) ---
+# --- 1. (skipped: fsnotify_backend.h required for sdcard monitor) ---
 
 # --- 2. Fix trailing whitespace in disabled log macros ---
 if grep -q 'SUSFS_LOGI(fmt, \.\.\.) $' "$SUSFS_C"; then
@@ -307,10 +307,7 @@ else
     echo "[=] sus_mount default already true"
 fi
 
-# --- 7. Fix trailing whitespace before kzalloc in cmdline_or_bootconfig ---
-sed -i '/void susfs_set_cmdline_or_bootconfig/,/^}/ {
-    s/	$/	/
-}' "$SUSFS_C"
+# --- 7. (removed: trailing whitespace fix was a no-op) ---
 
 # --- 8. Fix format specifier: spoofed_size is loff_t (long long), not unsigned int ---
 # Upstream uses '%u' for spoofed_size in the #else (non-STAT64) SUSFS_LOGI paths

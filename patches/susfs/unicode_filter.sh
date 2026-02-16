@@ -10,12 +10,18 @@ if [[ -z "$KV" ]]; then
     echo "FATAL: KERNEL_VERSION not set"; exit 1
 fi
 
-# struct filename* lift: 5.10/5.15 use const char __user *, 6.1+ use struct filename *
+# 5.15 has split API: namei.c functions take struct filename * (6.1-era)
+# but vfs_statx still takes const char __user * (5.10-era)
+# NOTE: 5.4 is GKI but upstream SUSFS has no 5.4 branch and the build workflow
+# does not offer 5.4 as a kernel_version choice. The branch is kept defensively
+# in case SUSFS adds 5.4 support in the future.
 case "$KV" in
-    5.10|5.15|5.4) USE_UPTR=false ;;
+    5.10|5.4)      USE_UPTR=false ;;
+    5.15)          USE_UPTR=true; STAT_UPTR=false ;;
     6.1|6.6|6.12)  USE_UPTR=true  ;;
     *)              echo "FATAL: Unsupported kernel: $KV"; exit 1 ;;
 esac
+STAT_UPTR="${STAT_UPTR:-$USE_UPTR}"
 
 inject_susfs_include() {
     sed -i "/$1/a\\
@@ -32,7 +38,7 @@ patch_namei() {
 
     inject_susfs_include '#include <linux\/uaccess.h>' "$f"
 
-    # do_mkdirat — 5.10/5.15: pathname (const char __user *), 6.1+: name (struct filename *)
+    # do_mkdirat — 5.10: pathname (const char __user *), 5.15+: name (struct filename *)
     if $USE_UPTR; then
         sed -i '/unsigned int lookup_flags = LOOKUP_DIRECTORY;/a\
 \
@@ -62,7 +68,7 @@ patch_namei() {
 #endif
     }' "$f"
 
-    # do_symlinkat — 5.10/5.15: static long, newname (const char __user *); 6.1+: int, to (struct filename *)
+    # do_symlinkat — 5.10: static long, newname (const char __user *); 5.15+: int, to (struct filename *)
     if $USE_UPTR; then
         sed -i '/^int do_symlinkat/,/unsigned int lookup_flags = 0;/{
             /unsigned int lookup_flags = 0;/a\
@@ -85,7 +91,7 @@ patch_namei() {
         }' "$f"
     fi
 
-    # do_linkat — 5.10/5.15: static int, newname (const char __user *); 6.1+: int, new (struct filename *)
+    # do_linkat — 5.10: static int, newname (const char __user *); 5.15+: int, new (struct filename *)
     if $USE_UPTR; then
         sed -i '/^int do_linkat/,/int error;/{
             /int error;$/a\
@@ -162,7 +168,7 @@ patch_stat() {
     inject_susfs_include '#include <linux\/compat.h>' "$f"
 
     # vfs_statx — 5.10/5.15: filename (const char __user *), 6.1+: filename (struct filename *)
-    if $USE_UPTR; then
+    if $STAT_UPTR; then
         sed -i '/^static int vfs_statx/,/int error;/{
             /int error;$/a\
 \

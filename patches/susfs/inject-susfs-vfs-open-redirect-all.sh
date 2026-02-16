@@ -1,5 +1,5 @@
 #!/bin/bash
-# Adds BIT_OPEN_REDIRECT_ALL two-branch check into do_filp_open.
+# Adds OPEN_REDIRECT_ALL two-branch check into do_filp_open.
 # Runs AFTER the SUSFS GKI patch has been applied to kernel source.
 #
 # Usage: ./inject-susfs-vfs-open-redirect-all.sh <KERNEL_COMMON_DIR>
@@ -26,6 +26,9 @@ if [[ -z "$KV" ]]; then
 fi
 
 # set_nameidata gained a 4th arg (const struct path *root) between 5.10 and 5.15
+# NOTE: 5.4 is GKI but upstream SUSFS has no 5.4 branch and the build workflow
+# does not offer 5.4 as a kernel_version choice. The branch is kept defensively
+# in case SUSFS adds 5.4 support in the future.
 case "$KV" in
     5.10|5.4)          NAMEIDATA_ARGS=3 ;;
     5.15|6.1|6.6|6.12) NAMEIDATA_ARGS=4 ;;

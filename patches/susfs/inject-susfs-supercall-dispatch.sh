@@ -3,6 +3,14 @@
 # Adds CMD_SUSFS_ADD_SUS_KSTAT_REDIRECT and CMD_SUSFS_ADD_OPEN_REDIRECT_ALL
 # case handlers into the KSU supercalls dispatch in 10_enable_susfs_for_ksu.patch.
 #
+# NOTE: Currently unused in the metamodule build pipeline. The build uses
+# KernelSU-Next's dev_susfs branch (which has SUSFS pre-integrated), so
+# 10_enable_susfs_for_ksu.patch is never applied via git-apply. The same
+# handler injection is performed directly on supercalls.c by
+# inject-susfs-custom-handlers.sh instead. This script is retained for
+# compatibility with build flows that apply the GKI .patch file on a
+# non-dev_susfs KernelSU branch.
+#
 # Usage: ./inject-susfs-supercall-dispatch.sh <SUSFS_KERNEL_PATCHES_DIR>
 
 set -e
