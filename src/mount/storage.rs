@@ -357,7 +357,8 @@ pub(crate) fn resolve_overlay_source(config_value: &str) -> String {
     if config_value.is_empty() || config_value == "auto" {
         match crate::utils::platform::detect_root_manager() {
             Ok(mgr) => match mgr.name() {
-                "KernelSU" | "APatch" => "KSU".to_string(),
+                "KernelSU" => "KSU".to_string(),
+                "APatch" => "APatch".to_string(),
                 "Magisk" => "magisk".to_string(),
                 _ => "overlay".to_string(),
             },
