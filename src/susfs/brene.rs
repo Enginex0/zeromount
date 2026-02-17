@@ -87,7 +87,7 @@ pub struct FontModuleInfo {
 /// Property spoofing uses resetprop (not SUSFS) and is handled separately.
 /// `skip_path_hide`: true at boot (sdcard not decrypted, all add_sus_path calls EINVAL).
 /// apply_brene_deferred handles path hiding after sdcard is available.
-pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, fonts_overlay_mounted: bool) -> Result<BreneResult> {
+pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, vfs_handles_fonts: bool) -> Result<BreneResult> {
     let mut result = BreneResult::default();
 
     if !client.is_available() {
@@ -150,13 +150,22 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
     // -- Font redirect (delegates to F15) --
     // Font redirect uses open_redirect (when available) and kstat — gate on those sub-toggles
 
-    if brene.auto_hide_fonts && (has_open_redirect || has_kstat) {
-        let fonts = if fonts_overlay_mounted {
+    if brene.auto_hide_fonts {
+        let has_custom_susfs = client.features().kstat_redirect
+            && client.features().open_redirect_all;
+
+        let fonts = if has_custom_susfs && !vfs_handles_fonts {
+            // SusfsOnly: full SUSFS redirect via open_redirect_all + kstat_redirect
+            process_font_modules(client, &config.mount.overlay_source)
+        } else if vfs_handles_fonts {
+            // VFS handles redirection — supplement with static kstat + path_hide
             hide_font_modules_overlay(client)
         } else {
+            // No VFS, no custom SUSFS — overlay fallback
             process_font_modules(client, &config.mount.overlay_source)
         };
-        info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
+        info!("BRENE: processed {} font modules (vfs={}, custom_susfs={}): {:?}",
+            fonts.len(), vfs_handles_fonts, has_custom_susfs, fonts);
         result.font_modules = fonts;
     }
 

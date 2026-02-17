@@ -61,14 +61,6 @@ impl SusfsClient {
             client.features = parse_features(&features_str);
         }
 
-        // Probe custom commands (kstat_redirect / open_redirect_all)
-        // These aren't listed in enabled_features -- they exist if the
-        // fork patches are applied. We detect them by attempting a no-op
-        // probe. If the kernel returns ERR_CMD_NOT_SUPPORTED we know
-        // the custom handler is absent.
-        client.features.kstat_redirect = probe_custom_cmd(SusfsCommand::AddSusKstatRedirect);
-        client.features.open_redirect_all = probe_custom_cmd(SusfsCommand::AddOpenRedirectAll);
-
         debug!("SUSFS features: {:?}", client.features);
 
         Ok(client)
@@ -605,52 +597,6 @@ fn apply_spoof_values(info: &mut StSusfsSusKstat, meta: &fs::Metadata, spoof: &K
     info.spoofed_blocks = spoof.blocks.unwrap_or(meta.blocks());
 }
 
-/// Probe whether a custom SUSFS command is recognized by the kernel.
-/// Uses a full-sized zeroed struct with err pre-set to ERR_CMD_NOT_SUPPORTED.
-/// If the kernel doesn't handle the command, the err field stays unchanged.
-/// Must use the correct struct size -- kernel's copy_from_user() EFAULTs on undersized buffers.
-fn probe_custom_cmd(cmd: SusfsCommand) -> bool {
-    match cmd {
-        SusfsCommand::AddSusKstatRedirect => {
-            let mut info = StSusfsSusKstatRedirect {
-                virtual_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
-                real_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
-                spoofed_ino: 0,
-                spoofed_dev: 0,
-                spoofed_nlink: 0,
-                _pad0: [0; 4],
-                spoofed_size: 0,
-                spoofed_atime_tv_sec: 0,
-                spoofed_mtime_tv_sec: 0,
-                spoofed_ctime_tv_sec: 0,
-                spoofed_atime_tv_nsec: 0,
-                spoofed_mtime_tv_nsec: 0,
-                spoofed_ctime_tv_nsec: 0,
-                spoofed_blksize: 0,
-                spoofed_blocks: 0,
-                err: ERR_CMD_NOT_SUPPORTED,
-            };
-            if supercall(cmd, &mut info as *mut _ as *mut u8).is_err() {
-                return false;
-            }
-            info.err != ERR_CMD_NOT_SUPPORTED
-        }
-        SusfsCommand::AddOpenRedirectAll => {
-            let mut info = StSusfsOpenRedirect {
-                target_ino: 0,
-                target_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
-                redirected_pathname: [0u8; SUSFS_MAX_LEN_PATHNAME],
-                err: ERR_CMD_NOT_SUPPORTED,
-            };
-            if supercall(cmd, &mut info as *mut _ as *mut u8).is_err() {
-                return false;
-            }
-            info.err != ERR_CMD_NOT_SUPPORTED
-        }
-        _ => false,
-    }
-}
-
 fn parse_features(features_str: &str) -> SusfsFeatures {
     SusfsFeatures {
         kstat: features_str.contains("CONFIG_KSU_SUSFS_SUS_KSTAT"),
@@ -658,9 +604,8 @@ fn parse_features(features_str: &str) -> SusfsFeatures {
         maps: features_str.contains("CONFIG_KSU_SUSFS_SUS_MAPS")
             || features_str.contains("CONFIG_KSU_SUSFS_SUS_MAP"),
         open_redirect: features_str.contains("CONFIG_KSU_SUSFS_OPEN_REDIRECT"),
-        // Custom commands are probed separately, not in enabled_features
-        kstat_redirect: false,
-        open_redirect_all: false,
+        kstat_redirect: features_str.contains("CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT"),
+        open_redirect_all: features_str.contains("CONFIG_KSU_SUSFS_OPEN_REDIRECT_ALL"),
     }
 }
 
@@ -693,7 +638,7 @@ mod tests {
     // -- Feature parsing tests --
 
     #[test]
-    fn parse_features_full_feature_set() {
+    fn parse_features_stock_kernel() {
         let features = "CONFIG_KSU_SUSFS_SUS_PATH=y\n\
                         CONFIG_KSU_SUSFS_SUS_KSTAT=y\n\
                         CONFIG_KSU_SUSFS_SUS_MAPS=y\n\
@@ -703,9 +648,25 @@ mod tests {
         assert!(f.kstat);
         assert!(f.maps);
         assert!(f.open_redirect);
-        // Custom commands never set by parse_features -- probed separately
         assert!(!f.kstat_redirect);
         assert!(!f.open_redirect_all);
+    }
+
+    #[test]
+    fn parse_features_extended_kernel() {
+        let features = "CONFIG_KSU_SUSFS_SUS_PATH=y\n\
+                        CONFIG_KSU_SUSFS_SUS_KSTAT=y\n\
+                        CONFIG_KSU_SUSFS_SUS_MAPS=y\n\
+                        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y\n\
+                        CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT=y\n\
+                        CONFIG_KSU_SUSFS_OPEN_REDIRECT_ALL=y\n";
+        let f = parse_features(features);
+        assert!(f.path);
+        assert!(f.kstat);
+        assert!(f.maps);
+        assert!(f.open_redirect);
+        assert!(f.kstat_redirect);
+        assert!(f.open_redirect_all);
     }
 
     #[test]
@@ -850,25 +811,20 @@ mod tests {
     }
 
     #[test]
-    fn parse_features_never_sets_custom_commands() {
-        // Custom commands (kstat_redirect, open_redirect_all) are probed at
-        // runtime, never derived from the features string. Verify parse_features
-        // always returns false for them regardless of input.
-        let everything = "CONFIG_KSU_SUSFS_SUS_PATH=y\n\
-                          CONFIG_KSU_SUSFS_SUS_KSTAT=y\n\
-                          CONFIG_KSU_SUSFS_SUS_MAPS=y\n\
-                          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y\n\
-                          CONFIG_KSU_SUSFS_KSTAT_REDIRECT=y\n\
-                          CONFIG_KSU_SUSFS_OPEN_REDIRECT_ALL=y\n";
-        let f = parse_features(everything);
-        assert!(!f.kstat_redirect, "custom cmd must not be set by parse_features");
-        assert!(!f.open_redirect_all, "custom cmd must not be set by parse_features");
+    fn parse_features_custom_without_base_prefix_collision() {
+        // CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT contains CONFIG_KSU_SUSFS_SUS_KSTAT
+        // as prefix — both should match when redirect is present
+        let features = "CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT=y\n\
+                        CONFIG_KSU_SUSFS_OPEN_REDIRECT_ALL=y\n";
+        let f = parse_features(features);
+        assert!(f.kstat, "base kstat should match from KSTAT_REDIRECT substring");
+        assert!(f.kstat_redirect);
+        assert!(f.open_redirect, "base redirect should match from REDIRECT_ALL substring");
+        assert!(f.open_redirect_all);
     }
 
     #[test]
     fn err_cmd_not_supported_is_recognized() {
-        // ERR_CMD_NOT_SUPPORTED (126) is the sentinel value the kernel sets
-        // when a command handler doesn't exist. probe_custom_cmd relies on this.
         assert_eq!(ERR_CMD_NOT_SUPPORTED, 126);
         let result = check_err(ERR_CMD_NOT_SUPPORTED, "probe_test");
         assert!(result.is_err());

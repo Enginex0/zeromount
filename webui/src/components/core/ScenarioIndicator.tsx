@@ -96,7 +96,7 @@ export function ScenarioIndicator() {
       <div class="scenario__desc">
         {config().description}
       </div>
-      <Show when={scenario() === 'susfs_frontend' && missing().length > 0}>
+      <Show when={(scenario() === 'susfs_frontend' || scenario() === 'full') && missing().length > 0}>
         <div class="scenario__missing">
           <For each={missing()}>
             {(cap) => (

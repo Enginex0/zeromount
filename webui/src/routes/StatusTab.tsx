@@ -418,7 +418,10 @@ export function StatusTab() {
             </div>
             <span class="status-mode__value color-text-accent">
               {store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
-                ? store.systemInfo.susfsVersion
+                ? `${store.systemInfo.susfsVersion} (${
+                    store.capabilities?.()?.susfs_kstat_redirect && store.capabilities?.()?.susfs_open_redirect_all
+                      ? 'Extended' : 'Stock'
+                  })`
                 : 'Unavailable'}
             </span>
           </div>
@@ -540,7 +543,9 @@ export function StatusTab() {
             </div>
             <div class="status-health__message color-text-secondary">
               {store.settings.susfs.enabled
-                ? 'SUSFS integration active'
+                ? (store.capabilities?.()?.susfs_kstat_redirect && store.capabilities?.()?.susfs_open_redirect_all
+                    ? 'SUSFS integration active (Extended)'
+                    : 'SUSFS integration active (Stock — limited kstat/redirect)')
                 : store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
                   ? 'SUSFS available but disabled'
                   : 'Running without SUSFS'}
