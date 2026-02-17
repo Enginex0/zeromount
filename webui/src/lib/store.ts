@@ -819,10 +819,12 @@ function createAppStore() {
   const effectiveStrategy = (): MountStrategy => {
     const strategy = activeStrategy();
     const caps = capabilities();
-    if (strategy === 'Vfs' && !caps?.vfs_driver) {
-      return caps?.overlay_supported ? 'Overlay' : 'MagicMount';
+    // Capabilities not loaded yet — show config-based strategy, not MagicMount fallback
+    if (!caps) return strategy;
+    if (strategy === 'Vfs' && !caps.vfs_driver) {
+      return caps.overlay_supported ? 'Overlay' : 'MagicMount';
     }
-    if (strategy === 'Overlay' && !caps?.overlay_supported) {
+    if (strategy === 'Overlay' && !caps.overlay_supported) {
       return 'MagicMount';
     }
     return strategy;
