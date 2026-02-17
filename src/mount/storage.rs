@@ -502,21 +502,12 @@ fn try_ext4_storage(base_path: &Path) -> Result<()> {
     let image_size_mb = calculate_ext4_image_size_mb();
     debug!(size_mb = image_size_mb, "ext4 image size calculated");
 
-    let dd_status = run_command_with_timeout(
-        Command::new("dd").args([
-            "if=/dev/zero",
-            &format!("of={}", image_path.display()),
-            "bs=1M",
-            "count=0",
-            &format!("seek={image_size_mb}"),
-        ]),
-        CMD_TIMEOUT,
-    )?;
-
-    if !dd_status.status.success() {
-        let stderr = String::from_utf8_lossy(&dd_status.stderr);
-        bail!("dd sparse image failed: {stderr}");
-    }
+    // Sparse allocation via ftruncate -- no dd, no external process
+    let file = fs::File::create(&image_path)
+        .with_context(|| format!("cannot create ext4 image: {}", image_path.display()))?;
+    file.set_len(image_size_mb * 1024 * 1024)
+        .with_context(|| format!("cannot set sparse size: {}", image_path.display()))?;
+    drop(file);
 
     let mkfs_status = run_command_with_timeout(
         Command::new("mkfs.ext4")
