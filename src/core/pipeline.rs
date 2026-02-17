@@ -366,6 +366,20 @@ impl MountController<Mounted> {
         &self.state.results
     }
 
+    pub fn sweep_rogue_mounts(self) -> Self {
+        let summary = crate::mount::hijack::sweep(
+            self.state.detection.scenario,
+            &self.state.detection.capabilities,
+            &self.state.config.susfs,
+            &self.state.results,
+        );
+        info!(
+            "sweep: {} found, {} hijacked, {} skipped",
+            summary.found, summary.hijacked, summary.skipped
+        );
+        self
+    }
+
     /// Apply SUSFS protections, notify root manager, write status JSON.
     ///
     /// KSU09 ordering: BRENE -> description update -> status JSON -> notify-module-mounted (LAST).
@@ -656,6 +670,7 @@ pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
         .detect()?
         .scan_and_plan()?
         .execute()?
+        .sweep_rogue_mounts()
         .finalize()?
         .into_state();
     Ok(state)

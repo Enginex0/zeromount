@@ -189,7 +189,7 @@ impl VfsExecutor {
 // BRENE owns font/emoji/audio via open_redirect_all (zero mount fingerprint)
 const BRENE_OWNED_TARGET_PREFIXES: &[&str] = &["/system/fonts/"];
 
-fn is_brene_owned_target(target: &Path) -> bool {
+pub(crate) fn is_brene_owned_target(target: &Path) -> bool {
     let s = match target.to_str() {
         Some(s) => s,
         None => return false,
