@@ -161,7 +161,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
     let c_fstype = CString::new("overlay")?;
 
     // fsopen("overlay", 0)
-    let fs_fd = unsafe { libc::syscall(syscall_nr::SYS_FSOPEN, c_fstype.as_ptr(), 0u32) };
+    let fs_fd = unsafe { libc::syscall(syscall_nr::SYS_FSOPEN, c_fstype.as_ptr(), 0x01u32) };
     if fs_fd < 0 {
         bail!(
             "fsopen(overlay): {}",
