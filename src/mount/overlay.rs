@@ -57,6 +57,7 @@ pub fn mount_overlay(
     target: &Path,
     module_id: &str,
     overlay_source: &str,
+    decoy_dir: Option<&Path>,
 ) -> Result<MountResult> {
     if lower_dirs.is_empty() {
         return Ok(MountResult {
@@ -82,7 +83,7 @@ pub fn mount_overlay(
         });
     }
 
-    let lowerdir = build_lowerdir_string(lower_dirs, target);
+    let lowerdir = build_lowerdir_string(lower_dirs, target, decoy_dir);
 
     // Try new mount API first, fall back to legacy
     let result = match mount_overlay_new_api(&lowerdir, target, overlay_source) {
@@ -138,11 +139,20 @@ pub fn mount_overlay(
 
 /// Build the lowerdir= option string. The target (original) directory goes last
 /// so module files take precedence in the overlay stack.
-fn build_lowerdir_string(lower_dirs: &[&Path], target: &Path) -> String {
-    let mut parts: Vec<String> = lower_dirs
-        .iter()
-        .map(|p| escape_overlay_path(&p.to_string_lossy()))
-        .collect();
+fn build_lowerdir_string(lower_dirs: &[&Path], target: &Path, decoy_dir: Option<&Path>) -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    // Decoy as highest-priority layer (first in overlay stack, hides staging paths)
+    if let Some(decoy) = decoy_dir {
+        parts.push(escape_overlay_path(&decoy.to_string_lossy()));
+    }
+
+    // Module staging directories
+    parts.extend(
+        lower_dirs
+            .iter()
+            .map(|p| escape_overlay_path(&p.to_string_lossy())),
+    );
 
     // Original filesystem content as the bottom layer
     parts.push(escape_overlay_path(&target.to_string_lossy()));

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::core::config::MountConfig;
 use crate::core::types::{
@@ -12,6 +12,7 @@ use crate::core::types::{
 use super::magic::mount_magic;
 use super::overlay::mount_overlay;
 use super::storage::init_storage;
+use super::decoy;
 
 pub fn execute_plan(
     plan: &MountPlan,
@@ -56,6 +57,9 @@ fn execute_overlay(
             warn!(error = %std::io::Error::last_os_error(), "MS_PRIVATE failed (non-fatal)");
         }
     }
+
+    // Set up decoy lowerdir for detection evasion
+    let decoy = decoy::setup_decoy();
 
     let module_map: std::collections::HashMap<&str, &ScannedModule> =
         modules.iter().map(|m| (m.id.as_str(), m)).collect();
@@ -104,7 +108,16 @@ fn execute_overlay(
         let target = &pm.mount_point;
         let mount_id = pm.contributing_modules.join("+");
 
-        let result = match mount_overlay(&lower_refs, target, &mount_id, &storage.overlay_source) {
+        // Compute decoy subdir for this mount target
+        let decoy_subdir = decoy.as_ref().map(|d| {
+            let sub = d.join(target.strip_prefix("/").unwrap_or(target));
+            let _ = std::fs::create_dir_all(&sub);
+            decoy::mirror_decoy_selinux(d, target);
+            sub
+        });
+        let decoy_ref = decoy_subdir.as_deref();
+
+        let result = match mount_overlay(&lower_refs, target, &mount_id, &storage.overlay_source, decoy_ref) {
             Ok(r) => r,
             Err(e) => {
                 warn!(target = %target.display(), error = %e, "overlay mount failed");
@@ -123,6 +136,11 @@ fn execute_overlay(
     }
 
     storage.detach_staging();
+
+    // Tear down decoy tmpfs -- overlay keeps inode references alive
+    if let Some(ref d) = decoy {
+        decoy::teardown_decoy(d);
+    }
 
     info!(mounts = results.len(), "overlay execution complete");
     Ok(results)

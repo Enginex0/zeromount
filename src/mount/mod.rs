@@ -1,3 +1,4 @@
+pub mod decoy;
 pub mod executor;
 pub mod magic;
 pub mod node;
