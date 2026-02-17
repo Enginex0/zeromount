@@ -63,6 +63,7 @@ fn main() -> Result<()> {
         Commands::Susfs { feature, state } => cli::handlers::handle_susfs(&feature, &state),
         Commands::Watch => cli::handlers::handle_watch(),
         Commands::Diag => cli::handlers::handle_diag(),
+        Commands::CleanupStale => cli::handlers::handle_cleanup_stale(),
         Commands::Version => {
             println!("zeromount v{}", read_version_from_prop());
             Ok(())

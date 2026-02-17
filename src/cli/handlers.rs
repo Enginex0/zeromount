@@ -583,3 +583,17 @@ pub fn handle_diag() -> Result<()> {
 
     Ok(())
 }
+
+pub fn handle_cleanup_stale() -> Result<()> {
+    tracing::info!("stale overlay cleanup started");
+    match crate::mount::cleanup::cleanup_stale_overlays() {
+        Ok(n) => {
+            tracing::info!(cleaned = n, "stale overlay cleanup complete");
+            Ok(())
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "stale overlay cleanup failed");
+            Ok(())
+        }
+    }
+}

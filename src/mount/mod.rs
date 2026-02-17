@@ -1,3 +1,4 @@
+pub mod cleanup;
 pub mod decoy;
 pub mod executor;
 pub mod magic;

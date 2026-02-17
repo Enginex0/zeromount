@@ -65,6 +65,8 @@ pub enum Commands {
     Watch,
     /// Diagnostic dump
     Diag,
+    /// Remove stale overlay mounts from previous runs
+    CleanupStale,
     /// Print version
     Version,
 }
