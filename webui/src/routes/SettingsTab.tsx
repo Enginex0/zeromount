@@ -204,6 +204,26 @@ export function SettingsTab() {
             onChange={(checked) => store.updateSettings({ fixedNav: checked })}
           />
         </div>
+
+        <div class="settings__group">
+          <div class="settings__label">
+            Glass Intensity
+            <span class="settings__label-value">{Math.round(store.bgOpacity() * 100)}%</span>
+          </div>
+          <div class="settings__slider-row">
+            <input
+              type="range"
+              class="settings__slider"
+              min="0"
+              max="100"
+              value={Math.round(store.bgOpacity() * 100)}
+              onInput={(e) => store.setBgOpacity(parseInt(e.currentTarget.value) / 100)}
+            />
+          </div>
+          <div class="settings__item-desc" style="margin-top: 4px">
+            Background atmosphere with frosted glass effect
+          </div>
+        </div>
       </Card>
 
       <Card>
