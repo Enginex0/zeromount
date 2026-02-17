@@ -2,6 +2,7 @@ pub mod decoy;
 pub mod executor;
 pub mod magic;
 pub mod node;
+pub mod opaque;
 pub mod overlay;
 pub mod planner;
 pub mod stock_overlays;

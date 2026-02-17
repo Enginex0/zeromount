@@ -222,6 +222,14 @@ fn prepare_lower_dir(
         }
     }
 
+    // Mark directories with .replace as opaque in the overlay
+    let system_dir = module.path.join(partition);
+    if system_dir.is_dir() {
+        if let Err(e) = super::opaque::mark_opaque_dirs(&system_dir, lower_dir) {
+            warn!(module = %module.id, error = %e, "opaque dir marking failed (non-fatal)");
+        }
+    }
+
     Ok(())
 }
 
