@@ -12,11 +12,13 @@ RELEASE_DIR="$PROJECT_ROOT/release"
 CURRENT_VERSION="$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
 VERSION=""
 BUILD=false
+CLEAN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) VERSION="$2"; shift 2 ;;
         --build)   BUILD=true; shift ;;
+        --clean)   CLEAN=true; shift ;;
         *)         echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
@@ -47,8 +49,10 @@ fi
 
 mkdir -p "$RELEASE_DIR/debug" "$RELEASE_DIR/release"
 
-echo "==> Cleaning old releases"
-rm -f "$RELEASE_DIR"/debug/zeromount-*.zip "$RELEASE_DIR"/release/zeromount-*.zip
+if [ "$CLEAN" = true ]; then
+    echo "==> Cleaning old releases"
+    rm -f "$RELEASE_DIR"/debug/zeromount-*.zip "$RELEASE_DIR"/release/zeromount-*.zip
+fi
 
 SCRIPTS=(
     common.sh

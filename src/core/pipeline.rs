@@ -426,12 +426,15 @@ impl MountController<Mounted> {
             Ok(client) => {
                 client.ensure_root_paths();
 
-                let vfs_handles_fonts = matches!(
-                    self.state.detection.scenario,
-                    Scenario::Full | Scenario::SusfsFrontend | Scenario::KernelOnly
-                );
+                // KSU bind mounts serve font files — BRENE only adds stealth (kstat+path_hide).
+                // True when VFS is active (executor defers fonts) or fonts are tagged as Font strategy.
+                let fonts_overlay_mounted = self.state.results.iter().any(|r| {
+                    r.strategy_used == MountStrategy::Vfs
+                    || r.strategy_used == MountStrategy::Font
+                    || (r.success && r.mount_paths.iter().any(|p| p.contains("/system/fonts")))
+                });
 
-                match crate::susfs::brene::apply_brene(&client, &self.state.config, true, vfs_handles_fonts) {
+                match crate::susfs::brene::apply_brene(&client, &self.state.config, true, fonts_overlay_mounted) {
                     Ok(brene) => {
                         debug!(
                             paths = brene.paths_hidden,
@@ -465,14 +468,21 @@ impl MountController<Mounted> {
             .flat_map(|r| r.module_id.split('+'))
             .collect();
 
-        let font_ids: std::collections::BTreeSet<&str> =
+        // Font IDs from BRENE + executor (survives even if BRENE fails)
+        let mut font_ids: std::collections::BTreeSet<&str> =
             font_infos.iter().map(|f| f.id.as_str()).collect();
+        for r in &self.state.results {
+            if r.strategy_used == MountStrategy::Font {
+                font_ids.insert(&r.module_id);
+            }
+        }
+
         let vfs_only: Vec<&str> = mounted.iter()
             .filter(|id| !font_ids.contains(*id))
             .copied()
             .collect();
 
-        if vfs_only.is_empty() && font_infos.is_empty() {
+        if vfs_only.is_empty() && font_ids.is_empty() {
             return "😴 Idle — No Module Mounted | Mountless VFS-level Redirection. GHOST👻"
                 .to_string();
         }
@@ -485,8 +495,8 @@ impl MountController<Mounted> {
             parts.push(format!("{} {} | {}", vfs_only.len(), label, names));
         }
 
-        if !font_infos.is_empty() {
-            let names: Vec<&str> = font_infos.iter().map(|f| f.id.as_str()).collect();
+        if !font_ids.is_empty() {
+            let names: Vec<&str> = font_ids.iter().copied().collect();
             parts.push(format!("Font: {}", names.join(", ")));
         }
 

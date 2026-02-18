@@ -33,23 +33,6 @@ impl RootManager for KsuManager {
     }
 
     fn update_description(&self, text: &str) -> Result<()> {
-        // ksud module config requires a KSU execution context that doesn't
-        // exist when the binary runs standalone; fall back to module.prop edit
-        let ksud = if Path::new("/data/adb/ksu/bin/ksud").exists() {
-            "/data/adb/ksu/bin/ksud"
-        } else {
-            "ksud"
-        };
-        let status = run_command_with_timeout(
-            Command::new(ksud).args(["module", "config", "set", "override.description", text]),
-            CMD_TIMEOUT,
-        )
-        .map(|o| o.status);
-
-        if status.map(|s| s.success()).unwrap_or(false) {
-            return Ok(());
-        }
-
         write_description_to_module_prop(text)
     }
 

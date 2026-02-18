@@ -158,6 +158,11 @@ fi
 
 zm_print "🚀 Finalizing" 0.3 "h"
 
+if command -v ksud >/dev/null 2>&1; then
+    ksud module config set manage.kernel_umount false 2>/dev/null || true
+fi
+rm -f /data/adb/ksu/module_configs/meta-zeromount/persist.config 2>/dev/null
+
 echo 0 > "$ZM_DATA/.bootcount"
 
 if command -v chcon >/dev/null 2>&1; then

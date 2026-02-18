@@ -28,6 +28,7 @@ if [ -n "$ABI" ] && [ -x "$BIN" ]; then
     "$BIN" mount
     RET=$?
     echo "$LOG: mount pipeline exited (rc=$RET)" > /dev/kmsg 2>/dev/null
+
 else
     echo "$LOG: binary not found (ABI=$ABI), skipping pipeline" > /dev/kmsg 2>/dev/null
 fi

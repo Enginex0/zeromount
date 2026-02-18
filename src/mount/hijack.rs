@@ -240,23 +240,20 @@ fn hijack_mount(
         "hijacking rogue bind mount"
     );
 
-    // BRENE owns font paths via SUSFS open_redirect_all — just unmount, no VFS rules.
-    // Adding VFS rules here would conflict: mountinfo root reflects the bind source
-    // (possibly a single file mounted to multiple targets), while BRENE matches by filename.
+    // BRENE handles font paths via kstat + path_hide on top of the existing bind mounts.
+    // Unmounting them would break font rendering — BRENE adds stealth, not file serving.
     let brene_owned = crate::vfs::executor::is_brene_owned_target(Path::new(target));
     if brene_owned {
-        let unmounted = lazy_umount(target);
         debug!(
             target,
             source = %source,
-            unmounted,
-            "BRENE-owned path — unmount only, SUSFS redirect deferred to finalize"
+            "BRENE-owned path — preserving bind mount, BRENE adds stealth in finalize"
         );
         return HijackResult {
             mount_point: target.clone(),
             source,
-            action: HijackAction::VfsReplaced, // BRENE will handle via SUSFS
-            success: true,
+            action: HijackAction::Skipped,
+            success: false,
             error: None,
         };
     }

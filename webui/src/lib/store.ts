@@ -61,9 +61,9 @@ function createAppStore() {
   const [lastApiError, setLastApiError] = createSignal<{ operation: string; error: unknown; timestamp: Date } | null>(null);
 
   const savedBgOpacity = typeof window !== 'undefined'
-    ? parseFloat(localStorage.getItem('zeromount-bgOpacity') ?? '0.5')
-    : 0.5;
-  const [bgOpacity, _setBgOpacity] = createSignal(isNaN(savedBgOpacity) ? 0.5 : savedBgOpacity);
+    ? parseFloat(localStorage.getItem('zeromount-bgOpacity') ?? '0.35')
+    : 0.35;
+  const [bgOpacity, _setBgOpacity] = createSignal(isNaN(savedBgOpacity) ? 0.35 : savedBgOpacity);
   const setBgOpacity = (value: number) => {
     const clamped = Math.max(0, Math.min(1, value));
     _setBgOpacity(clamped);

@@ -87,7 +87,7 @@ pub struct FontModuleInfo {
 /// Property spoofing uses resetprop (not SUSFS) and is handled separately.
 /// `skip_path_hide`: true at boot (sdcard not decrypted, all add_sus_path calls EINVAL).
 /// apply_brene_deferred handles path hiding after sdcard is available.
-pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, vfs_handles_fonts: bool) -> Result<BreneResult> {
+pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, fonts_overlay_mounted: bool) -> Result<BreneResult> {
     let mut result = BreneResult::default();
 
     if !client.is_available() {
@@ -101,8 +101,8 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
     // Effective feature flags: kernel capability AND user config sub-toggle
     let has_path = client.features().path && susfs_cfg.path_hide;
     let has_maps = client.features().maps && susfs_cfg.maps_hide;
-    let has_open_redirect = client.features().open_redirect && susfs_cfg.open_redirect;
-    let has_kstat = client.features().kstat && susfs_cfg.kstat;
+    let _has_open_redirect = client.features().open_redirect && susfs_cfg.open_redirect;
+    let _has_kstat = client.features().kstat && susfs_cfg.kstat;
 
     // -- Auto-hide toggles (path-based) --
     // Skipped at boot — deferred retry handles all path hiding after sdcard decryption
@@ -147,25 +147,17 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
         info!("BRENE: zygisk maps hidden ({count})");
     }
 
-    // -- Font redirect (delegates to F15) --
-    // Font redirect uses open_redirect (when available) and kstat — gate on those sub-toggles
+    // -- Font redirect --
+    // Overlay mode: kstat + path_hide only (overlay serves files, open_redirect would conflict)
+    // Non-overlay mode: bind mount + full SUSFS redirect
 
     if brene.auto_hide_fonts {
-        let has_custom_susfs = client.features().kstat_redirect
-            && client.features().open_redirect_all;
-
-        let fonts = if has_custom_susfs && !vfs_handles_fonts {
-            // SusfsOnly: full SUSFS redirect via open_redirect_all + kstat_redirect
-            process_font_modules(client, &config.mount.overlay_source)
-        } else if vfs_handles_fonts {
-            // VFS handles redirection — supplement with static kstat + path_hide
+        let fonts = if fonts_overlay_mounted {
             hide_font_modules_overlay(client)
         } else {
-            // No VFS, no custom SUSFS — overlay fallback
             process_font_modules(client, &config.mount.overlay_source)
         };
-        info!("BRENE: processed {} font modules (vfs={}, custom_susfs={}): {:?}",
-            fonts.len(), vfs_handles_fonts, has_custom_susfs, fonts);
+        info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
         result.font_modules = fonts;
     }
 
@@ -312,7 +304,9 @@ fn hide_apk_paths(client: &SusfsClient) -> u32 {
     count
 }
 
-/// Scan /data/adb/modules/ for font modules and apply redirect via F15.
+/// Scan /data/adb/modules/ for font modules. Bind-mount each font file
+/// (kernel_umount=false keeps mounts in app namespaces, hide_sus_mounts
+/// covers the traces), then layer SUSFS redirect + kstat on top.
 fn process_font_modules(client: &SusfsClient, overlay_source: &str) -> Vec<FontModuleInfo> {
     let modules_dir = Path::new(MODULES_DIR);
     if !modules_dir.is_dir() {
@@ -346,6 +340,11 @@ fn process_font_modules(client: &SusfsClient, overlay_source: &str) -> Vec<FontM
             None => continue,
         };
 
+        let bind_count = bind_mount_font_files(&font_dir, SYSTEM_FONTS_DIR);
+        if bind_count > 0 {
+            info!("font module '{module_id}': {bind_count} files bind-mounted");
+        }
+
         match fonts::redirect_font_module(client, &module_id, &font_dir, SYSTEM_FONTS_DIR, overlay_source) {
             Ok(result) => {
                 debug!(
@@ -364,21 +363,70 @@ fn process_font_modules(client: &SusfsClient, overlay_source: &str) -> Vec<FontM
     results
 }
 
-/// Overlay-mode font hiding: kstat + path_hide only, no open_redirect_all.
+fn bind_mount_font_files(font_dir: &Path, system_font_dir: &str) -> u32 {
+    let entries = match fs::read_dir(font_dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    let mut count = 0u32;
+    for entry in entries.filter_map(|e| e.ok()) {
+        let source = entry.path();
+        if !source.is_file() {
+            continue;
+        }
+        let filename = match source.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        let target = format!("{}/{}", system_font_dir, filename);
+
+        if !Path::new(&target).exists() {
+            debug!("font bind skip {filename}: no stock counterpart");
+            continue;
+        }
+
+        crate::utils::selinux::copy_selinux_context(Path::new(&target), &source);
+
+        let c_src = match std::ffi::CString::new(source.as_os_str().as_encoded_bytes()) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        let c_tgt = match std::ffi::CString::new(target.as_bytes()) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let ret = unsafe {
+            libc::mount(
+                c_src.as_ptr(),
+                c_tgt.as_ptr(),
+                std::ptr::null(),
+                libc::MS_BIND,
+                std::ptr::null(),
+            )
+        };
+        if ret == 0 {
+            count += 1;
+        } else {
+            let err = std::io::Error::last_os_error();
+            debug!("font bind mount failed for {filename}: {err}");
+        }
+    }
+    count
+}
+
+/// Overlay-mode font hiding: kstat + path_hide only, no open_redirect.
 /// When overlay already mounted /system/fonts, SUSFS open_redirect would conflict.
 fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
     let modules_dir = Path::new(MODULES_DIR);
     if !modules_dir.is_dir() {
-        warn!("BRENE: overlay font hide skipped — {} not found", MODULES_DIR);
         return Vec::new();
     }
 
     let entries = match fs::read_dir(modules_dir) {
         Ok(e) => e,
-        Err(e) => {
-            warn!("BRENE: overlay font hide failed to read {}: {e}", MODULES_DIR);
-            return Vec::new();
-        }
+        Err(_) => return Vec::new(),
     };
 
     let mut results = Vec::new();
@@ -401,10 +449,7 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
         let mut hidden_count = 0u32;
         let font_entries = match fs::read_dir(&font_dir) {
             Ok(e) => e,
-            Err(e) => {
-                warn!("BRENE: overlay font hide failed to read {}: {e}", font_dir.display());
-                continue;
-            }
+            Err(_) => continue,
         };
 
         for fe in font_entries.filter_map(|e| e.ok()) {

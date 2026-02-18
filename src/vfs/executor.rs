@@ -101,6 +101,7 @@ impl VfsExecutor {
     fn inject_module_rules(&self, module: &ScannedModule) -> MountResult {
         let mut applied = 0u32;
         let mut failed = 0u32;
+        let mut brene_deferred = 0u32;
         let mut mount_paths = Vec::new();
         let mut error = None;
 
@@ -136,6 +137,9 @@ impl VfsExecutor {
 
             if let Some(ref susfs) = self.susfs {
                 if susfs.features().open_redirect && is_brene_owned_target(&target) {
+                    if !is_dir {
+                        brene_deferred += 1;
+                    }
                     continue;
                 }
             }
@@ -161,18 +165,26 @@ impl VfsExecutor {
             }
         }
 
+        // Font-only module: all regular files deferred to BRENE, none injected into VFS
+        let (strategy, success, rules) = if applied == 0 && brene_deferred > 0 {
+            (MountStrategy::Font, true, brene_deferred)
+        } else {
+            (MountStrategy::Vfs, failed == 0 && applied > 0, applied)
+        };
+
         debug!(
             module = %module.id,
             applied,
             failed,
+            brene_deferred,
             "module rule injection done"
         );
 
         MountResult {
             module_id: module.id.clone(),
-            strategy_used: MountStrategy::Vfs,
-            success: failed == 0 && applied > 0,
-            rules_applied: applied,
+            strategy_used: strategy,
+            success,
+            rules_applied: rules,
             rules_failed: failed,
             error,
             mount_paths,
