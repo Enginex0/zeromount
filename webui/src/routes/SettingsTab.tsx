@@ -31,7 +31,7 @@ export function SettingsTab() {
   const [customMountSource, setCustomMountSource] = createSignal('');
   const [showOverlaySheet, setShowOverlaySheet] = createSignal(false);
   const [showStagingSheet, setShowStagingSheet] = createSignal(false);
-  const [sliderOpen, setSliderOpen] = createSignal(false);
+  const [glassOpen, setGlassOpen] = createSignal(false);
   const selectedAccent = () => store.settings.accentColor;
 
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'auto' | 'amoled') => {
@@ -195,6 +195,31 @@ export function SettingsTab() {
           />
         </div>
 
+        <div class="settings__glass-row" onClick={() => setGlassOpen(!glassOpen())}>
+          <div class="settings__item-content">
+            <div class="settings__item-label">Glass Intensity</div>
+            <div class="settings__item-desc">Background frosted glass effect</div>
+          </div>
+          <div class="settings__glass-badge">
+            <span>{Math.round(store.bgOpacity() * 100)}%</span>
+            <svg class={`settings__glass-chevron${glassOpen() ? ' settings__glass-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </div>
+        </div>
+        <Show when={glassOpen()}>
+          <div class="settings__glass-slider">
+            <input
+              type="range"
+              class="settings__slider"
+              min="0"
+              max="100"
+              value={Math.round(store.bgOpacity() * 100)}
+              onInput={(e) => store.setBgOpacity(parseInt(e.currentTarget.value) / 100)}
+            />
+          </div>
+        </Show>
+
         <div class="settings__item">
           <div class="settings__item-content">
             <div class="settings__item-label">Fix Bottom Nav</div>
@@ -204,34 +229,6 @@ export function SettingsTab() {
             checked={store.settings.fixedNav}
             onChange={(checked) => store.updateSettings({ fixedNav: checked })}
           />
-        </div>
-
-        <div class="settings__group">
-          <div
-            class="settings__label"
-            style="cursor: pointer; user-select: none"
-            onClick={() => setSliderOpen(!sliderOpen())}
-          >
-            Glass Intensity
-            <span class="settings__label-value">{Math.round(store.bgOpacity() * 100)}%</span>
-          </div>
-          <Show when={sliderOpen()}>
-            <div class="settings__slider-row">
-              <input
-                type="range"
-                class="settings__slider"
-                min="0"
-                max="100"
-                value={Math.round(store.bgOpacity() * 100)}
-                onInput={(e) => store.setBgOpacity(parseInt(e.currentTarget.value) / 100)}
-                onPointerUp={() => setTimeout(() => setSliderOpen(false), 600)}
-                onTouchEnd={() => setTimeout(() => setSliderOpen(false), 600)}
-              />
-            </div>
-          </Show>
-          <div class="settings__item-desc" style="margin-top: 4px">
-            Background atmosphere with frosted glass effect
-          </div>
         </div>
       </Card>
 

@@ -32,6 +32,7 @@
   pointer-events: none;
 }
 
+
 .settings__item--disabled {
   opacity: 0.4;
 }
@@ -51,6 +52,43 @@
   font-size: 13px;
   color: var(--text-accent);
   font-weight: 600;
+}
+
+.settings__glass-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  margin-bottom: 4px;
+}
+
+.settings__glass-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(var(--accent-rgb), 0.12);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-accent);
+  flex-shrink: 0;
+}
+
+.settings__glass-chevron {
+  transition: transform 0.2s ease;
+  color: var(--text-accent);
+}
+
+.settings__glass-chevron--open {
+  transform: rotate(180deg);
+}
+
+.settings__glass-slider {
+  padding: 8px 0 4px;
+  animation: slideDown 0.15s ease-out;
 }
 
 .settings__slider-row {
