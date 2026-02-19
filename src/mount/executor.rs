@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::core::config::MountConfig;
 use crate::core::types::{
@@ -268,24 +268,20 @@ fn ensure_parent_dirs_with_context(
     Ok(())
 }
 
-// Prevent double-mounting when root manager also mounts on the same paths.
-// Creates skip_mount in each module dir so the root manager skips its own mount.
-// Tracks flagged modules for cleanup on uninstall.
+// KSU/APatch metamodules own all mounting — skip_mount flags are irrelevant.
+// BindMount (Magisk) needs flags so the root manager doesn't double-mount.
 pub fn manage_skip_mount_flags(modules: &[ScannedModule], mode: RootMountMode) {
+    if mode == RootMountMode::Metamodule {
+        return;
+    }
+
     let modules_base = Path::new("/data/adb/modules");
     let mut flagged = Vec::new();
 
     for module in modules {
         let flag = modules_base.join(&module.id).join("skip_mount");
-        match mode {
-            RootMountMode::Metamodule => {
-                let _ = std::fs::remove_file(&flag);
-            }
-            RootMountMode::BindMount => {
-                let _ = std::fs::write(&flag, "");
-                flagged.push(module.id.as_str());
-            }
-        }
+        let _ = std::fs::write(&flag, "");
+        flagged.push(module.id.as_str());
     }
 
     if !flagged.is_empty() {

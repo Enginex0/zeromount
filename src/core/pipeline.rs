@@ -505,12 +505,12 @@ impl MountController<Mounted> {
                 .to_string();
         }
 
+        let total = vfs_only.len() + font_ids.len();
+        let label = if total == 1 { "Module" } else { "Modules" };
         let mut parts = Vec::new();
 
         if !vfs_only.is_empty() {
-            let label = if vfs_only.len() == 1 { "Module" } else { "Modules" };
-            let names = vfs_only.join(", ");
-            parts.push(format!("{} {} | {}", vfs_only.len(), label, names));
+            parts.push(vfs_only.join(", "));
         }
 
         if !font_ids.is_empty() {
@@ -518,7 +518,7 @@ impl MountController<Mounted> {
             parts.push(format!("Font: {}", names.join(", ")));
         }
 
-        format!("✅ GHOST ⚡️ | {}", parts.join(" | "))
+        format!("✅ GHOST ⚡️ | {} {} | {}", total, label, parts.join(" | "))
     }
 
     fn build_runtime_state(&self, font_infos: &[crate::susfs::brene::FontModuleInfo]) -> RuntimeState {
@@ -972,7 +972,7 @@ mod tests {
 
         let fonts = vec![crate::susfs::brene::FontModuleInfo { id: "viperfxmod".into(), redirect_count: 5 }];
         let desc = ctrl.build_description_summary(&fonts);
-        assert_eq!(desc, "✅ GHOST ⚡️ | 1 Module | clean | Font: viperfxmod");
+        assert_eq!(desc, "✅ GHOST ⚡️ | 2 Modules | clean | Font: viperfxmod");
     }
 
     #[test]

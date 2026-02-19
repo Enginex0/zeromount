@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 
 /// Walk a module's system directory looking for `.replace` markers.
 /// For each directory with a `.replace` file, set `trusted.overlay.opaque=y`
