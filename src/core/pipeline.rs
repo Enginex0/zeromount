@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -391,22 +390,6 @@ impl MountController<Mounted> {
         // 1. SUSFS protections (BRENE)
         let (hidden_paths, font_infos) = self.apply_susfs_protections();
 
-        // 1b. Push hide_stock_overlays toggle to kernel sysfs before apps launch
-        let hide_val = if self.state.config.mount.hide_stock_overlays { "1" } else { "0" };
-        match fs::write("/sys/kernel/zeromount/hide_overlays", hide_val) {
-            Ok(()) => info!(enabled = self.state.config.mount.hide_stock_overlays, "overlay hide sysfs toggle applied"),
-            Err(e) => warn!("overlay hide sysfs write failed (non-fatal): {e}"),
-        }
-
-        // 1c. Collect stock OEM overlays for diagnostics/status reporting
-        let stock_overlay_count = if self.state.config.mount.hide_stock_overlays {
-            let overlays = crate::mount::stock_overlays::collect_stock_overlays();
-            info!(count = overlays.len(), "stock OEM overlays detected");
-            overlays.len() as u32
-        } else {
-            0
-        };
-
         // 2. Update module description with status summary
         let summary = self.build_description_summary(&font_infos);
         if let Err(e) = self.state.root_mgr.update_description(&summary) {
@@ -416,7 +399,6 @@ impl MountController<Mounted> {
         // 3. Build RuntimeState and persist atomically (ME07: write tmp then rename)
         let mut runtime_state = self.build_runtime_state(&font_infos);
         runtime_state.hidden_path_count = hidden_paths;
-        runtime_state.stock_overlay_count = stock_overlay_count;
         write_status_json_atomic(&runtime_state);
 
         // 4. KSU09: notify-module-mounted LAST -- after all rules, SUSFS, description
@@ -617,7 +599,6 @@ impl MountController<Mounted> {
             degradation_reason,
             root_manager: Some(self.state.root_mgr.name().to_string()),
             resolved_storage_mode: crate::mount::storage::get_resolved_storage_mode(),
-            stock_overlay_count: 0,
         }
     }
 }
@@ -626,6 +607,8 @@ impl MountController<Mounted> {
 /// Reads .status.json for module list; missing file means first boot (no-op).
 /// VFS modules use CLEAR_ALL so they don't need individual umount.
 fn cleanup_previous_mounts() {
+    cleanup_font_mounts();
+
     let status_path = Path::new(STATUS_JSON_PATH);
     let prev_state = match RuntimeState::read_status_file(status_path) {
         Ok(s) => s,
@@ -639,26 +622,68 @@ fn cleanup_previous_mounts() {
         match module.strategy {
             MountStrategy::Overlay | MountStrategy::MagicMount => {
                 for path in &module.mount_paths {
-                    let c_path = match std::ffi::CString::new(path.as_bytes()) {
-                        Ok(p) => p,
-                        Err(_) => continue,
-                    };
-                    let ret = unsafe { libc::umount2(c_path.as_ptr(), libc::MNT_DETACH) };
-                    if ret != 0 {
-                        let errno = std::io::Error::last_os_error();
-                        if errno.raw_os_error() != Some(libc::EINVAL) {
-                            debug!(path = %path, error = %errno, "previous umount failed (may already be gone)");
-                        }
-                    }
+                    detach_mount(path);
                 }
             }
-            MountStrategy::Vfs | MountStrategy::Font => {
-                // VFS uses CLEAR_ALL; Font uses SUSFS redirect — no per-mount teardown
-            }
+            MountStrategy::Vfs | MountStrategy::Font => {}
         }
     }
 
     info!(modules = prev_state.modules.len(), "previous mounts cleaned up");
+}
+
+fn detach_mount(path: &str) {
+    let c_path = match std::ffi::CString::new(path.as_bytes()) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let ret = unsafe { libc::umount2(c_path.as_ptr(), libc::MNT_DETACH) };
+    if ret != 0 {
+        let errno = std::io::Error::last_os_error();
+        if errno.raw_os_error() != Some(libc::EINVAL) {
+            debug!(path = %path, error = %errno, "umount failed (may already be gone)");
+        }
+    }
+}
+
+/// Clean up any stale font overlay or bind mounts from a previous boot.
+/// Reads /proc/self/mountinfo to find mounts under /system/fonts, then
+/// detaches them in reverse order (bind mounts first, then overlay).
+fn cleanup_font_mounts() {
+    let mountinfo = match std::fs::read_to_string("/proc/self/mountinfo") {
+        Ok(m) => m,
+        Err(_) => return,
+    };
+
+    let mut font_mounts: Vec<String> = Vec::new();
+    let mut has_font_overlay = false;
+
+    for line in mountinfo.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() < 5 {
+            continue;
+        }
+        let mount_point = fields[4];
+        if mount_point == "/system/fonts" {
+            has_font_overlay = true;
+        } else if mount_point.starts_with("/system/fonts/") {
+            font_mounts.push(mount_point.to_string());
+        }
+    }
+
+    // Detach bind mounts first (children before parent)
+    for path in font_mounts.iter().rev() {
+        detach_mount(path);
+    }
+
+    if has_font_overlay {
+        detach_mount("/system/fonts");
+        debug!("cleaned up font overlay on /system/fonts");
+    }
+
+    if !font_mounts.is_empty() {
+        info!(count = font_mounts.len(), "cleaned up font bind mounts");
+    }
 }
 
 

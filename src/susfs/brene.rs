@@ -890,6 +890,9 @@ fn apply_force_hide_lsposed() {
     };
 
     for path in DEX2OAT_UMOUNT_PATHS {
+        if crate::utils::signal::shutdown_requested() {
+            break;
+        }
         match run_command_with_timeout(
             Command::new(ksud).args(["kernel", "umount", "add", path, "--flags", "2"]),
             CMD_TIMEOUT,

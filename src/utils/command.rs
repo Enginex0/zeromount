@@ -38,6 +38,11 @@ pub fn run_command_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<
                     let _ = child.wait();
                     bail!("command {:?} timed out after {timeout:?}", cmd.get_program());
                 }
+                if crate::utils::signal::shutdown_requested() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    bail!("shutdown requested, killed {:?}", cmd.get_program());
+                }
                 std::thread::sleep(CMD_POLL_INTERVAL);
             }
             Err(e) => bail!("error waiting for {:?}: {e}", cmd.get_program()),

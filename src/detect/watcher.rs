@@ -191,6 +191,9 @@ impl ModuleWatcher {
                 + std::time::Duration::from_millis(DEBOUNCE_MS);
 
             loop {
+                if crate::utils::signal::shutdown_requested() {
+                    break;
+                }
                 let remaining = deadline.saturating_duration_since(std::time::Instant::now());
                 if remaining.is_zero() {
                     break;
