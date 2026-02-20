@@ -153,9 +153,8 @@ pub fn build_node_tree(modules: &[ScannedModule]) -> Node {
 const PROMOTABLE_PARTITIONS: &[&str] = &["vendor", "system_ext", "product", "odm"];
 
 fn promote_partitions(root: &mut Node) {
-    let system = match root.children.get_mut("system") {
-        Some(s) => s as *mut Node,
-        None => return,
+    let Some(mut system) = root.children.remove("system") else {
+        return;
     };
 
     for &partition in PROMOTABLE_PARTITIONS {
@@ -164,17 +163,13 @@ fn promote_partitions(root: &mut Node) {
             continue;
         }
 
-        // Safety: we're borrowing system mutably and root mutably, but system is a child of root.
-        // We remove from system.children first, then insert into root.children.
-        let system_ref = unsafe { &mut *system };
-        if let Some(promoted) = system_ref.children.remove(partition) {
+        if let Some(promoted) = system.children.remove(partition) {
             debug!(
                 partition,
                 "promoting /system/{} to /{} (real path is symlink)", partition, partition
             );
 
             if let Some(existing) = root.children.get_mut(partition) {
-                // Merge promoted children into existing top-level partition node
                 for (name, child) in promoted.children {
                     existing.children.entry(name).or_insert(child);
                 }
@@ -186,6 +181,8 @@ fn promote_partitions(root: &mut Node) {
             }
         }
     }
+
+    root.children.insert("system".to_string(), system);
 }
 
 pub fn needs_tmpfs(node: &Node, real_path: &Path) -> bool {
