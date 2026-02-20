@@ -42,7 +42,8 @@ pub fn cleanup_stale_overlays() -> Result<usize> {
 
         if per_mount_rw && super_ro {
             debug!(mount_point, "stale overlay detected (rw per-mount + ro super)");
-            let target = CString::new(mount_point).unwrap();
+            let Some(target) = CString::new(mount_point).ok() else { continue; };
+            // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
             let ret = unsafe { libc::umount2(target.as_ptr(), libc::MNT_DETACH) };
             if ret == 0 {
                 cleaned += 1;
