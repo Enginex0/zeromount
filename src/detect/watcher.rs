@@ -52,6 +52,7 @@ pub struct ModuleWatcher {
 
 impl ModuleWatcher {
     pub fn new(modules_dir: &Path) -> Result<Self> {
+        // SAFETY: inotify_init1 flags are valid constants; returns fd or -1 (checked below).
         let fd = unsafe { libc::inotify_init1(IN_NONBLOCK | IN_CLOEXEC) };
         if fd < 0 {
             return Err(io::Error::last_os_error())
@@ -61,11 +62,13 @@ impl ModuleWatcher {
         let c_path = CString::new(modules_dir.as_os_str().as_encoded_bytes())
             .context("modules_dir contains null byte")?;
 
+        // SAFETY: fd is valid from inotify_init1; CString is non-null NUL-terminated.
         let wd = unsafe {
             libc::inotify_add_watch(fd, c_path.as_ptr(), WATCH_MASK)
         };
         if wd < 0 {
             let err = io::Error::last_os_error();
+            // SAFETY: fd is a valid open file descriptor from inotify_init1 above.
             unsafe { libc::close(fd); }
             return Err(err).context("inotify_add_watch failed");
         }
@@ -87,6 +90,7 @@ impl ModuleWatcher {
             revents: 0,
         };
 
+        // SAFETY: pfd is a valid pollfd struct; fd is a valid open inotify descriptor.
         let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
         if ret < 0 {
             let err = io::Error::last_os_error();
@@ -104,6 +108,7 @@ impl ModuleWatcher {
 
     fn read_events(&self) -> Result<Vec<WatchEvent>> {
         let mut buf = [0u8; EVENT_BUF_SIZE];
+        // SAFETY: fd is a valid open inotify descriptor; buf is a stack-allocated array.
         let len = unsafe {
             libc::read(
                 self.inotify_fd,
@@ -213,6 +218,7 @@ impl ModuleWatcher {
 
 impl Drop for ModuleWatcher {
     fn drop(&mut self) {
+        // SAFETY: inotify_fd is a valid open file descriptor obtained during construction.
         unsafe { libc::close(self.inotify_fd); }
     }
 }

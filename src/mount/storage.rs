@@ -374,6 +374,7 @@ fn is_dir_writable(path: &str) -> bool {
         Ok(p) => p,
         Err(_) => return false,
     };
+    // SAFETY: CString is non-null NUL-terminated; access(2) returns 0 or -1.
     unsafe { libc::access(c_path.as_ptr(), libc::W_OK) == 0 }
 }
 
@@ -406,6 +407,7 @@ fn try_erofs_storage(base_path: &Path) -> Result<()> {
     let c_target = CString::new(base_path.as_os_str().as_encoded_bytes())?;
     let c_fstype = CString::new("erofs")?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; null pointer for unused mount(2) data arg is valid.
     let ret = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -439,6 +441,7 @@ fn try_tmpfs_with_xattr(base_path: &Path, source_name: &str) -> Result<()> {
     let c_name = CString::new("trusted.overlay.whiteout")?;
     let value = b"y";
 
+    // SAFETY: CStrings are non-null NUL-terminated; value is a stack-allocated byte array.
     let ret = unsafe {
         libc::setxattr(
             c_path.as_ptr(),
@@ -528,6 +531,7 @@ fn try_ext4_storage(base_path: &Path) -> Result<()> {
     let c_fstype = CString::new("ext4")?;
     let c_data = CString::new("loop")?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -556,6 +560,7 @@ fn mount_tmpfs_at(target: &Path, source_name: &str) -> Result<()> {
     let c_fstype = CString::new("tmpfs")?;
     let c_data = CString::new("mode=0755")?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -581,6 +586,7 @@ fn do_umount(target: &Path) -> Result<()> {
         Err(_) => return Ok(()),
     };
 
+    // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
     let ret = unsafe { libc::umount2(c_target.as_ptr(), libc::MNT_DETACH) };
     if ret != 0 {
         let errno = std::io::Error::last_os_error();
@@ -723,6 +729,7 @@ fn try_apex_spoof(base_path: &Path) -> Result<(PathBuf, PathBuf)> {
     let c_source = CString::new(base_path.as_os_str().as_encoded_bytes())?;
     let c_target = CString::new(versioned.as_os_str().as_encoded_bytes())?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; null pointers for unused mount(2) args are valid.
     let ret = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -744,6 +751,7 @@ fn try_apex_spoof(base_path: &Path) -> Result<(PathBuf, PathBuf)> {
     let c_versioned = CString::new(versioned.as_os_str().as_encoded_bytes())?;
     let c_facade = CString::new(facade.as_os_str().as_encoded_bytes())?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; null pointers for unused mount(2) args are valid.
     let ret = unsafe {
         libc::mount(
             c_versioned.as_ptr(),
@@ -757,6 +765,7 @@ fn try_apex_spoof(base_path: &Path) -> Result<(PathBuf, PathBuf)> {
         warn!(error = %std::io::Error::last_os_error(), "facade bind mount failed (non-fatal)");
     } else {
         // Remount RO
+        // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
         let _ = unsafe {
             libc::mount(
                 std::ptr::null(),

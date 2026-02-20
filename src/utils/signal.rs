@@ -12,6 +12,7 @@ pub fn register_shutdown_handler() {
         SHUTDOWN_REQUESTED.store(true, Ordering::Release);
     }
 
+    // SAFETY: handler is a valid extern "C" fn; sigaction struct is zeroed then initialized.
     unsafe {
         let mut action: libc::sigaction = std::mem::zeroed();
         action.sa_sigaction = handler as *const () as libc::sighandler_t;

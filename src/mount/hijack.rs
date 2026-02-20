@@ -397,6 +397,7 @@ fn lazy_umount(path: &str) -> bool {
         Ok(p) => p,
         Err(_) => return false,
     };
+    // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
     let ret = unsafe { libc::umount2(c_path.as_ptr(), libc::MNT_DETACH) };
     ret == 0
 }

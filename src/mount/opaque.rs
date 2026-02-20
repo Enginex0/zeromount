@@ -50,6 +50,7 @@ fn set_opaque_xattr(dir: &Path) -> Result<()> {
         CString::new(dir.to_string_lossy().as_bytes()).context("invalid path for xattr")?;
     let name = CString::new("trusted.overlay.opaque").unwrap();
     let val = b"y";
+    // SAFETY: CStrings are non-null NUL-terminated; val is a stack-allocated byte literal.
     let ret = unsafe {
         libc::lsetxattr(
             path_cstr.as_ptr(),

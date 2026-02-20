@@ -208,6 +208,7 @@ pub fn supercall(cmd: SusfsCommand, data: *mut u8) -> Result<i32, i32> {
 
 // Accepts a raw command code for probing arbitrary/nonexistent commands
 pub fn supercall_raw(cmd: u32, data: *mut u8) -> Result<i32, i32> {
+    // SAFETY: syscall args are valid constants and data is a caller-provided mutable pointer.
     let ret = unsafe {
         libc::syscall(
             libc::SYS_reboot as libc::c_long,

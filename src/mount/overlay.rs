@@ -171,6 +171,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
     let c_fstype = CString::new("overlay")?;
 
     // fsopen("overlay", 0)
+    // SAFETY: CString is non-null NUL-terminated; syscall args are valid constants.
     let fs_fd = unsafe { libc::syscall(syscall_nr::SYS_FSOPEN, c_fstype.as_ptr(), 0x01u32) };
     if fs_fd < 0 {
         bail!(
@@ -191,6 +192,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
         // lowerdir-only overlay: no upperdir/workdir needed (read-only merge)
 
         // fsconfig(fs_fd, FSCONFIG_CMD_CREATE, NULL, NULL, 0) -- finalize
+        // SAFETY: fs_fd is a valid open fd from fsopen; CStrings and constants are valid.
         let ret = unsafe {
             libc::syscall(
                 syscall_nr::SYS_FSCONFIG,
@@ -207,6 +209,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
 
         // fsmount(fs_fd, FSMOUNT_CLOEXEC, MOUNT_ATTR_RDONLY)
         // MOUNT_ATTR_RDONLY = 0x1: match stock overlay VFS flags (ro,relatime)
+        // SAFETY: fs_fd is a valid open fd from fsopen; flags are valid constants.
         let mnt_fd = unsafe {
             libc::syscall(syscall_nr::SYS_FSMOUNT, fs_fd, 0x00000001u32, 0x00000001u32)
         };
@@ -218,6 +221,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
         // move_mount(mnt_fd, "", AT_FDCWD, target, MOVE_MOUNT_F_EMPTY_PATH)
         let c_empty = CString::new("")?;
         let c_target = CString::new(target.as_os_str().as_encoded_bytes())?;
+        // SAFETY: mnt_fd is a valid fd from fsmount; CStrings are NUL-terminated.
         let ret = unsafe {
             libc::syscall(
                 syscall_nr::SYS_MOVE_MOUNT,
@@ -229,6 +233,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
             )
         };
 
+        // SAFETY: mnt_fd is a valid open fd from fsmount above.
         unsafe { libc::close(mnt_fd) };
 
         if ret < 0 {
@@ -238,6 +243,7 @@ fn mount_overlay_new_api(lowerdir: &str, target: &Path, overlay_source: &str) ->
         Ok(())
     })();
 
+    // SAFETY: fs_fd is a valid open fd from fsopen above.
     unsafe { libc::close(fs_fd) };
     result
 }
@@ -246,6 +252,7 @@ fn fsconfig_set_string(fs_fd: libc::c_int, key: &str, value: &str) -> Result<()>
     let c_key = CString::new(key)?;
     let c_value = CString::new(value)?;
 
+    // SAFETY: fs_fd is a valid open fd from fsopen; CStrings are NUL-terminated.
     let ret = unsafe {
         libc::syscall(
             syscall_nr::SYS_FSCONFIG,
@@ -277,6 +284,7 @@ fn mount_overlay_legacy(lowerdir: &str, target: &Path, overlay_source: &str) -> 
     let data = format!("lowerdir={}", lowerdir);
     let c_data = CString::new(data)?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             c_source.as_ptr(),

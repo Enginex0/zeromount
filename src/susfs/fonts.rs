@@ -306,6 +306,7 @@ fn mount_font_overlay(module_font_dir: &Path, system_font_dir: &str, overlay_sou
     let opts_c = CString::new(opts.as_str())
         .map_err(|_| anyhow::anyhow!("invalid overlay options"))?;
 
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             source.as_ptr(),

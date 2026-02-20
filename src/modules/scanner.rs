@@ -254,6 +254,7 @@ fn has_xattr(path: &Path, attr_name: &str, expected_value: &str) -> bool {
     };
 
     let mut buf = [0u8; 256];
+    // SAFETY: CStrings are non-null NUL-terminated; buf is a stack-allocated array.
     let len = unsafe {
         libc::lgetxattr(
             c_path.as_ptr(),
@@ -288,6 +289,7 @@ fn has_xattr_present(path: &Path, attr_name: &str) -> bool {
         Err(_) => return false,
     };
 
+    // SAFETY: CStrings are non-null NUL-terminated; null pointer for size query is valid.
     let len = unsafe {
         libc::lgetxattr(
             c_path.as_ptr(),

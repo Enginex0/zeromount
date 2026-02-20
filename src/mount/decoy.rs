@@ -58,12 +58,14 @@ pub fn setup_decoy() -> Option<PathBuf> {
             .map(|d| d.as_ptr() as *const libc::c_void)
             .unwrap_or(std::ptr::null());
 
+        // SAFETY: CStrings are non-null NUL-terminated; data_ptr is valid or null.
         let ret = unsafe {
             libc::mount(source.as_ptr(), cstr.as_ptr(), fstype.as_ptr(), 0, data_ptr)
         };
         if ret != 0 {
             let err = std::io::Error::last_os_error();
             trace!("decoy: rootcontext mount failed on {candidate}: {err}, trying plain");
+            // SAFETY: CStrings are non-null NUL-terminated; null pointer for mount(2) data is valid.
             let ret = unsafe {
                 libc::mount(
                     source.as_ptr(),
@@ -99,6 +101,7 @@ pub fn setup_decoy() -> Option<PathBuf> {
 pub fn teardown_decoy(decoy: &Path) {
     trace!("decoy: tearing down tmpfs at {}", decoy.display());
     let cstr = CString::new(decoy.to_string_lossy().as_bytes()).unwrap();
+    // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
     let ret = unsafe { libc::umount2(cstr.as_ptr(), libc::MNT_DETACH) };
     if ret != 0 {
         warn!(
@@ -156,6 +159,7 @@ fn get_selinux_context_raw(path: &Path) -> Option<Vec<u8>> {
     let c_path = CString::new(path.to_string_lossy().as_bytes()).ok()?;
     let attr = b"security.selinux\0";
     let attr_ptr = attr.as_ptr() as *const libc::c_char;
+    // SAFETY: CString is non-null NUL-terminated; attr is a static NUL-terminated byte literal.
     unsafe {
         let size = libc::lgetxattr(c_path.as_ptr(), attr_ptr, std::ptr::null_mut(), 0);
         if size <= 0 {
@@ -184,6 +188,7 @@ fn set_selinux_context_raw(path: &Path, context: &[u8]) {
         Err(_) => return,
     };
     let attr = b"security.selinux\0";
+    // SAFETY: CString is non-null NUL-terminated; attr is a static NUL-terminated byte literal.
     let ret = unsafe {
         libc::lsetxattr(
             c_path.as_ptr(),

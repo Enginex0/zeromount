@@ -17,6 +17,7 @@ pub fn copy_selinux_context(source: &Path, dest: &Path) {
     let attr_ptr = attr.as_ptr() as *const libc::c_char;
 
     if std::fs::symlink_metadata(source).is_ok() {
+        // SAFETY: CStrings are non-null NUL-terminated; attr is a static NUL-terminated byte literal.
         unsafe {
             let size = libc::lgetxattr(src_c.as_ptr(), attr_ptr, std::ptr::null_mut(), 0);
             if size > 0 {
@@ -50,6 +51,7 @@ pub fn copy_selinux_context(source: &Path, dest: &Path) {
     }
 
     let context = b"u:object_r:system_data_file:s0\0";
+    // SAFETY: CStrings are non-null NUL-terminated; context is a static NUL-terminated byte literal.
     unsafe {
         let ret = libc::lsetxattr(
             dst_c.as_ptr(),
@@ -74,6 +76,7 @@ pub fn set_selinux_context(path: &Path, context: &str) {
         Err(_) => return,
     };
     let attr = b"security.selinux\0";
+    // SAFETY: CStrings are non-null NUL-terminated; attr is a static NUL-terminated byte literal.
     unsafe {
         let ret = libc::lsetxattr(
             c_path.as_ptr(),

@@ -44,6 +44,7 @@ fn execute_overlay(
         let c_path = std::ffi::CString::new(
             storage.base_path.to_string_lossy().as_bytes().to_vec()
         ).context("base_path contains null byte")?;
+        // SAFETY: CString is non-null NUL-terminated; null pointers for unused mount(2) args are valid.
         let ret = unsafe {
             libc::mount(
                 std::ptr::null(),
@@ -159,6 +160,7 @@ fn execute_magic_mount(
         let c_path = std::ffi::CString::new(
             storage.base_path.to_string_lossy().as_bytes().to_vec()
         ).context("base_path contains null byte")?;
+        // SAFETY: CString is non-null NUL-terminated; null pointers for unused mount(2) args are valid.
         let ret = unsafe {
             libc::mount(
                 std::ptr::null(),

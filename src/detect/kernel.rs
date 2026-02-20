@@ -153,6 +153,7 @@ pub fn check_tmpfs_xattr() -> Result<bool> {
     let c_name = CString::new("trusted.overlay.whiteout")?;
     let c_val = b"y";
 
+    // SAFETY: CStrings are non-null NUL-terminated; test file was created on the line above.
     let result = unsafe {
         libc::setxattr(
             c_path.as_ptr(),

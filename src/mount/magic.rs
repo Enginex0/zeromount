@@ -23,6 +23,7 @@ fn path_to_cstring(path: &Path) -> Result<CString> {
 fn bind_mount(source: &Path, target: &Path) -> Result<()> {
     let c_src = path_to_cstring(source)?;
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CStrings are non-null NUL-terminated; null pointers for unused mount(2) args are valid.
     let ret = unsafe {
         libc::mount(
             c_src.as_ptr(),
@@ -47,6 +48,7 @@ fn bind_mount(source: &Path, target: &Path) -> Result<()> {
 fn bind_mount_recursive(source: &Path, target: &Path) -> Result<()> {
     let c_src = path_to_cstring(source)?;
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CStrings are non-null NUL-terminated; null pointers for unused mount(2) args are valid.
     let ret = unsafe {
         libc::mount(
             c_src.as_ptr(),
@@ -73,6 +75,7 @@ fn mount_tmpfs(target: &Path, source_label: &str) -> Result<()> {
     let c_tgt = path_to_cstring(target)?;
     let c_fs = CString::new("tmpfs")?;
     let c_data = CString::new("mode=0755")?;
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             c_src.as_ptr(),
@@ -96,6 +99,7 @@ fn mount_tmpfs(target: &Path, source_label: &str) -> Result<()> {
 fn mount_move(source: &Path, target: &Path) -> Result<()> {
     let c_src = path_to_cstring(source)?;
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CStrings are non-null NUL-terminated; null pointers for unused mount(2) args are valid.
     let ret = unsafe {
         libc::mount(
             c_src.as_ptr(),
@@ -119,6 +123,7 @@ fn mount_move(source: &Path, target: &Path) -> Result<()> {
 
 fn remount_readonly(target: &Path) -> Result<()> {
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             std::ptr::null(),
@@ -140,6 +145,7 @@ fn remount_readonly(target: &Path) -> Result<()> {
 
 fn mount_private(target: &Path) -> Result<()> {
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CStrings are non-null NUL-terminated; mount flags are valid constants.
     let ret = unsafe {
         libc::mount(
             std::ptr::null(),
@@ -161,6 +167,7 @@ fn mount_private(target: &Path) -> Result<()> {
 
 fn lazy_unmount(target: &Path) -> Result<()> {
     let c_tgt = path_to_cstring(target)?;
+    // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
     let ret = unsafe { libc::umount2(c_tgt.as_ptr(), libc::MNT_DETACH) };
     if ret != 0 {
         bail!(
@@ -485,6 +492,7 @@ fn apply_tmpfs_directory(
 
     if let Ok(meta) = fs::metadata(&reference) {
         let c_wpath = path_to_cstring(&wpath)?;
+        // SAFETY: CString is non-null NUL-terminated; mode and uid/gid are from fs::metadata.
         unsafe {
             libc::chmod(c_wpath.as_ptr(), meta.permissions().mode() as libc::mode_t);
             libc::chown(c_wpath.as_ptr(), meta.uid(), meta.gid());
@@ -571,6 +579,7 @@ fn apply_inline_directory(
 
     if let Ok(meta) = fs::metadata(&reference) {
         let c_wpath = path_to_cstring(&wpath)?;
+        // SAFETY: CString is non-null NUL-terminated; mode and uid/gid are from fs::metadata.
         unsafe {
             libc::chmod(c_wpath.as_ptr(), meta.permissions().mode() as libc::mode_t);
             libc::chown(c_wpath.as_ptr(), meta.uid(), meta.gid());
@@ -648,6 +657,7 @@ fn mirror_stock_entries(real_path: &Path, wpath: &Path, node: &Node) -> Result<(
         } else if meta.is_dir() {
             fs::create_dir_all(&dst)?;
             let c_dst = path_to_cstring(&dst)?;
+            // SAFETY: CString is non-null NUL-terminated; mode and uid/gid are from fs::metadata.
             unsafe {
                 libc::chmod(c_dst.as_ptr(), meta.permissions().mode() as libc::mode_t);
                 libc::chown(c_dst.as_ptr(), meta.uid(), meta.gid());

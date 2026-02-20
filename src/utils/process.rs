@@ -17,6 +17,7 @@ pub fn camouflage() -> Result<()> {
 /// comm is limited to 16 bytes including null terminator.
 fn set_comm(name: &str) -> Result<()> {
     let cname = CString::new(name).context("invalid comm name")?;
+    // SAFETY: cname is a valid NUL-terminated CString from CString::new above.
     let ret = unsafe { libc::prctl(libc::PR_SET_NAME, cname.as_ptr(), 0, 0, 0) };
     if ret != 0 {
         anyhow::bail!(

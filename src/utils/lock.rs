@@ -11,6 +11,7 @@ pub fn acquire_instance_lock() -> anyhow::Result<Option<File>> {
         .write(true)
         .open(LOCK_PATH)?;
 
+    // SAFETY: fd is a valid open file descriptor from OpenOptions::open above.
     let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
     if rc == 0 {
         Ok(Some(file))
