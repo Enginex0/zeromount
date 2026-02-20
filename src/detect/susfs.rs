@@ -7,14 +7,9 @@ use crate::core::types::CapabilityFlags;
 use crate::susfs::SusfsClient;
 use crate::utils::platform;
 
-/// SUSFS module directory names (checked under /data/adb/modules/)
-const SUSFS_MODULE_IDS: &[&str] = &["susfs4ksu", "susfs"];
-
-/// DET03: Kernel-first SUSFS probe with stale marker recovery.
+/// DET03: Kernel-first SUSFS probe.
 ///
-/// Probes kernel FIRST (ground truth), then reconciles module disable markers.
-/// If kernel has SUSFS but module has a stale disable marker from a previous
-/// kernel, the marker is removed automatically.
+/// Probes the kernel supercall to determine SUSFS availability and feature set.
 pub fn probe_susfs() -> Result<CapabilityFlags> {
     let mut caps = CapabilityFlags::default();
 
@@ -57,49 +52,7 @@ pub fn probe_susfs() -> Result<CapabilityFlags> {
         }
     };
 
-    // Reconcile module disable marker with kernel reality
-    if kernel_has_susfs && is_susfs_module_disabled() {
-        warn!("SUSFS kernel present but module disabled — removing stale marker");
-        remove_susfs_disable_marker();
-    } else if !kernel_has_susfs && is_susfs_module_disabled() {
-        debug!("no SUSFS kernel, disable marker is correct state");
-    }
-
     Ok(caps)
-}
-
-/// Check whether SUSFS module directory has a .disabled marker.
-/// DET03 layer 1: if disabled, all SUSFS operations are skipped.
-fn is_susfs_module_disabled() -> bool {
-    let modules_dir = Path::new("/data/adb/modules");
-    for module_id in SUSFS_MODULE_IDS {
-        let module_dir = modules_dir.join(module_id);
-        if module_dir.exists() {
-            let disabled = module_dir.join("disable");
-            if disabled.exists() {
-                debug!("SUSFS module {module_id} has 'disable' marker");
-                return true;
-            }
-            // Module dir exists but not disabled -- proceed
-            return false;
-        }
-    }
-    // No SUSFS module dir found -- not disabled (may still have binary)
-    false
-}
-
-fn remove_susfs_disable_marker() {
-    let modules_dir = Path::new("/data/adb/modules");
-    for module_id in SUSFS_MODULE_IDS {
-        let disable_path = modules_dir.join(module_id).join("disable");
-        if disable_path.exists() {
-            if let Err(_e) = std::fs::remove_file(&disable_path) {
-                warn!("failed to remove stale disable marker: {}", disable_path.display());
-            } else {
-                debug!("removed stale disable marker: {}", disable_path.display());
-            }
-        }
-    }
 }
 
 /// Locate the SUSFS binary by searching platform-specific paths.
