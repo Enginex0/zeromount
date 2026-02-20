@@ -166,7 +166,7 @@ rm -f /data/adb/ksu/module_configs/meta-zeromount/persist.config 2>/dev/null
 echo 0 > "$ZM_DATA/.bootcount"
 
 if command -v chcon >/dev/null 2>&1; then
-    chcon -R u:object_r:system_file:s0 "$MODPATH" 2>/dev/null || true
+    find "$MODPATH" -path "*/webroot" -prune -o -exec chcon u:object_r:system_file:s0 {} + 2>/dev/null || true
     chcon -R u:object_r:adb_data_file:s0 "$ZM_DATA" 2>/dev/null || true
 fi
 
