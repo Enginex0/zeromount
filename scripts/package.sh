@@ -144,6 +144,7 @@ package_zip() {
 
     sed -i "s/^version=.*/version=${VERSION}/" "$staging/module.prop"
     local vcode="${VERSION#v}"
+    vcode="${vcode%%-*}"
     vcode="${vcode//.}"
     sed -i "s/^versionCode=.*/versionCode=${vcode}/" "$staging/module.prop"
 
