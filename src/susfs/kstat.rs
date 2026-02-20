@@ -49,11 +49,11 @@ pub fn build_kstat_values_from_paths(virtual_path: &str, real_path: &str) -> Res
                 nlink: Some(virt_meta.nlink() as u32),
                 size: Some(size),
                 atime_sec: Some(virt_meta.atime()),
-                atime_nsec: Some(0),
+                atime_nsec: Some(virt_meta.atime_nsec()),
                 mtime_sec: Some(virt_meta.mtime()),
-                mtime_nsec: Some(0),
+                mtime_nsec: Some(virt_meta.mtime_nsec()),
                 ctime_sec: Some(virt_meta.ctime()),
-                ctime_nsec: Some(0),
+                ctime_nsec: Some(virt_meta.ctime_nsec()),
                 blksize: Some(blksize),
                 blocks: Some(blocks),
             })
@@ -66,12 +66,13 @@ pub fn build_kstat_values_from_paths(virtual_path: &str, real_path: &str) -> Res
                 .with_context(|| format!("no existing ancestor for '{virtual_path}'"))?;
 
             let synthetic_ino = {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let pid = std::process::id() as u64;
-                (now.wrapping_add(pid)) % 2_147_483_647
+                // FNV-1a: stable across runs, deterministic per path
+                let mut hash: u64 = 0xcbf29ce484222325;
+                for byte in virtual_path.as_bytes() {
+                    hash ^= *byte as u64;
+                    hash = hash.wrapping_mul(0x100000001b3);
+                }
+                (hash % 2_147_483_647).max(1)
             };
 
             debug!("virtual path absent, using parent-derived metadata: ino={synthetic_ino}");
@@ -82,11 +83,11 @@ pub fn build_kstat_values_from_paths(virtual_path: &str, real_path: &str) -> Res
                 nlink: Some(1),
                 size: Some(size),
                 atime_sec: Some(ancestor_meta.atime()),
-                atime_nsec: Some(0),
+                atime_nsec: Some(ancestor_meta.atime_nsec()),
                 mtime_sec: Some(ancestor_meta.mtime()),
-                mtime_nsec: Some(0),
+                mtime_nsec: Some(ancestor_meta.mtime_nsec()),
                 ctime_sec: Some(ancestor_meta.ctime()),
-                ctime_nsec: Some(0),
+                ctime_nsec: Some(ancestor_meta.ctime_nsec()),
                 blksize: Some(blksize),
                 blocks: Some(blocks),
             })

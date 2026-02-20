@@ -401,11 +401,8 @@ impl MountController<Mounted> {
         runtime_state.hidden_path_count = hidden_paths;
         write_status_json_atomic(&runtime_state);
 
-        // 4. KSU09: notify-module-mounted LAST -- after all rules, SUSFS, description
-        // Bootcount reset moved to service.sh — only reset after sys.boot_completed=1
-        if let Err(e) = self.state.root_mgr.notify_module_mounted() {
-            warn!("notify-module-mounted failed (non-fatal): {e}");
-        }
+        // KSU09: notify-module-mounted is fired by metamount.sh after the binary
+        // exits — removed from Rust to avoid double-signaling.
 
         info!("pipeline complete");
 
@@ -637,6 +634,7 @@ fn detach_mount(path: &str) {
         Ok(p) => p,
         Err(_) => return,
     };
+    // SAFETY: CString is non-null NUL-terminated; MNT_DETACH is a valid umount2 flag.
     let ret = unsafe { libc::umount2(c_path.as_ptr(), libc::MNT_DETACH) };
     if ret != 0 {
         let errno = std::io::Error::last_os_error();
