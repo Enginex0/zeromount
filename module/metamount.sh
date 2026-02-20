@@ -25,8 +25,11 @@ fi
 
 if [ -n "$ABI" ] && [ -x "$BIN" ]; then
     echo "$LOG: starting mount pipeline (pre-zygote)" > /dev/kmsg 2>/dev/null
-    "$BIN" mount
+    timeout 60 "$BIN" mount
     RET=$?
+    if [ "$RET" -eq 124 ]; then
+        echo "$LOG: mount pipeline hung after 60s — forced termination" > /dev/kmsg 2>/dev/null
+    fi
     echo "$LOG: mount pipeline exited (rc=$RET)" > /dev/kmsg 2>/dev/null
 
 else
