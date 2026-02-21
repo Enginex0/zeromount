@@ -5,7 +5,6 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use tracing::{debug, info, warn};
 
-use super::kstat::build_kstat_values_from_paths;
 use super::SusfsClient;
 
 // Font file extensions we handle

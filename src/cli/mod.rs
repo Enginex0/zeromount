@@ -64,6 +64,8 @@ pub enum Commands {
     },
     /// Watch /data/adb/modules/ for changes (inotify with polling fallback)
     Watch,
+    /// Performance tuning + input boost daemon (controlled by perf.enabled)
+    Perf,
     /// Diagnostic dump
     Diag,
     /// Remove stale overlay mounts from previous runs

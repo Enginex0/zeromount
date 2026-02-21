@@ -398,6 +398,15 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn handle_perf() -> Result<()> {
+    let config = crate::core::config::ZeroMountConfig::load(None)?;
+    if !config.perf.enabled {
+        tracing::info!("perf.enabled = false, exiting");
+        return Ok(());
+    }
+    crate::perf::run_perf()
+}
+
 pub fn handle_watch() -> Result<()> {
     let modules_dir = Path::new("/data/adb/modules");
     tracing::info!("starting module watcher on {}", modules_dir.display());

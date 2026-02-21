@@ -5,6 +5,7 @@ mod logging;
 mod modules;
 mod mount;
 mod susfs;
+mod perf;
 mod utils;
 mod vfs;
 
@@ -62,6 +63,7 @@ fn main() -> Result<()> {
         Commands::Log { action } => cli::handlers::handle_log(action),
         Commands::Susfs { feature, state } => cli::handlers::handle_susfs(&feature, &state),
         Commands::Watch => cli::handlers::handle_watch(),
+        Commands::Perf => cli::handlers::handle_perf(),
         Commands::Diag => cli::handlers::handle_diag(),
         Commands::CleanupStale => cli::handlers::handle_cleanup_stale(),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),

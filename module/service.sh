@@ -42,49 +42,11 @@ spoof_props() {
 }
 spoof_props
 
-tune_performance() {
-    ENABLED=$("$BIN" config get perf.enabled 2>/dev/null)
-    [ "$ENABLED" != "true" ] && return 0
-
-    # Scheduler
-    echo 250000 > /proc/sys/kernel/sched_migration_cost_ns
-    echo 2000000 > /proc/sys/kernel/sched_min_granularity_ns
-    echo 2000000 > /proc/sys/kernel/sched_wakeup_granularity_ns
-    echo 1 > /proc/sys/kernel/sched_child_runs_first
-
-    # CPU frequency
-    for cpu_dir in /sys/devices/system/cpu/cpufreq/policy*; do
-        [ -d "$cpu_dir/schedutil" ] || continue
-        echo 2000 > "$cpu_dir/schedutil/rate_limit_us" 2>/dev/null
-    done
-
-    # VM
-    echo 100 > /proc/sys/vm/swappiness
-    echo 5 > /proc/sys/vm/dirty_background_ratio
-    echo 15 > /proc/sys/vm/dirty_ratio
-    echo 300 > /proc/sys/vm/dirty_writeback_centisecs
-    echo 80 > /proc/sys/vm/vfs_cache_pressure
-    echo 0 > /proc/sys/vm/page-cluster
-
-    # I/O scheduler
-    for bdev in /sys/block/mmcblk*/queue/scheduler; do
-        [ -f "$bdev" ] || continue
-        if grep -q 'mq-deadline' "$bdev"; then
-            echo mq-deadline > "$bdev"
-        elif grep -q 'deadline' "$bdev"; then
-            echo deadline > "$bdev"
-        fi
-    done
-
-    # Readahead
-    for bdev in /sys/block/mmcblk*/queue/read_ahead_kb; do
-        [ -f "$bdev" ] || continue
-        echo 64 > "$bdev"
-    done
-
-    echo "zeromount: performance tunables applied" > /dev/kmsg 2>/dev/null
-}
-tune_performance
+# Performance tuning + input boost daemon (Rust-native, auto-detects device)
+if [ "$("$BIN" config get perf.enabled 2>/dev/null)" = "true" ]; then
+    "$BIN" perf &
+    _perf_pid=$!
+fi
 
 # Reset bootloop counter only after the system actually finishes booting
 (
@@ -103,4 +65,7 @@ tune_performance
 # Deferred SUSFS — waits for sdcard decryption via inotify, then retries path hiding
 "$BIN" mount --susfs-retry --wait &
 _susfs_pid=$!
-trap 'kill $_susfs_pid 2>/dev/null; rm -f "$LOCKFILE"' EXIT
+trap 'kill $_perf_pid $_susfs_pid 2>/dev/null; rm -f "$LOCKFILE"' EXIT
+
+# Keep service.sh alive while perf daemon and SUSFS retry run
+wait
