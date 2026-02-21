@@ -67,12 +67,11 @@ pub fn handle_detect() -> Result<()> {
     Ok(())
 }
 
-pub fn handle_status(json: bool) -> Result<()> {
+pub fn build_runtime_status() -> crate::core::types::RuntimeState {
     let status_path = std::path::Path::new("/data/adb/zeromount/.status.json");
     let mut state = crate::core::types::RuntimeState::read_status_file(status_path)
         .unwrap_or_default();
 
-    // Backfill from .detection.json when .status.json is missing or has bare defaults
     if !state.capabilities.vfs_driver && !state.capabilities.susfs_available {
         match crate::detect::load_detection() {
             Ok(det) => {
@@ -91,7 +90,6 @@ pub fn handle_status(json: bool) -> Result<()> {
         }
     }
 
-    // Augment cached state with live kernel data when the driver is reachable
     if let Ok(driver) = crate::vfs::VfsDriver::open() {
         state.capabilities.vfs_driver = true;
         if let Ok(v) = driver.get_version() {
@@ -102,10 +100,15 @@ pub fn handle_status(json: bool) -> Result<()> {
         }
     }
 
-    // Detect root manager live rather than relying on cached state
     if let Ok(mgr) = crate::utils::platform::detect_root_manager() {
         state.root_manager = Some(mgr.name().to_string());
     }
+
+    state
+}
+
+pub fn handle_status(json: bool) -> Result<()> {
+    let state = build_runtime_status();
 
     if json {
         let out = serde_json::to_string_pretty(&state)?;

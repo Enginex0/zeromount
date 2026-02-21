@@ -1,4 +1,5 @@
 pub mod handlers;
+pub mod webui_init;
 
 use clap::{Parser, Subcommand};
 
@@ -67,6 +68,8 @@ pub enum Commands {
     Diag,
     /// Remove stale overlay mounts from previous runs
     CleanupStale,
+    /// Batched WebUI init data (single JSON blob)
+    WebUiInit,
     /// Print version
     Version,
 }
