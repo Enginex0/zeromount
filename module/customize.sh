@@ -117,13 +117,13 @@ if [ "$SUSFS_DETECTED" = true ]; then
     mkdir -p "$SUSFS_DIR"
     if [ -f "$SUSFS_CONFIG" ]; then
         zm_print "  🔧 Syncing SUSFS config"
-        sed -i 's/^susfs_log=.*/susfs_log=0/' "$SUSFS_CONFIG"
-        sed -i 's/^avc_log_spoofing=.*/avc_log_spoofing=1/' "$SUSFS_CONFIG"
-        sed -i 's/^hide_sus_mnts_for_all_or_non_su_procs=.*/hide_sus_mnts_for_all_or_non_su_procs=1/' "$SUSFS_CONFIG"
-        sed -i 's/^emulate_vold_app_data=.*/emulate_vold_app_data=1/' "$SUSFS_CONFIG"
-        sed -i 's/^force_hide_lsposed=.*/force_hide_lsposed=0/' "$SUSFS_CONFIG"
+        grep -q '^susfs_log=' "$SUSFS_CONFIG" || echo 'susfs_log=0' >> "$SUSFS_CONFIG"
+        grep -q '^avc_log_spoofing=' "$SUSFS_CONFIG" || echo 'avc_log_spoofing=1' >> "$SUSFS_CONFIG"
+        grep -q '^hide_sus_mnts_for_all_or_non_su_procs=' "$SUSFS_CONFIG" || echo 'hide_sus_mnts_for_all_or_non_su_procs=1' >> "$SUSFS_CONFIG"
+        grep -q '^emulate_vold_app_data=' "$SUSFS_CONFIG" || echo 'emulate_vold_app_data=1' >> "$SUSFS_CONFIG"
+        grep -q '^force_hide_lsposed=' "$SUSFS_CONFIG" || echo 'force_hide_lsposed=1' >> "$SUSFS_CONFIG"
         grep -q '^spoof_cmdline=' "$SUSFS_CONFIG" || echo 'spoof_cmdline=0' >> "$SUSFS_CONFIG"
-        grep -q '^hide_loops=' "$SUSFS_CONFIG" || echo 'hide_loops=0' >> "$SUSFS_CONFIG"
+        grep -q '^hide_loops=' "$SUSFS_CONFIG" || echo 'hide_loops=1' >> "$SUSFS_CONFIG"
         zm_print "  ✅ SUSFS config synced"
     else
         zm_print "  🔧 Seeding SUSFS config"
@@ -137,8 +137,8 @@ hide_compat_matrix=0
 hide_gapps=0
 hide_revanced=0
 spoof_cmdline=0
-hide_loops=0
-force_hide_lsposed=0
+hide_loops=1
+force_hide_lsposed=1
 spoof_uname=0
 hide_sus_mnts_for_all_or_non_su_procs=1
 umount_for_zygote_iso_service=0

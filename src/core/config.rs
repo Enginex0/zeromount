@@ -166,11 +166,11 @@ pub struct BreneConfig {
     pub hide_sus_mounts: bool,
     #[serde(default = "default_true")]
     pub emulate_vold_app_data: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub force_hide_lsposed: bool,
     #[serde(default)]
     pub spoof_cmdline: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub hide_ksu_loops: bool,
     #[serde(default)]
     pub prop_spoofing: bool,
@@ -196,9 +196,9 @@ impl Default for BreneConfig {
             susfs_log: false,
             hide_sus_mounts: true,
             emulate_vold_app_data: true,
-            force_hide_lsposed: false,
+            force_hide_lsposed: true,
             spoof_cmdline: false,
-            hide_ksu_loops: false,
+            hide_ksu_loops: true,
             prop_spoofing: true,
             custom_sus_paths: Vec::new(),
             custom_sus_maps: Vec::new(),
@@ -694,9 +694,9 @@ mod tests {
         assert!(!config.brene.susfs_log);
         assert!(config.brene.hide_sus_mounts);
         assert!(config.brene.emulate_vold_app_data);
-        assert!(!config.brene.force_hide_lsposed);
+        assert!(config.brene.force_hide_lsposed);
         assert!(!config.brene.spoof_cmdline);
-        assert!(!config.brene.hide_ksu_loops);
+        assert!(config.brene.hide_ksu_loops);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
         assert!(!config.perf.enabled);
         assert!(config.per_module.is_empty());
