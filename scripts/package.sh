@@ -219,7 +219,7 @@ UPDATER
     echo "" > "$staging/META-INF/com/google/android/updater-script"
 
     # Verify no eliminated scripts
-    local eliminated=(logging.sh susfs_integration.sh sync.sh zm-diag.sh)
+    local eliminated=(logging.sh susfs_integration.sh sync.sh zm-diag.sh zm-init.sh)
     for dead in "${eliminated[@]}"; do
         if [ -f "$staging/$dead" ]; then
             echo "FATAL: eliminated script $dead in staging!" >&2
@@ -257,7 +257,7 @@ if [ "$BUILD" = true ]; then
 
     if [ -f "$WEBUI_DIR/package.json" ]; then
         echo "==> Building WebUI"
-        (cd "$WEBUI_DIR" && pnpm install --frozen-lockfile && pnpm run build)
+        (cd "$WEBUI_DIR" && npm install && npm run build)
         echo "==> WebUI built"
     else
         echo "WARN: webui/package.json not found, skipping WebUI build" >&2
