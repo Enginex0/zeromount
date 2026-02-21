@@ -135,7 +135,7 @@ function createAppStore() {
   };
 
   const defaultPerf: PerfSettings = {
-    enabled: true,
+    enabled: false,
   };
 
   const [settings, setSettings] = createStore<Settings>({

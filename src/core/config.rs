@@ -258,13 +258,13 @@ impl Default for UnameConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerfConfig {
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub enabled: bool,
 }
 
 impl Default for PerfConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self { enabled: false }
     }
 }
 
@@ -698,7 +698,7 @@ mod tests {
         assert!(!config.brene.spoof_cmdline);
         assert!(!config.brene.hide_ksu_loops);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
-        assert!(config.perf.enabled);
+        assert!(!config.perf.enabled);
         assert!(config.per_module.is_empty());
     }
 
