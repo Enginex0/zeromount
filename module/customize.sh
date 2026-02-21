@@ -62,18 +62,21 @@ zm_print "  ✅ Binary ready"
 ZM_DATA="/data/adb/zeromount"
 zm_print "📁 Preparing Data" 0.3 "h"
 
-# Clean install — wipe previous state so every install starts fresh
-if [ -d "$ZM_DATA" ]; then
-    rm -rf "$ZM_DATA"
-    zm_print "  🧹 Previous installation cleaned"
+FRESH_INSTALL=false
+if [ ! -f "$ZM_DATA/config.toml" ]; then
+    FRESH_INSTALL=true
 fi
 
 mkdir -p "$ZM_DATA"
 mkdir -p "$ZM_DATA/logs"
 zm_print "  ✅ Data directory ready"
 
-zm_print "  🔧 Writing default config"
-"$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
+if [ "$FRESH_INSTALL" = true ]; then
+    zm_print "  🔧 Writing default config"
+    "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
+else
+    zm_print "  ✅ Existing config preserved"
+fi
 
 # Xiaomi/Redmi/POCO devices have mi_ext overlay mounts that trigger detection
 BRAND=$(getprop ro.product.brand 2>/dev/null | tr '[:upper:]' '[:lower:]')
