@@ -372,8 +372,10 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
         }
     }
 
-    // Only re-run path-hiding operations — maps, mounts, AVC, log already succeeded at boot
-    match crate::susfs::brene::apply_brene_deferred(&client, &config) {
+    let susfs_mode = crate::detect::load_detection()
+        .map(|d| d.capabilities.susfs_mode)
+        .unwrap_or(crate::core::types::SusfsMode::Absent);
+    match crate::susfs::brene::apply_brene_deferred(&client, &config, susfs_mode) {
         Ok(brene) => {
             tracing::info!(
                 paths = brene.paths_hidden,

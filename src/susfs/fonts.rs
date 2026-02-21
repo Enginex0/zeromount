@@ -24,13 +24,10 @@ pub struct FontRedirectResult {
     pub path_hidden: bool,
 }
 
-/// Redirect a single font file.
+/// Redirect a single font file using stock SUSFS ioctls.
 ///
-/// Flow (mirrors susfs_integration.sh:apply_font_redirect):
-/// 1. Copy SELinux context from original to replacement
-/// 2. open_redirect_all (so all UIDs see replacement when opening target)
-/// 3. kstat_redirect (so stat() on target returns original metadata)
-/// 4. Hide replacement path via add_sus_path
+/// Strategy: kstat spoof (redirect or static fallback) + sus_path hide.
+/// open_redirect_all is not used — kernel patch not stable yet.
 pub fn redirect_font_file(
     client: &SusfsClient,
     target: &str,
@@ -52,48 +49,22 @@ pub fn redirect_font_file(
         bail!("replacement file does not exist: {replacement}");
     }
 
-    // 1. Copy SELinux context
     copy_selinux_context(target, replacement);
 
-    // 2. Open redirect (all UIDs)
-    if client.features().open_redirect {
-        match client.add_open_redirect_all(target, replacement) {
-            Ok(()) => {
-                result.open_redirect = true;
-                debug!("open_redirect_all: {target} -> {replacement}");
-            }
-            Err(e) => {
-                // Custom fonts that don't exist on stock system — expected, not an error
-                if !Path::new(target).exists() {
-                    debug!("open_redirect_all skipped for {target}: target absent on stock");
-                } else {
-                    warn!("open_redirect_all failed for {target}: {e}");
-                }
-                return Ok(result);
-            }
-        }
-    } else {
-        warn!("open_redirect not available, font redirect incomplete for {target}");
-        return Ok(result);
-    }
-
-    // 3. Kstat redirect
+    // kstat spoof — uses kstat_redirect if available, falls back to kstat_statically
     if client.features().kstat {
-        let spoof = build_kstat_values_from_paths(target, replacement)?;
-
-        match client.add_sus_kstat_redirect(target, replacement, &spoof) {
+        match super::kstat::apply_kstat_redirect_or_static(client, target, replacement) {
             Ok(()) => {
                 result.kstat_redirect = true;
-                debug!("kstat_redirect: {target} -> {replacement}");
+                debug!("kstat spoofed: {target}");
             }
             Err(e) => {
-                // Partial success is acceptable -- open_redirect still works
-                warn!("kstat_redirect failed for {target}: {e} (open_redirect OK)");
+                warn!("kstat spoof failed for {target}: {e}");
             }
         }
     }
 
-    // 4. Hide replacement path
+    // Hide replacement path so module font files aren't visible
     if client.features().path {
         match client.add_sus_path(replacement) {
             Ok(()) => {
@@ -106,8 +77,8 @@ pub fn redirect_font_file(
     }
 
     info!(
-        "font redirect: {target} -> {replacement} (redirect={}, kstat={}, hidden={})",
-        result.open_redirect, result.kstat_redirect, result.path_hidden
+        "font redirect: {target} -> {replacement} (kstat={}, hidden={})",
+        result.kstat_redirect, result.path_hidden
     );
 
     Ok(result)
@@ -203,9 +174,8 @@ pub struct FontModuleResult {
 
 /// Mount a font module with SUSFS redirect, falling back to OverlayFS (S07).
 ///
-/// SUSFS is preferred because it avoids visible mounts. When open_redirect
-/// is unavailable or >50% of redirects fail, fall back to overlay on
-/// /system/fonts.
+/// SUSFS kstat + sus_path is preferred (no visible mounts). When SUSFS
+/// is unavailable or >50% fail, fall back to overlay on /system/fonts.
 pub fn redirect_font_module(
     client: &SusfsClient,
     module_id: &str,
@@ -213,16 +183,15 @@ pub fn redirect_font_module(
     system_font_dir: &str,
     overlay_source: &str,
 ) -> Result<FontModuleResult> {
-    // Try SUSFS redirect first
-    if client.is_available() && client.features().open_redirect {
+    if client.is_available() && client.features().kstat {
         let results = redirect_font_directory(client, module_font_dir, system_font_dir)?;
         let total = results.len();
-        let success = results.iter().filter(|r| r.open_redirect).count();
+        let success = results.iter().filter(|r| r.kstat_redirect || r.path_hidden).count();
         let failed = total - success;
 
         if total > 0 && success > total / 2 {
             info!(
-                "font module '{module_id}': SUSFS redirect {success}/{total} files"
+                "font module '{module_id}': SUSFS kstat+path {success}/{total} files"
             );
             return Ok(FontModuleResult {
                 module_id: module_id.to_string(),
@@ -239,7 +208,7 @@ pub fn redirect_font_module(
             );
         }
     } else {
-        debug!("font module '{module_id}': SUSFS redirect unavailable, using overlay");
+        debug!("font module '{module_id}': SUSFS unavailable, using overlay");
     }
 
     // OverlayFS fallback (S07 exception to VFS02)
@@ -451,18 +420,18 @@ mod tests {
     }
 
     #[test]
-    fn redirect_font_module_falls_back_when_redirect_missing() {
+    fn redirect_font_module_falls_back_when_kstat_missing() {
         use crate::susfs::{SusfsClient, SusfsFeatures};
 
         let features = SusfsFeatures {
-            open_redirect: false,
+            kstat: false,
             ..SusfsFeatures::default()
         };
         let client = SusfsClient::new_for_test(true, features);
 
-        // Client available but open_redirect missing -> overlay fallback
+        // Client available but kstat missing -> overlay fallback
         assert!(client.is_available());
-        assert!(!client.features().open_redirect);
+        assert!(!client.features().kstat);
     }
 
     #[test]
@@ -470,18 +439,16 @@ mod tests {
         use crate::susfs::{SusfsClient, SusfsFeatures};
 
         let features = SusfsFeatures {
-            open_redirect: true,
             kstat: true,
             path: true,
             kstat_redirect: true,
-            open_redirect_all: true,
             ..SusfsFeatures::default()
         };
         let client = SusfsClient::new_for_test(true, features);
 
-        // Full SUSFS available -> should prefer SUSFS redirect over overlay
+        // kstat available -> should prefer SUSFS kstat+path over overlay
         assert!(client.is_available());
-        assert!(client.features().open_redirect);
+        assert!(client.features().kstat);
         assert!(client.features().kstat_redirect);
     }
 }

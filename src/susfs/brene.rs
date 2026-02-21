@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
+use crate::core::types::SusfsMode;
 use crate::utils::command::{run_command_with_timeout, CMD_TIMEOUT};
 use super::SusfsClient;
 use super::fonts;
@@ -89,7 +90,7 @@ pub struct FontModuleInfo {
 /// Property spoofing uses resetprop (not SUSFS) and is handled separately.
 /// `skip_path_hide`: true at boot (sdcard not decrypted, all add_sus_path calls EINVAL).
 /// apply_brene_deferred handles path hiding after sdcard is available.
-pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, fonts_overlay_mounted: bool) -> Result<BreneResult> {
+pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hide: bool, fonts_overlay_mounted: bool, _susfs_mode: SusfsMode) -> Result<BreneResult> {
     let mut result = BreneResult::default();
 
     if !client.is_available() {
@@ -764,7 +765,7 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
 /// Deferred BRENE: only re-run path-hiding operations that require
 /// android_data_root_path (which isn't available at boot time).
 /// Maps, mounts, AVC, log, uname, fonts all succeed at boot — skip them.
-pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> Result<BreneResult> {
+pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _susfs_mode: SusfsMode) -> Result<BreneResult> {
     let mut result = BreneResult::default();
 
     if !client.is_available() {
@@ -828,7 +829,6 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig) -> R
         }
     }
 
-    // Retry font replacement path hiding (fonts.rs:92 add_sus_path fails at boot due to EINVAL)
     if brene.auto_hide_fonts && has_path {
         let count = hide_font_replacement_paths(client);
         result.paths_hidden += count;
@@ -1036,7 +1036,7 @@ mod tests {
     fn brene_skips_when_susfs_unavailable() {
         let client = SusfsClient::new_for_test(false, SusfsFeatures::default());
         let config = ZeroMountConfig::default();
-        let result = apply_brene(&client, &config, false, false).expect("should not error");
+        let result = apply_brene(&client, &config, false, false, SusfsMode::Enhanced).expect("should not error");
         assert_eq!(result.paths_hidden, 0);
         assert_eq!(result.maps_hidden, 0);
         assert!(!result.uname_spoofed);

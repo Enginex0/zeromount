@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use tracing::{debug, warn};
 
-use crate::core::types::CapabilityFlags;
+use crate::core::types::{CapabilityFlags, SusfsMode};
 use crate::susfs::SusfsClient;
 use crate::utils::platform;
 
@@ -51,6 +51,31 @@ pub fn probe_susfs() -> Result<CapabilityFlags> {
             false
         }
     };
+
+    let module_ids = ["susfs4ksu", "susfs4ksu_next"];
+    let modules_base = Path::new("/data/adb/modules");
+
+    let module_installed = module_ids.iter().any(|id| modules_base.join(id).exists());
+    let module_disabled = module_ids.iter().any(|id| modules_base.join(id).join("disable").exists());
+    let module_enabled = module_installed && !module_disabled;
+    let binary_found = binary.is_some();
+
+    caps.susfs_module_installed = module_installed;
+    caps.susfs_module_enabled = module_enabled;
+    caps.susfs_binary_found = binary_found;
+
+    caps.susfs_mode = if kernel_has_susfs && module_enabled && binary_found {
+        SusfsMode::Enhanced
+    } else if kernel_has_susfs {
+        SusfsMode::Embedded
+    } else {
+        SusfsMode::Absent
+    };
+
+    debug!(
+        "SUSFS mode: {:?} (kernel={}, module_installed={}, module_enabled={}, binary={})",
+        caps.susfs_mode, kernel_has_susfs, module_installed, module_enabled, binary_found
+    );
 
     Ok(caps)
 }

@@ -21,6 +21,20 @@ impl Default for Scenario {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SusfsMode {
+    Enhanced,
+    Embedded,
+    Absent,
+}
+
+impl Default for SusfsMode {
+    fn default() -> Self {
+        Self::Absent
+    }
+}
+
 // -- Capability Flags --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +50,10 @@ pub struct CapabilityFlags {
     pub susfs_open_redirect: bool,
     pub susfs_kstat_redirect: bool,
     pub susfs_open_redirect_all: bool,
+    pub susfs_mode: SusfsMode,
+    pub susfs_module_installed: bool,
+    pub susfs_module_enabled: bool,
+    pub susfs_binary_found: bool,
     pub overlay_supported: bool,
     pub erofs_supported: bool,
     pub tmpfs_xattr: bool,
@@ -55,6 +73,10 @@ impl Default for CapabilityFlags {
             susfs_open_redirect: false,
             susfs_kstat_redirect: false,
             susfs_open_redirect_all: false,
+            susfs_mode: SusfsMode::Absent,
+            susfs_module_installed: false,
+            susfs_module_enabled: false,
+            susfs_binary_found: false,
             overlay_supported: false,
             erofs_supported: false,
             tmpfs_xattr: false,
