@@ -21,12 +21,6 @@ export const accentPresets: Record<string, { gradient: string; textAccent: strin
     rgb: '0, 214, 143',
     textOnAccent: '#1A1A2E',
   },
-  '#00B4D8': { // Azure
-    gradient: 'linear-gradient(135deg, #00B4D8 0%, #48CAE4 50%, #90E0EF 100%)',
-    textAccent: '#00B4D8',
-    rgb: '0, 180, 216',
-    textOnAccent: '#1A1A2E',
-  },
   '#D4A574': { // Beige
     gradient: 'linear-gradient(135deg, #D4A574 0%, #DEB887 50%, #F0D9B5 100%)',
     textAccent: '#DEB887',
@@ -63,6 +57,17 @@ export const accentPresets: Record<string, { gradient: string; textAccent: strin
     rgb: '255, 107, 107',
     textOnAccent: '#1A1A2E',
   },
+};
+
+export const accentNames: Record<string, string> = {
+  '#FF8E53': 'Orange',
+  '#00D68F': 'Emerald',
+  '#D4A574': 'Beige',
+  '#A855F7': 'Amethyst',
+  '#D946EF': 'Fuchsia',
+  '#84CC16': 'Lime',
+  '#6366F1': 'Indigo',
+  '#FF6B6B': 'Coral',
 };
 
 export function needsDarkText(accentColor: string): boolean {

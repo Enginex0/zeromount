@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse } from './types';
 import { api, shouldUseMock } from './api';
 import { listPackages, getPackagesInfo, getAppLabelViaAapt } from './ksuApi';
-import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets } from './theme';
+import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
 import { readCache, writeCache, type HydratableState } from './cache';
 
 function createAppStore() {
@@ -91,7 +91,8 @@ function createAppStore() {
 
   const accentColors = Object.keys(accentPresets);
   const randomAccent = accentColors[Math.floor(Math.random() * accentColors.length)];
-  const initialAccent = savedAutoAccent ? randomAccent : (savedAccent && accentPresets[savedAccent] ? savedAccent : '#FF8E53');
+  const firstOpen = savedAutoAccentRaw === null;
+  const initialAccent = firstOpen ? '#FF6B6B' : savedAutoAccent ? randomAccent : (savedAccent && accentPresets[savedAccent] ? savedAccent : '#FF8E53');
 
   const defaultBrene: BreneSettings = {
     auto_hide_apk: true,
@@ -632,7 +633,7 @@ function createAppStore() {
     console.log('[ZM-Store] updateSettings() called:', updates);
     setSettings(updates);
     if (updates.theme) pushActivity('theme_changed', `Theme → ${updates.theme}`);
-    if (updates.accentColor) pushActivity('theme_changed', `Accent → ${updates.accentColor}`);
+    if (updates.accentColor) pushActivity('theme_changed', `Accent → ${accentNames[updates.accentColor] || updates.accentColor}`);
     if (updates.fixedNav !== undefined) pushActivity('setting_changed', `Fixed nav → ${updates.fixedNav ? 'ON' : 'OFF'}`);
   };
 
