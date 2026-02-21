@@ -587,6 +587,7 @@ impl MountController<Mounted> {
                 Some(MountStrategy::Vfs) => Some("VFS".into()),
                 Some(MountStrategy::MagicMount) => Some("KSU".into()),
                 Some(MountStrategy::Overlay) => self.state.overlay_source.clone(),
+                _ if det.capabilities.vfs_driver => Some("VFS".into()),
                 _ => self.state.overlay_source.clone(),
             },
             modules,
@@ -645,17 +646,16 @@ fn detach_mount(path: &str) {
     }
 }
 
-/// Clean up any stale font overlay or bind mounts from a previous boot.
-/// Reads /proc/self/mountinfo to find mounts under /system/fonts, then
-/// detaches them in reverse order (bind mounts first, then overlay).
+// Only detach font mounts that WE created (overlay/tmpfs).
+// KSU bind mounts (f2fs/ext4/erofs) are left untouched.
 fn cleanup_font_mounts() {
     let mountinfo = match std::fs::read_to_string("/proc/self/mountinfo") {
         Ok(m) => m,
         Err(_) => return,
     };
 
-    let mut font_mounts: Vec<String> = Vec::new();
-    let mut has_font_overlay = false;
+    let mut our_font_mounts: Vec<String> = Vec::new();
+    let mut has_our_overlay = false;
 
     for line in mountinfo.lines() {
         let fields: Vec<&str> = line.split_whitespace().collect();
@@ -663,25 +663,41 @@ fn cleanup_font_mounts() {
             continue;
         }
         let mount_point = fields[4];
-        if mount_point == "/system/fonts" {
-            has_font_overlay = true;
-        } else if mount_point.starts_with("/system/fonts/") {
-            font_mounts.push(mount_point.to_string());
+        if !mount_point.starts_with("/system/fonts") {
+            continue;
+        }
+
+        let fs_type = fields.iter()
+            .position(|&f| f == "-")
+            .and_then(|i| fields.get(i + 1))
+            .copied()
+            .unwrap_or("");
+
+        match fs_type {
+            "overlay" | "tmpfs" => {
+                if mount_point == "/system/fonts" {
+                    has_our_overlay = true;
+                } else {
+                    our_font_mounts.push(mount_point.to_string());
+                }
+            }
+            _ => {
+                debug!(mount_point, fs_type, "preserving KSU font bind mount");
+            }
         }
     }
 
-    // Detach bind mounts first (children before parent)
-    for path in font_mounts.iter().rev() {
+    for path in our_font_mounts.iter().rev() {
         detach_mount(path);
     }
 
-    if has_font_overlay {
+    if has_our_overlay {
         detach_mount("/system/fonts");
-        debug!("cleaned up font overlay on /system/fonts");
+        debug!("cleaned up stale font overlay on /system/fonts");
     }
 
-    if !font_mounts.is_empty() {
-        info!(count = font_mounts.len(), "cleaned up font bind mounts");
+    if !our_font_mounts.is_empty() {
+        info!(count = our_font_mounts.len(), "cleaned up stale font mounts");
     }
 }
 
