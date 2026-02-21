@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For } from 'solid-js';
+import { For, onMount, onCleanup } from 'solid-js';
 import { store } from '../../lib/store';
 import type { Tab } from '../../lib/types';
 import "./NavBar.css";
@@ -16,45 +16,38 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 ];
 
 export function NavBar(props: NavBarProps) {
-  const [indicatorLeft, setIndicatorLeft] = createSignal(0);
-  const [indicatorWidth, setIndicatorWidth] = createSignal(0);
-  const [isStretching, setIsStretching] = createSignal(false);
+  let scrollDebounce: ReturnType<typeof setTimeout> | undefined;
+  let navRef: HTMLElement | undefined;
 
-  let tabRefs: { [key: string]: HTMLButtonElement | undefined } = {};
-
-  createEffect(() => {
-    const activeTabEl = tabRefs[props.activeTab];
-    if (activeTabEl) {
-      const rect = activeTabEl.getBoundingClientRect();
-      const parentRect = activeTabEl.parentElement?.getBoundingClientRect();
-      if (parentRect) {
-        setIsStretching(true);
-        setTimeout(() => {
-          setIndicatorLeft(rect.left - parentRect.left);
-          setIndicatorWidth(rect.width);
-          setTimeout(() => setIsStretching(false), 200);
-        }, 50);
-      }
-    }
+  onMount(() => {
+    const handleScroll = () => {
+      navRef?.classList.add('navbar--scrolling');
+      clearTimeout(scrollDebounce);
+      scrollDebounce = setTimeout(() => {
+        navRef?.classList.remove('navbar--scrolling');
+      }, 150);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollDebounce);
+    });
   });
 
+  const tabIndex = () => tabs.findIndex(t => t.id === props.activeTab);
   const extraPadding = () => store.settings.fixedNav;
 
   return (
-    <nav class={`navbar ${extraPadding() ? 'navbar--fixed-nav' : ''}`}>
+    <nav ref={navRef} class={`navbar ${extraPadding() ? 'navbar--fixed-nav' : ''}`}>
       <div class="navbar__tabs">
         <div
-          class={`navbar__indicator ${isStretching() ? 'navbar__indicator--stretching' : ''}`}
-          style={{
-            left: `${indicatorLeft()}px`,
-            width: `${indicatorWidth()}px`,
-          }}
+          class="navbar__indicator"
+          style={{ '--tab-index': tabIndex() }}
         />
 
         <For each={tabs}>
           {(tab) => (
             <button
-              ref={(el) => (tabRefs[tab.id] = el)}
               onClick={() => props.onTabChange(tab.id)}
               class={`navbar__tab ${props.activeTab === tab.id ? 'navbar__tab--active' : ''}`}
             >
