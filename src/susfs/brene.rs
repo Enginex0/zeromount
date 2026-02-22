@@ -120,9 +120,9 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
         }
 
         if brene.auto_hide_tmp && has_path {
-            let count = paths::hide_paths(client, TMP_PATHS).unwrap_or(0);
+            let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
             result.paths_hidden += count;
-            info!("BRENE: tmp paths hidden ({count})");
+            info!("BRENE: tmp children hidden via path_loop ({count})");
         }
 
         if brene.auto_hide_apk && has_path {
@@ -852,9 +852,9 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
     }
 
     if brene.auto_hide_tmp && has_path {
-        let count = paths::hide_paths(client, TMP_PATHS).unwrap_or(0);
+        let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
         result.paths_hidden += count;
-        info!("BRENE deferred: tmp paths hidden ({count})");
+        info!("BRENE deferred: tmp children hidden via path_loop ({count})");
     }
 
     if brene.auto_hide_apk && has_path {

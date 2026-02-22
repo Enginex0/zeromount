@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Result};
@@ -41,6 +42,38 @@ pub fn hide_paths_loop(client: &SusfsClient, paths: &[&str]) -> Result<u32> {
         match client.add_sus_path_loop(path) {
             Ok(()) => count += 1,
             Err(e) => debug!("add_sus_path_loop failed for {path}: {e}"),
+        }
+    }
+    Ok(count)
+}
+
+// Hide children of each directory via add_sus_path_loop so they get
+// re-flagged on every non-root process spawn (matches BRENE behavior).
+pub fn hide_dir_children_loop(client: &SusfsClient, dirs: &[&str]) -> Result<u32> {
+    if !client.is_available() || !client.features().path {
+        bail!("SUSFS path hiding not available");
+    }
+
+    let mut count = 0u32;
+    for dir in dirs {
+        let dir_path = Path::new(dir);
+        if !dir_path.is_dir() {
+            debug!("skip nonexistent dir: {dir}");
+            continue;
+        }
+        let entries = match fs::read_dir(dir_path) {
+            Ok(e) => e,
+            Err(e) => {
+                debug!("read_dir failed for {dir}: {e}");
+                continue;
+            }
+        };
+        for entry in entries.flatten() {
+            let child = format!("{}/{}", dir, entry.file_name().to_string_lossy());
+            match client.add_sus_path_loop(&child) {
+                Ok(()) => count += 1,
+                Err(e) => debug!("add_sus_path_loop failed for {child}: {e}"),
+            }
         }
     }
     Ok(count)
