@@ -86,8 +86,6 @@ pub struct MountConfig {
     pub mount_source: String,
     #[serde(default = "default_auto")]
     pub overlay_source: String,
-    #[serde(default)]
-    pub hide_stock_overlays: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,7 +112,6 @@ impl Default for MountConfig {
             random_mount_paths: true,
             mount_source: default_auto(),
             overlay_source: default_auto(),
-            hide_stock_overlays: false,
         }
     }
 }
@@ -481,7 +478,6 @@ impl ZeroMountConfig {
             "mount.random_mount_paths" => Some(self.mount.random_mount_paths.to_string()),
             "mount.mount_source" => Some(self.mount.mount_source.clone()),
             "mount.overlay_source" => Some(self.mount.overlay_source.clone()),
-            "mount.hide_stock_overlays" => Some(self.mount.hide_stock_overlays.to_string()),
 
             // susfs.*
             "susfs.enabled" => Some(self.susfs.enabled.to_string()),
@@ -549,7 +545,6 @@ impl ZeroMountConfig {
             "mount.random_mount_paths" => self.mount.random_mount_paths = value.parse()?,
             "mount.mount_source" => self.mount.mount_source = value.to_string(),
             "mount.overlay_source" => self.mount.overlay_source = value.to_string(),
-            "mount.hide_stock_overlays" => self.mount.hide_stock_overlays = value.parse()?,
 
             // susfs.*
             "susfs.enabled" => self.susfs.enabled = value.parse()?,

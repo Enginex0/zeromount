@@ -735,11 +735,6 @@ echo "]"
     return logActivity(type, message);
   },
 
-  async setHideOverlays(enabled: boolean): Promise<void> {
-    if (shouldUseMock()) return;
-    await ksuExec(`echo ${enabled ? 1 : 0} > /sys/kernel/zeromount/hide_overlays`);
-  },
-
   async setSusfsLog(enabled: boolean): Promise<void> {
     if (shouldUseMock()) return;
     await ksuExec(`ksu_susfs enable_log ${enabled ? 1 : 0}`);

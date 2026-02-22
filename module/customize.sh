@@ -114,14 +114,6 @@ fi
 # Xiaomi/Redmi/POCO devices have mi_ext overlay mounts that trigger detection
 BRAND=$(getprop ro.product.brand 2>/dev/null | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer 2>/dev/null | tr '[:upper:]' '[:lower:]')
-case "$BRAND$MANUFACTURER" in
-    *xiaomi*|*redmi*|*poco*)
-        if ! grep -q 'hide_stock_overlays' "$ZM_DATA/config.toml" 2>/dev/null; then
-            sed -i '/^\[mount\]/a hide_stock_overlays = true' "$ZM_DATA/config.toml"
-            zm_print "  🔧 Xiaomi device detected — stock overlay hiding enabled"
-        fi
-        ;;
-esac
 
 zm_print "🛡️ SUSFS Detection" 0.3 "h"
 

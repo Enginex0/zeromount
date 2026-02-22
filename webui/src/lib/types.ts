@@ -164,7 +164,6 @@ export interface MountSettings {
   random_mount_paths: boolean;
   mount_source: string;
   overlay_source: string;
-  hide_stock_overlays: boolean;
 }
 
 export interface Settings {

@@ -134,7 +134,6 @@ function createAppStore() {
     random_mount_paths: true,
     mount_source: 'auto',
     overlay_source: 'auto',
-    hide_stock_overlays: false,
   };
 
   const defaultPerf: PerfSettings = {
@@ -371,7 +370,6 @@ function createAppStore() {
         random_mount_paths: cfg.mount.random_mount_paths ?? prev.random_mount_paths,
         mount_source: cfg.mount.mount_source ?? prev.mount_source,
         overlay_source: cfg.mount.overlay_source ?? prev.overlay_source,
-        hide_stock_overlays: cfg.mount.hide_stock_overlays ?? prev.hide_stock_overlays,
       }));
     }
     if (cfg.perf) {
@@ -969,7 +967,6 @@ function createAppStore() {
       if (m.random_mount_paths != null) mount.random_mount_paths = typeof m.random_mount_paths === 'boolean' ? m.random_mount_paths : String(m.random_mount_paths) === 'true';
       if (m.mount_source != null) mount.mount_source = String(m.mount_source);
       if (m.overlay_source != null) mount.overlay_source = String(m.overlay_source);
-      if (m.hide_stock_overlays != null) mount.hide_stock_overlays = typeof m.hide_stock_overlays === 'boolean' ? m.hide_stock_overlays : String(m.hide_stock_overlays) === 'true';
       setSettings('mount', prev => ({ ...prev, ...mount }));
       console.log('[ZM-Store] loadMountSettings() loaded from dump:', mount);
       return;
@@ -977,7 +974,7 @@ function createAppStore() {
 
     // Fallback: individual configGet calls — all in a single Promise.allSettled
     const boolKeys: (keyof MountSettings)[] = [
-      'overlay_preferred', 'magic_mount_fallback', 'random_mount_paths', 'hide_stock_overlays',
+      'overlay_preferred', 'magic_mount_fallback', 'random_mount_paths',
     ];
     const results = await Promise.allSettled([
       api.configGet('mount.storage_mode'),
@@ -1037,15 +1034,12 @@ function createAppStore() {
     }
   };
 
-  const setMountToggle = async (key: 'overlay_preferred' | 'magic_mount_fallback' | 'random_mount_paths' | 'hide_stock_overlays', value: boolean) => {
+  const setMountToggle = async (key: 'overlay_preferred' | 'magic_mount_fallback' | 'random_mount_paths', value: boolean) => {
     console.log('[ZM-Store] setMountToggle() called:', key, value);
     const prev = settings.mount[key];
     setSettings('mount', key, value);
     try {
       await api.configSet(`mount.${key}`, String(value));
-      if (key === 'hide_stock_overlays') {
-        api.setHideOverlays(value).catch(e => console.warn('[ZM-Store] sysfs hide_overlays write failed:', e));
-      }
       pushActivity('setting_changed', `${key} → ${value ? 'ON' : 'OFF'}`);
       console.log('[ZM-Store] setMountToggle() saved:', key, value);
     } catch (e) {

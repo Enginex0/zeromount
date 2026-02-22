@@ -685,17 +685,6 @@ export function SettingsTab() {
           </div>
           <Toggle checked={store.settings.brene.prop_spoofing} onChange={(v) => handleBreneToggle('prop_spoofing', v)} />
         </div>
-        <div class={`settings__item${!susfsAvailable() ? ' settings__item--disabled' : ''}`}>
-          <div class="settings__item-content">
-            <div class="settings__item-label">Hide Stock Overlays</div>
-            <div class="settings__item-desc">
-              {susfsAvailable()
-                ? 'Unmount OEM overlay mounts that trigger detection'
-                : 'Requires SUSFS kernel support'}
-            </div>
-          </div>
-          <Toggle checked={store.settings.mount.hide_stock_overlays} onChange={(v) => store.setMountToggle('hide_stock_overlays', v)} disabled={!susfsAvailable()} />
-        </div>
         <div class="settings__item">
           <div class="settings__item-content">
             <div class="settings__item-label">Hide USB Debugging</div>
