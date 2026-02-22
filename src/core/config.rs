@@ -290,7 +290,7 @@ impl Default for EmojiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdbConfig {
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub hide_usb_debugging: bool,
     #[serde(default)]
     pub adb_root: bool,
@@ -299,7 +299,7 @@ pub struct AdbConfig {
 impl Default for AdbConfig {
     fn default() -> Self {
         Self {
-            hide_usb_debugging: false,
+            hide_usb_debugging: true,
             adb_root: false,
         }
     }
@@ -755,7 +755,7 @@ mod tests {
         assert_eq!(config.uname.mode, UnameMode::Disabled);
         assert!(!config.perf.enabled);
         assert!(!config.emoji.enabled);
-        assert!(!config.adb.hide_usb_debugging);
+        assert!(config.adb.hide_usb_debugging);
         assert!(!config.adb.adb_root);
         assert!(config.per_module.is_empty());
     }
@@ -909,7 +909,7 @@ kstat = false
         assert!(config.brene.auto_hide_apk);
         assert!(config.brene.auto_hide_rooted_folders);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
-        assert!(!config.adb.hide_usb_debugging);
+        assert!(config.adb.hide_usb_debugging);
         assert!(!config.adb.adb_root);
     }
 

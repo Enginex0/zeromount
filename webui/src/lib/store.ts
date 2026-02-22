@@ -141,7 +141,7 @@ function createAppStore() {
   };
 
   const defaultAdb: AdbSettings = {
-    hide_usb_debugging: false,
+    hide_usb_debugging: true,
     adb_root: false,
   };
 
