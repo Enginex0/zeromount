@@ -204,11 +204,8 @@ pub fn apply_emoji_fonts(
             }
         }
 
-        if client.features().path {
-            if let Err(e) = client.add_sus_path(&replacement) {
-                debug!("emoji: path hide failed for {}: {}", target_name, e);
-            }
-        }
+        // Source path is under /data/adb (already hidden by rooted folders).
+        // Don't add_sus_path here — it makes the font invisible to emoji apply-apps post-boot.
     }
 
     info!("emoji: complete — {} mounts, {} redirects, {} VFS rules, {} skipped",
@@ -220,10 +217,19 @@ pub fn apply_emoji_app_overrides() -> EmojiAppResult {
     let mut result = EmojiAppResult::default();
     let source = Path::new(EMOJI_STAGING_DIR).join(EMOJI_FONT_NAME);
 
-    if !source.exists() {
-        warn!("emoji: source font missing for app overrides, skipping");
-        return result;
-    }
+    // Staging dir may be hidden by SUSFS rooted-folder logic — fall back to
+    // the bind-mounted target which is always visible post-mount.
+    let source = if source.exists() {
+        source
+    } else {
+        let fallback = Path::new(SYSTEM_FONTS_DIR).join(EMOJI_FONT_NAME);
+        if !fallback.exists() {
+            warn!("emoji: source font missing for app overrides, skipping");
+            return result;
+        }
+        info!("emoji: staging dir hidden, using bind-mount fallback at {}", fallback.display());
+        fallback
+    };
 
     info!("emoji: applying app-level overrides (FB + GBoard + GMS)");
 
