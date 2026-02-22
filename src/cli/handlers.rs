@@ -345,22 +345,8 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
         }
     };
 
-    // Bisect gate: /data/adb/zeromount/.bisect controls which phases run
-    // "1" = ensure_root_paths only, "2" = +modules, "3" or absent = full
-    let bisect_phase: u8 = std::fs::read_to_string("/data/adb/zeromount/.bisect")
-        .ok()
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(3);
-    tracing::info!("bisect phase: {bisect_phase}");
-
     client.ensure_root_paths();
 
-    if bisect_phase < 2 {
-        tracing::info!("bisect: stopping after ensure_root_paths");
-        return Ok(());
-    }
-
-    // Only apply per-module protections for modules the boot pipeline mounted
     let status_path = Path::new("/data/adb/zeromount/.status.json");
     let boot_module_ids: Vec<String> = crate::core::types::RuntimeState::read_status_file(status_path)
         .map(|s| s.modules.iter().map(|m| m.id.clone()).collect())
@@ -377,11 +363,6 @@ pub fn handle_susfs_retry(wait: bool) -> Result<()> {
                 }
             }
         }
-    }
-
-    if bisect_phase < 3 {
-        tracing::info!("bisect: stopping after module protections");
-        return Ok(());
     }
 
     let susfs_mode = crate::detect::load_detection()

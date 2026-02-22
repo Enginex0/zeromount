@@ -877,14 +877,9 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
         info!("BRENE deferred: custom sus_path_loops hidden ({count})");
     }
 
-    // -- Emulate vold app data isolation --
-    if brene.emulate_vold_app_data && has_path {
-        let count = emulate_vold_app_data(client);
-        result.paths_hidden += count;
-        if count > 0 {
-            info!("BRENE deferred: vold app data isolation ({count} packages)");
-        }
-    }
+    // emulate_vold_app_data removed: add_sus_path on /sdcard/Android/data/<pkg>
+    // causes readdir-vs-stat mismatch → infinite scan loop in file managers.
+    // SUSFS kernel handles sdcard isolation natively via sdcard_monitor.
 
     if brene.auto_hide_fonts && has_path {
         let count = hide_font_replacement_paths(client);
@@ -916,46 +911,6 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
 
     info!("BRENE deferred complete: {} paths hidden", result.paths_hidden);
     Ok(result)
-}
-
-/// Hide /sdcard/Android/data/<pkg> for all third-party packages.
-/// Mimics SUSFS boot-completed.sh emulate_vold_app_data logic.
-fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
-    let output = match run_command_with_timeout(
-        Command::new("pm").args(["list", "packages", "-3"]),
-        CMD_TIMEOUT,
-    ) {
-        Ok(o) if o.status.success() => o,
-        Ok(o) => {
-            warn!("pm list packages -3 failed (exit {})", o.status.code().unwrap_or(-1));
-            return 0;
-        }
-        Err(e) => {
-            warn!("pm list packages -3 failed: {e}");
-            return 0;
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut count = 0u32;
-
-    for line in stdout.lines() {
-        let pkg = match line.strip_prefix("package:") {
-            Some(p) => p.trim(),
-            None => continue,
-        };
-        if pkg.is_empty() {
-            continue;
-        }
-
-        let path = format!("/sdcard/Android/data/{pkg}");
-        match client.add_sus_path(&path) {
-            Ok(()) => count += 1,
-            Err(e) => debug!("vold app data hide failed for {pkg}: {e}"),
-        }
-    }
-
-    count
 }
 
 fn apply_force_hide_lsposed() {
