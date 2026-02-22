@@ -174,8 +174,8 @@ fn arm_timer(timer_fd: RawFd, duration_ms: u64) {
     let ts = libc::itimerspec {
         it_interval: libc::timespec { tv_sec: 0, tv_nsec: 0 },
         it_value: libc::timespec {
-            tv_sec: (duration_ms / 1000) as i64,
-            tv_nsec: ((duration_ms % 1000) * 1_000_000) as i64,
+            tv_sec: (duration_ms / 1000) as _,
+            tv_nsec: ((duration_ms % 1000) * 1_000_000) as _,
         },
     };
     unsafe { libc::timerfd_settime(timer_fd, 0, &ts, std::ptr::null_mut()) };
