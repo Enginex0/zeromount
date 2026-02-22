@@ -79,7 +79,6 @@ hide_usb_debugging() {
     fi
     echo "zeromount: dynamic props overridden: ${_dyn_count}" > /dev/kmsg 2>/dev/null
 
-    # Static safe props (NEVER touch sys.usb.* -- those kill ADB transport)
     resetprop -n init.svc.adbd stopped
     resetprop -n service.adb.root 0
     resetprop -n service.adb.tcp.port -1
@@ -102,13 +101,23 @@ hide_usb_debugging() {
 
     echo "zeromount: static debug props set (19 props via resetprop -n)" > /dev/kmsg 2>/dev/null
 
-    # init.svc.adbd resets itself when adbd restarts -- keep overriding
-    while true; do
-        resetprop -n init.svc.adbd stopped
-        sleep 2
-    done &
+    # USB props + adbd loop: must wait for boot_completed so USB HAL is stable
+    {
+        while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done
+        echo "zeromount: boot completed, spoofing USB props" > /dev/kmsg 2>/dev/null
+        while true; do
+            resetprop -n persist.sys.usb.config mtp
+            resetprop -n sys.usb.config mtp
+            resetprop -n sys.usb.state mtp
+            resetprop -n sys.usb.ffs.ready 0
+            resetprop -n sys.usb.ffs.adb.ready 0
+            resetprop -n persist.sys.usb.reboot.func mtp
+            resetprop -n init.svc.adbd stopped
+            sleep 2
+        done
+    } &
     _bg_pids="$_bg_pids $!"
-    echo "zeromount: adbd prop loop started (pid $!)" > /dev/kmsg 2>/dev/null
+    echo "zeromount: USB spoof + adbd loop started (pid $!)" > /dev/kmsg 2>/dev/null
 }
 hide_usb_debugging
 
