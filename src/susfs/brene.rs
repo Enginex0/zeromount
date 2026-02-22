@@ -3,7 +3,7 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tracing::{debug, error, info, warn};
 
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
@@ -62,6 +62,28 @@ const DEX2OAT_UMOUNT_PATHS: &[&str] = &[
     "/apex/com.android.art/bin/dex2oat64",
 ];
 
+// Custom ROM artifacts that reveal recovery/OTA infrastructure
+const ROM_SUS_PATHS: &[&str] = &[
+    "/system/addon.d",
+    "/vendor/bin/install-recovery.sh",
+    "/system/bin/install-recovery.sh",
+    "/system/vendor/bin/install-recovery.sh",
+];
+
+const SDCARD_ROOTED_APP_FOLDERS: &[&str] = &[
+    "MT2",
+    "OhMyFont",
+    "AppManager",
+    "DataBackup",
+    "Android/fas-rs",
+];
+
+const SDCARD_RECOVERY_FOLDERS: &[&str] = &[
+    "Fox",
+    "PBRP",
+    "TWRP",
+];
+
 
 /// Summary of all BRENE operations applied during a boot cycle.
 #[derive(Debug, Default)]
@@ -98,22 +120,37 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, fonts_overlay
     let _has_open_redirect = client.features().open_redirect && susfs_cfg.open_redirect;
     let _has_kstat = client.features().kstat && susfs_cfg.kstat;
 
+    // ROM artifacts are hidden unconditionally — mirrors post-fs-data.sh behavior
+    if has_path {
+        let count = paths::hide_paths(client, ROM_SUS_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE: ROM sus paths hidden ({count})");
+    }
+
     if brene.auto_hide_rooted_folders && has_path {
         let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: rooted folders hidden ({count})");
+        let sdcard_count = hide_sdcard_rooted_folders(client).unwrap_or(0);
+        result.paths_hidden += count + sdcard_count;
+        info!("BRENE: rooted folders hidden ({count} infra + {sdcard_count} sdcard)");
     }
 
     if brene.auto_hide_recovery && has_path {
         let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: recovery paths hidden ({count})");
+        let sdcard_count = hide_sdcard_recovery_folders(client).unwrap_or(0);
+        result.paths_hidden += count + sdcard_count;
+        info!("BRENE: recovery paths hidden ({count} cache + {sdcard_count} sdcard)");
     }
 
     if brene.auto_hide_tmp && has_path {
         let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
         result.paths_hidden += count;
         info!("BRENE: tmp children hidden via path_loop ({count})");
+    }
+
+    if brene.auto_hide_sdcard_data && has_path {
+        let count = hide_sdcard_data(client).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE: sdcard android/data hidden ({count})");
     }
 
     if brene.auto_hide_apk && has_path {
@@ -125,9 +162,16 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, fonts_overlay
     // -- Maps hiding --
 
     if brene.auto_hide_zygisk && has_maps {
-        let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
+        let pattern_count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
+        let dynamic_count = hide_zygisk_modules_dynamic(client).unwrap_or(0);
+        result.maps_hidden += pattern_count + dynamic_count;
+        info!("BRENE: zygisk hidden ({pattern_count} patterns + {dynamic_count} dynamic)");
+    }
+
+    if brene.auto_hide_injections && has_maps {
+        let count = hide_module_injections(client).unwrap_or(0);
         result.maps_hidden += count;
-        info!("BRENE: zygisk maps hidden ({count})");
+        info!("BRENE: module injection files hidden ({count})");
     }
 
     // -- Font redirect --
@@ -243,11 +287,6 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, fonts_overlay
 
     apply_uname(client, &config.uname, &mut result)?;
 
-    // Sync all 7 controlled settings to SUSFS config.sh
-    if let Err(e) = sync_susfs_config(config) {
-        warn!("BRENE: SUSFS config sync failed: {e}");
-    }
-
     info!(
         "BRENE complete: {} paths, {} maps, {} font modules, uname={}, avc={}",
         result.paths_hidden,
@@ -298,6 +337,145 @@ fn hide_apk_paths(client: &SusfsClient) -> u32 {
         match client.add_sus_path(&path_str) {
             Ok(()) => count += 1,
             Err(e) => debug!("hide APK failed for {path_str}: {e}"),
+        }
+    }
+
+    count
+}
+
+/// Enumerate children of /sdcard/Android/data and /storage/emulated/0/Android/data
+/// and hide each with add_sus_path. Both mount paths need hiding — apps may resolve
+/// either depending on whether they follow the /sdcard symlink or not.
+fn hide_sdcard_data(client: &SusfsClient) -> Result<u32> {
+    let paths = [
+        "/sdcard/Android/data",
+        "/storage/emulated/0/Android/data",
+    ];
+    let mut count = 0u32;
+    for base in &paths {
+        let dir = Path::new(base);
+        if !dir.is_dir() {
+            continue;
+        }
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path_str = entry.path().to_string_lossy().to_string();
+            match client.add_sus_path(&path_str) {
+                Ok(()) => count += 1,
+                Err(e) => debug!("sdcard data hide failed for {path_str}: {e}"),
+            }
+        }
+    }
+    Ok(count)
+}
+
+/// Walk /data/adb/modules/*/zygisk/ and hide all .so files dynamically.
+/// Catches novel zygisk module names that ZYGISK_MAP_PATTERNS doesn't know about.
+fn hide_zygisk_modules_dynamic(client: &SusfsClient) -> Result<u32> {
+    let modules_dir = Path::new(MODULES_DIR);
+    if !modules_dir.is_dir() {
+        return Ok(0);
+    }
+
+    let mut count = 0u32;
+
+    for module_entry in fs::read_dir(modules_dir)?.filter_map(|e| e.ok()) {
+        let zygisk_dir = module_entry.path().join("zygisk");
+        if !zygisk_dir.is_dir() {
+            continue;
+        }
+
+        let dir_entries = match fs::read_dir(&zygisk_dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in dir_entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let is_so = path.extension().and_then(|e| e.to_str()) == Some("so");
+            if !is_so {
+                continue;
+            }
+            let path_str = path.to_string_lossy().to_string();
+            match client.add_sus_map(&path_str) {
+                Ok(()) => count += 1,
+                Err(e) => debug!("hide zygisk dynamic failed for {path_str}: {e}"),
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// Walk /data/adb/modules/*/system/ and hide all files with a "." in the name.
+/// Matches BRENE's `find -name "*.*"` filter — catches injected overlays in /proc/maps.
+/// Skips our own module dir (meta-zeromount) to avoid self-hiding.
+fn hide_module_injections(client: &SusfsClient) -> Result<u32> {
+    let modules_dir = Path::new(MODULES_DIR);
+    if !modules_dir.is_dir() {
+        return Ok(0);
+    }
+
+    let mut count = 0u32;
+
+    for module_entry in fs::read_dir(modules_dir)?.filter_map(|e| e.ok()) {
+        let module_path = module_entry.path();
+        let module_name = match module_path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // Don't self-hide — our own system/ files must remain visible to zeromount
+        if module_name == "meta-zeromount" {
+            continue;
+        }
+
+        let system_dir = module_path.join("system");
+        if !system_dir.is_dir() {
+            continue;
+        }
+
+        count += walk_system_dir_hide_dotfiles(client, &system_dir);
+    }
+
+    Ok(count)
+}
+
+fn walk_system_dir_hide_dotfiles(client: &SusfsClient, dir: &Path) -> u32 {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    let mut count = 0u32;
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            count += walk_system_dir_hide_dotfiles(client, &path);
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        // BRENE uses `-name "*.*"` — match any file with a dot in the name
+        if !name.contains('.') {
+            continue;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        match client.add_sus_map(&path_str) {
+            Ok(()) => count += 1,
+            Err(e) => debug!("hide injection failed for {path_str}: {e}"),
         }
     }
 
@@ -596,54 +774,58 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
     results
 }
 
-/// Retry add_sus_path for font replacement files that failed at boot (EINVAL).
-/// Scans module font dirs and hides each replacement file individually.
-fn hide_font_replacement_paths(client: &SusfsClient) -> u32 {
-    let modules_dir = Path::new(MODULES_DIR);
-    if !modules_dir.is_dir() {
-        return 0;
+/// Hide rooted-app sdcard folders: add_sus_path + add_sus_path_loop on /sdcard/ variant,
+/// add_sus_path on /storage/emulated/0/ variant (matches BRENE boot-completed.sh:199-219).
+fn hide_sdcard_rooted_folders(client: &SusfsClient) -> Result<u32> {
+    if !client.is_available() || !client.features().path {
+        return Ok(0);
     }
-
-    let entries = match fs::read_dir(modules_dir) {
-        Ok(e) => e,
-        Err(_) => return 0,
-    };
 
     let mut count = 0u32;
+    for name in SDCARD_ROOTED_APP_FOLDERS {
+        let sdcard = format!("/sdcard/{name}");
+        let emulated = format!("/storage/emulated/0/{name}");
 
-    for entry in entries.filter_map(|e| e.ok()) {
-        let module_path = entry.path();
-        if !module_path.is_dir() {
-            continue;
+        if std::path::Path::new(&sdcard).exists() {
+            if client.add_sus_path(&sdcard).is_ok() { count += 1; }
+            let _ = client.add_sus_path_loop(&sdcard);
         }
-        if module_path.join("disable").exists() || module_path.join("remove").exists() {
-            continue;
+        if std::path::Path::new(&emulated).exists() {
+            if client.add_sus_path(&emulated).is_ok() { count += 1; }
         }
+    }
+    Ok(count)
+}
 
-        let font_dir = module_path.join("system/fonts");
-        if !font_dir.is_dir() {
-            continue;
+/// Hide recovery sdcard folders with TWRP special case at /storage/emulated/TWRP
+/// (matches BRENE boot-completed.sh:221-236).
+fn hide_sdcard_recovery_folders(client: &SusfsClient) -> Result<u32> {
+    if !client.is_available() || !client.features().path {
+        return Ok(0);
+    }
+
+    let mut count = 0u32;
+    for name in SDCARD_RECOVERY_FOLDERS {
+        let sdcard = format!("/sdcard/{name}");
+        let emulated = format!("/storage/emulated/0/{name}");
+
+        if std::path::Path::new(&sdcard).exists() {
+            if client.add_sus_path(&sdcard).is_ok() { count += 1; }
+            let _ = client.add_sus_path_loop(&sdcard);
         }
-
-        let font_files = match fs::read_dir(&font_dir) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-
-        for file_entry in font_files.filter_map(|e| e.ok()) {
-            let path = file_entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let path_str = path.to_string_lossy().to_string();
-            match client.add_sus_path(&path_str) {
-                Ok(()) => count += 1,
-                Err(e) => debug!("font path hide failed for {path_str}: {e}"),
-            }
+        if std::path::Path::new(&emulated).exists() {
+            if client.add_sus_path(&emulated).is_ok() { count += 1; }
         }
     }
 
-    count
+    // TWRP also appears at /storage/emulated/TWRP (without /0/)
+    let twrp_alt = "/storage/emulated/TWRP";
+    if std::path::Path::new(twrp_alt).exists() {
+        if client.add_sus_path(twrp_alt).is_ok() { count += 1; }
+        let _ = client.add_sus_path_loop(twrp_alt);
+    }
+
+    Ok(count)
 }
 
 fn apply_uname(client: &SusfsClient, uname: &UnameConfig, result: &mut BreneResult) -> Result<()> {
@@ -678,180 +860,51 @@ fn apply_uname(client: &SusfsClient, uname: &UnameConfig, result: &mut BreneResu
     Ok(())
 }
 
-/// Build sanitized uname values by stripping kernel build markers.
-/// Reads /proc/version and removes KernelSU/SUSFS/custom build indicators.
+/// Build sanitized uname values matching BRENE's uname2 mode.
+/// Field-splits on '-', keeps only the base version + android suffix, then
+/// strips known ROM/KSU markers. Pins version to a fixed timestamp so the
+/// real build date is never exposed.
 fn build_dynamic_uname() -> Result<(String, String)> {
     let raw = fs::read_to_string("/proc/version")
         .unwrap_or_else(|_| "Linux version 5.10.0".to_string());
 
     let parts: Vec<&str> = raw.splitn(4, ' ').collect();
-    let release = parts.get(2).unwrap_or(&"5.10.0").to_string();
+    let kernel_release_raw = parts.get(2).unwrap_or(&"5.10.0").to_string();
+    let lower = kernel_release_raw.to_lowercase();
 
-    // Strip known build markers from version string
-    let version = raw
-        .replace("-ksu", "")
+    // Mirror BRENE's field-splitting: keep version + android suffix only
+    let fields: Vec<&str> = lower.splitn(3, '-').collect();
+    let base = fields.get(0).copied().unwrap_or("5.10.0");
+    let release = if fields.get(1).map(|f| f.starts_with("android")).unwrap_or(false) {
+        format!("{}-{}", base, fields[1])
+    } else {
+        base.to_string()
+    };
+
+    // Strip all known ROM/KSU build markers (existing + BRENE additions)
+    let release = release
+        .replace("sultan", "")
+        .replace("lineage", "")
+        .replace("wild", "")
+        .replace("sukisu", "")
+        .replace("ksu", "")
+        .replace("🟢", "")
+        .replace("✅", "")
         .replace("-susfs", "")
         .replace("-dirty", "")
         .replace("-custom", "")
-        .replace("-gki", "-android13");
+        .replace("-gki", "");
 
-    // Truncate to kernel's NEW_UTS_LEN (64 chars)
+    // Fixed timestamp — prevents leaking the real kernel build date
+    let version = "#1 SMP PREEMPT Mon Jan 1 18:00:00 UTC 2010".to_string();
+
     let release = truncate_uname(&release);
     let version = truncate_uname(&version);
 
     Ok((release, version))
 }
 
-const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";
-const SUSFS_CONFIG_DIR: &str = "/data/adb/susfs4ksu";
 
-const SUSFS_SHARED_KEYS: [(&str, fn(&crate::core::config::BreneConfig) -> bool); 7] = [
-    ("susfs_log", |b| b.susfs_log),
-    ("avc_log_spoofing", |b| b.avc_log_spoofing),
-    ("hide_sus_mnts_for_all_or_non_su_procs", |b| b.hide_sus_mounts),
-    ("emulate_vold_app_data", |b| b.emulate_vold_app_data),
-    ("force_hide_lsposed", |b| b.force_hide_lsposed),
-    ("spoof_cmdline", |b| b.spoof_cmdline),
-    ("hide_loops", |b| b.hide_ksu_loops),
-];
-
-fn parse_shell_bool(content: &str, key: &str) -> Option<bool> {
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('#') {
-            continue;
-        }
-        if let Some(val) = trimmed.strip_prefix(key).and_then(|rest| rest.strip_prefix('=')) {
-            // Strip inline comments and quotes: `1 # comment` -> `1`, `"1"` -> `1`
-            let clean = val.split('#').next().unwrap_or(val).trim().trim_matches('"');
-            return Some(clean == "1");
-        }
-    }
-    None
-}
-
-pub fn import_susfs_config(config: &mut ZeroMountConfig) -> Result<bool> {
-    let config_path = Path::new(SUSFS_PERSISTENT_CONFIG);
-    if !config_path.exists() {
-        return Ok(false);
-    }
-
-    let content = fs::read_to_string(config_path)
-        .context("reading SUSFS config.sh for import")?;
-
-    let mut changed = false;
-    let brene = &mut config.brene;
-
-    for &(shell_key, getter) in &SUSFS_SHARED_KEYS {
-        if let Some(file_val) = parse_shell_bool(&content, shell_key) {
-            let current = getter(brene);
-            if file_val != current {
-                match shell_key {
-                    "susfs_log" => brene.susfs_log = file_val,
-                    "avc_log_spoofing" => brene.avc_log_spoofing = file_val,
-                    "hide_sus_mnts_for_all_or_non_su_procs" => brene.hide_sus_mounts = file_val,
-                    "emulate_vold_app_data" => brene.emulate_vold_app_data = file_val,
-                    "force_hide_lsposed" => brene.force_hide_lsposed = file_val,
-                    "spoof_cmdline" => brene.spoof_cmdline = file_val,
-                    "hide_loops" => brene.hide_ksu_loops = file_val,
-                    _ => {}
-                }
-                info!("imported from SUSFS: {shell_key} = {file_val}");
-                changed = true;
-            }
-        }
-    }
-
-    if changed {
-        config.save()?;
-    }
-
-    Ok(changed)
-}
-
-// Sync our BRENE toggles to SUSFS config.sh so SUSFS boot scripts stay in sync
-pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
-    let config_path = Path::new(SUSFS_PERSISTENT_CONFIG);
-    let brene = &config.brene;
-
-    if !config_path.exists() {
-        // SUSFS installed but config.sh missing — create it
-        if Path::new(SUSFS_CONFIG_DIR).is_dir() {
-            let mut content = String::new();
-            for &(key, getter) in &SUSFS_SHARED_KEYS {
-                let val = if getter(brene) { "1" } else { "0" };
-                content.push_str(&format!("{key}={val}\n"));
-            }
-            fs::write(config_path, &content).context("creating SUSFS config.sh")?;
-            info!("BRENE: created SUSFS config.sh with 7 settings");
-        } else {
-            debug!("SUSFS not installed, skipping config sync");
-        }
-        return Ok(());
-    }
-
-    let pairs: Vec<(&str, bool)> = SUSFS_SHARED_KEYS
-        .iter()
-        .map(|&(key, getter)| (key, getter(brene)))
-        .collect();
-
-    let mut content = fs::read_to_string(config_path)
-        .context("reading SUSFS config.sh")?;
-
-    for (key, value) in &pairs {
-        let val_str = if *value { "1" } else { "0" };
-        let pattern = format!("{key}=");
-        if let Some(pos) = content.find(&pattern) {
-            let line_end = content[pos..].find('\n').map(|i| pos + i).unwrap_or(content.len());
-            content.replace_range(pos..line_end, &format!("{key}={val_str}"));
-        }
-    }
-
-    fs::write(config_path, &content).context("writing SUSFS config.sh")?;
-    info!("BRENE: synced 7 settings to SUSFS config.sh");
-    Ok(())
-}
-
-/// Deferred BRENE: only re-run path-hiding operations that require
-/// android_data_root_path (which isn't available at boot time).
-/// Maps, mounts, AVC, log, uname, fonts all succeed at boot — skip them.
-fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
-    let output = match run_command_with_timeout(
-        Command::new("pm").args(["list", "packages", "-3"]),
-        CMD_TIMEOUT,
-    ) {
-        Ok(o) if o.status.success() => o,
-        Ok(o) => {
-            warn!("pm list packages -3 failed (exit {})", o.status.code().unwrap_or(-1));
-            return 0;
-        }
-        Err(e) => {
-            warn!("pm list packages -3 failed: {e}");
-            return 0;
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut count = 0u32;
-
-    for line in stdout.lines() {
-        let pkg = match line.strip_prefix("package:") {
-            Some(p) => p.trim(),
-            None => continue,
-        };
-        if pkg.is_empty() {
-            continue;
-        }
-
-        let path = format!("/sdcard/Android/data/{pkg}");
-        match client.add_sus_path(&path) {
-            Ok(()) => count += 1,
-            Err(e) => debug!("vold app data hide failed for {pkg}: {e}"),
-        }
-    }
-
-    count
-}
 
 fn apply_force_hide_lsposed() {
     let ksud = if Path::new("/data/adb/ksu/bin/ksud").exists() {

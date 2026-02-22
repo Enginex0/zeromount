@@ -24,7 +24,7 @@ spoof_props() {
     set_prop() {
         CURRENT=$(getprop "$1" 2>/dev/null)
         if [ "$CURRENT" != "$2" ]; then
-            resetprop "$1" "$2"
+            resetprop -n "$1" "$2"
         fi
     }
 
@@ -37,6 +37,36 @@ spoof_props() {
     set_prop ro.boot.flash.locked 1
     set_prop ro.boot.veritymode enforcing
     set_prop ro.adb.secure 1
+
+    set_prop ro.crypto.state encrypted
+    set_prop ro.force.debuggable 0
+    set_prop ro.kernel.qemu ""
+    set_prop ro.secureboot.lockstate locked
+    set_prop ro.is_ever_orange 0
+    set_prop ro.bootmode normal
+    set_prop ro.bootimage.build.tags release-keys
+    set_prop vendor.boot.vbmeta.device_state locked
+    set_prop vendor.boot.verifiedbootstate green
+    set_prop ro.boot.realme.lockstate 1
+    set_prop ro.boot.realmebootstate green
+    set_prop ro.boot.verifiedbooterror ""
+    set_prop ro.boot.veritymode.managed yes
+    set_prop ro.boot.vbmeta.size 4096
+    set_prop ro.boot.vbmeta.hash_alg sha256
+    set_prop ro.boot.vbmeta.avb_version 1.3
+    set_prop ro.boot.vbmeta.invalidate_on_error yes
+    set_prop sys.oem_unlock_allowed 0
+    set_prop init.svc.adbd stopped
+    set_prop init.svc_debug_pid.adbd ""
+    set_prop persist.sys.usb.config mtp
+
+    for prop in ro.warranty_bit ro.vendor.boot.warranty_bit \
+                ro.vendor.warranty_bit ro.boot.warranty_bit; do
+        set_prop "$prop" "0"
+    done
+
+    VBH=$("$BIN" config get brene.verified_boot_hash 2>/dev/null)
+    [ -n "$VBH" ] && set_prop "ro.boot.vbmeta.digest" "$VBH"
 
     echo "zeromount: prop spoofing applied" > /dev/kmsg 2>/dev/null
 }

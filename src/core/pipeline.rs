@@ -757,7 +757,7 @@ pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
 
 /// Bootloop-aware pipeline entry point (ME15).
 /// Checks bootcount before running; enters safe mode if threshold exceeded.
-pub fn run_pipeline_with_bootloop_guard(mut config: ZeroMountConfig) -> Result<RuntimeState> {
+pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<RuntimeState> {
     if ZeroMountConfig::check_bootloop()? {
         warn!("bootloop detected — safe mode (zero rules, no mounts)");
 
@@ -777,11 +777,6 @@ pub fn run_pipeline_with_bootloop_guard(mut config: ZeroMountConfig) -> Result<R
     }
 
     ZeroMountConfig::increment_bootcount()?;
-
-    // Pick up SUSFS WebUI toggle changes before pipeline applies them
-    if let Err(e) = crate::susfs::brene::import_susfs_config(&mut config) {
-        warn!("SUSFS config import failed: {e}");
-    }
 
     let state = run_full_pipeline(config)?;
 

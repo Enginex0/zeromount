@@ -8,6 +8,7 @@ pub mod paths;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use tracing::{debug, warn};
@@ -107,6 +108,35 @@ impl SusfsClient {
     /// strstr returns non-NULL for any input, hitting the is_inited=false
     /// branch and returning EINVAL for every path.
     pub fn ensure_root_paths(&self) {
+        // sdcard/Android/data entries are app-private dirs that only appear after
+        // the media daemon mounts the FUSE layer — wait for that before probing
+        let android_dir = Path::new("/data/media/0/Android");
+        let deadline = Instant::now() + Duration::from_secs(120);
+        while !android_dir.is_dir() {
+            if Instant::now() >= deadline {
+                warn!("sdcard readiness timeout — /data/media/0/Android not found after 120s");
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+
+        // Stabilization: wait until /data/media/0/Android/data entry count stops growing
+        let data_dir = Path::new("/data/media/0/Android/data");
+        if data_dir.is_dir() {
+            let mut prev_count = fs::read_dir(data_dir).map(|d| d.count()).unwrap_or(0);
+            loop {
+                std::thread::sleep(Duration::from_secs(5));
+                let cur_count = fs::read_dir(data_dir).map(|d| d.count()).unwrap_or(0);
+                if cur_count == prev_count {
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    break;
+                }
+                prev_count = cur_count;
+            }
+        }
+
         let data_candidates = [
             "/sdcard/Android/data",
             "/storage/emulated/0/Android/data",

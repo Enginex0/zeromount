@@ -60,6 +60,7 @@ fn main() -> Result<()> {
         Commands::Perf => cli::handlers::handle_perf(),
         Commands::Diag => cli::handlers::handle_diag(),
         Commands::CleanupStale => cli::handlers::handle_cleanup_stale(),
+        Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),
         Commands::Version => {
             println!("zeromount v{}", read_version_from_prop());

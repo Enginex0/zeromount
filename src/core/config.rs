@@ -169,21 +169,25 @@ pub struct BreneConfig {
     #[serde(default = "default_true")]
     pub hide_sus_mounts: bool,
     #[serde(default = "default_true")]
-    pub emulate_vold_app_data: bool,
-    #[serde(default = "default_true")]
     pub force_hide_lsposed: bool,
     #[serde(default)]
     pub spoof_cmdline: bool,
     #[serde(default = "default_true")]
     pub hide_ksu_loops: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub prop_spoofing: bool,
+    #[serde(default = "default_true")]
+    pub auto_hide_injections: bool,
     #[serde(default)]
     pub custom_sus_paths: Vec<String>,
     #[serde(default)]
     pub custom_sus_maps: Vec<String>,
     #[serde(default)]
     pub custom_sus_path_loops: Vec<String>,
+    #[serde(default = "default_true")]
+    pub kernel_umount: bool,
+    #[serde(default)]
+    pub verified_boot_hash: String,
 }
 
 impl Default for BreneConfig {
@@ -199,14 +203,16 @@ impl Default for BreneConfig {
             avc_log_spoofing: true,
             susfs_log: false,
             hide_sus_mounts: true,
-            emulate_vold_app_data: true,
             force_hide_lsposed: true,
             spoof_cmdline: false,
             hide_ksu_loops: true,
             prop_spoofing: true,
+            auto_hide_injections: true,
             custom_sus_paths: Vec::new(),
             custom_sus_maps: Vec::new(),
             custom_sus_path_loops: Vec::new(),
+            kernel_umount: true,
+            verified_boot_hash: String::new(),
         }
     }
 }
@@ -499,14 +505,17 @@ impl ZeroMountConfig {
             "brene.avc_log_spoofing" => Some(self.brene.avc_log_spoofing.to_string()),
             "brene.susfs_log" => Some(self.brene.susfs_log.to_string()),
             "brene.hide_sus_mounts" => Some(self.brene.hide_sus_mounts.to_string()),
-            "brene.emulate_vold_app_data" => Some(self.brene.emulate_vold_app_data.to_string()),
+
             "brene.force_hide_lsposed" => Some(self.brene.force_hide_lsposed.to_string()),
             "brene.spoof_cmdline" => Some(self.brene.spoof_cmdline.to_string()),
             "brene.hide_ksu_loops" => Some(self.brene.hide_ksu_loops.to_string()),
             "brene.prop_spoofing" => Some(self.brene.prop_spoofing.to_string()),
+            "brene.auto_hide_injections" => Some(self.brene.auto_hide_injections.to_string()),
             "brene.custom_sus_paths" => Some(self.brene.custom_sus_paths.join(",")),
             "brene.custom_sus_maps" => Some(self.brene.custom_sus_maps.join(",")),
             "brene.custom_sus_path_loops" => Some(self.brene.custom_sus_path_loops.join(",")),
+            "brene.kernel_umount" => Some(self.brene.kernel_umount.to_string()),
+            "brene.verified_boot_hash" => Some(self.brene.verified_boot_hash.clone()),
 
             // uname.*
             "uname.mode" => Some(uname_mode_str(self.uname.mode).to_string()),
@@ -566,14 +575,17 @@ impl ZeroMountConfig {
             "brene.avc_log_spoofing" => self.brene.avc_log_spoofing = value.parse()?,
             "brene.susfs_log" => self.brene.susfs_log = value.parse()?,
             "brene.hide_sus_mounts" => self.brene.hide_sus_mounts = value.parse()?,
-            "brene.emulate_vold_app_data" => self.brene.emulate_vold_app_data = value.parse()?,
+
             "brene.force_hide_lsposed" => self.brene.force_hide_lsposed = value.parse()?,
             "brene.spoof_cmdline" => self.brene.spoof_cmdline = value.parse()?,
             "brene.hide_ksu_loops" => self.brene.hide_ksu_loops = value.parse()?,
             "brene.prop_spoofing" => self.brene.prop_spoofing = value.parse()?,
+            "brene.auto_hide_injections" => self.brene.auto_hide_injections = value.parse()?,
             "brene.custom_sus_paths" => self.brene.custom_sus_paths = parse_csv(value),
             "brene.custom_sus_maps" => self.brene.custom_sus_maps = parse_csv(value),
             "brene.custom_sus_path_loops" => self.brene.custom_sus_path_loops = parse_csv(value),
+            "brene.kernel_umount" => self.brene.kernel_umount = value.parse()?,
+            "brene.verified_boot_hash" => self.brene.verified_boot_hash = value.to_string(),
 
             // uname.*
             "uname.mode" => self.uname.mode = parse_uname_mode(value)?,
@@ -748,10 +760,10 @@ mod tests {
         assert!(config.brene.avc_log_spoofing);
         assert!(!config.brene.susfs_log);
         assert!(config.brene.hide_sus_mounts);
-        assert!(config.brene.emulate_vold_app_data);
         assert!(config.brene.force_hide_lsposed);
         assert!(!config.brene.spoof_cmdline);
         assert!(config.brene.hide_ksu_loops);
+        assert!(config.brene.auto_hide_injections);
         assert_eq!(config.uname.mode, UnameMode::Disabled);
         assert!(!config.perf.enabled);
         assert!(!config.emoji.enabled);

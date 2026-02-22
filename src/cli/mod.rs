@@ -66,8 +66,19 @@ pub enum Commands {
     /// Batched WebUI init data (single JSON blob)
     #[command(name = "webui-init")]
     WebUiInit,
+    /// Emoji app-level overrides (post-boot only — needs pm)
+    Emoji {
+        #[command(subcommand)]
+        action: EmojiAction,
+    },
     /// Print version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum EmojiAction {
+    /// Apply app-level emoji overrides (Facebook, GBoard, GMS font provider)
+    ApplyApps,
 }
 
 #[derive(Subcommand)]

@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use tracing::{debug, warn};
 
-use super::{ConfigAction, LogAction, ModuleAction, UidAction, VfsAction};
+use super::{ConfigAction, EmojiAction, LogAction, ModuleAction, UidAction, VfsAction};
 
 pub fn handle_mount() -> Result<()> {
     let _lock = match crate::utils::lock::acquire_instance_lock()? {
@@ -402,6 +402,24 @@ pub fn handle_cleanup_stale() -> Result<()> {
         }
         Err(e) => {
             tracing::warn!(error = %e, "stale overlay cleanup failed");
+            Ok(())
+        }
+    }
+}
+
+pub fn handle_emoji(action: EmojiAction) -> Result<()> {
+    match action {
+        EmojiAction::ApplyApps => {
+            let config = crate::core::config::ZeroMountConfig::load(None)?;
+            if !config.emoji.enabled {
+                tracing::info!("emoji: disabled in config, skipping app overrides");
+                return Ok(());
+            }
+            let result = crate::susfs::emoji::apply_emoji_app_overrides();
+            tracing::info!(
+                "emoji app overrides: fb={}/{}, gboard={}, gms={}",
+                result.fb_succeeded, result.fb_total, result.gboard_ok, result.gms_ok
+            );
             Ok(())
         }
     }
