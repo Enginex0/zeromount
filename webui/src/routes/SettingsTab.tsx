@@ -699,7 +699,7 @@ export function SettingsTab() {
         <div class="settings__item">
           <div class="settings__item-content">
             <div class="settings__item-label">Hide USB Debugging</div>
-            <div class="settings__item-desc">Hide USB debugging from prop + libc level - use with HMA-OSS for full coverage</div>
+            <div class="settings__item-desc">Hide USB debugging from prop level + libc hook - use with HMA-OSS for full coverage</div>
           </div>
           <Toggle
             checked={store.settings.adb.hide_usb_debugging}
