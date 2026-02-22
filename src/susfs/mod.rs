@@ -460,7 +460,7 @@ impl SusfsClient {
 
     // ---- Per-mount hiding (custom 0x55563) ----
 
-    pub fn hide_mount(&self, mount_point: &str) -> Result<()> {
+    pub fn hide_mount(&self, mount_point: &str, spoofed_dev: u32) -> Result<()> {
         self.ensure_available()?;
         if !self.features.hide_mount {
             bail!("hide_mount not available on this kernel");
@@ -468,6 +468,7 @@ impl SusfsClient {
 
         let mut info = StSusfsHideMount {
             mount_point: [0u8; SUSFS_MAX_LEN_PATHNAME],
+            spoofed_dev,
             err: ERR_CMD_NOT_SUPPORTED,
         };
         copy_path_to_buf(&mut info.mount_point, mount_point);
@@ -774,6 +775,7 @@ fn probe_open_redirect_all(baseline: &ProbeBaseline) -> bool {
 fn probe_hide_mount(baseline: &ProbeBaseline) -> bool {
     let mut info = StSusfsHideMount {
         mount_point: [0u8; SUSFS_MAX_LEN_PATHNAME],
+        spoofed_dev: 0,
         err: PROBE_ERR_SENTINEL,
     };
     copy_path_to_buf(&mut info.mount_point, "/__zm_probe__");

@@ -198,6 +198,15 @@ pub struct StSusfsHideSusMnts {
     pub err: i32,
 }
 
+/// hide_mount (custom 0x55563)
+#[repr(C)]
+#[derive(Clone)]
+pub struct StSusfsHideMount {
+    pub mount_point: [u8; SUSFS_MAX_LEN_PATHNAME],
+    pub spoofed_dev: u32,
+    pub err: i32,
+}
+
 // ---- supercall ----
 
 /// Issue a SUSFS supercall via SYS_reboot with KSU magic numbers.
@@ -339,6 +348,15 @@ mod tests {
         assert_eq!(mem::offset_of!(StSusfsSusKstatRedirect, spoofed_blksize), 592);
         assert_eq!(mem::offset_of!(StSusfsSusKstatRedirect, spoofed_blocks), 600);
         assert_eq!(mem::offset_of!(StSusfsSusKstatRedirect, err), 608);
+    }
+
+    #[test]
+    fn hide_mount_layout() {
+        // C: char[256] + unsigned int (4) + int (4) = 264
+        assert_eq!(mem::size_of::<StSusfsHideMount>(), 264);
+        assert_eq!(mem::offset_of!(StSusfsHideMount, mount_point), 0);
+        assert_eq!(mem::offset_of!(StSusfsHideMount, spoofed_dev), 256);
+        assert_eq!(mem::offset_of!(StSusfsHideMount, err), 260);
     }
 
     #[test]

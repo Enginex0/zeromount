@@ -388,7 +388,7 @@ impl MountController<Mounted> {
         info!("pipeline: finalize phase");
 
         // 1. SUSFS protections (BRENE)
-        let (hidden_paths, font_infos) = self.apply_susfs_protections();
+        let (hidden_paths, font_infos, emoji_applied) = self.apply_susfs_protections();
 
         // 2. Stock overlay hiding (SUSFS-gated)
         let stock_overlay_count = self.hide_stock_overlays();
@@ -403,6 +403,7 @@ impl MountController<Mounted> {
         let mut runtime_state = self.build_runtime_state(&font_infos);
         runtime_state.hidden_path_count = hidden_paths;
         runtime_state.stock_overlay_count = stock_overlay_count;
+        runtime_state.emoji_applied = emoji_applied;
         write_status_json_atomic(&runtime_state);
 
         // KSU09: notify-module-mounted is fired by metamount.sh after the binary
@@ -417,10 +418,10 @@ impl MountController<Mounted> {
         })
     }
 
-    fn apply_susfs_protections(&self) -> (u32, Vec<crate::susfs::brene::FontModuleInfo>) {
+    fn apply_susfs_protections(&self) -> (u32, Vec<crate::susfs::brene::FontModuleInfo>, bool) {
         if !self.state.config.susfs.enabled {
             debug!("SUSFS disabled in config, skipping protections");
-            return (0, Vec::new());
+            return (0, Vec::new(), false);
         }
 
         match crate::susfs::SusfsClient::probe() {
@@ -442,25 +443,24 @@ impl MountController<Mounted> {
                             paths = brene.paths_hidden,
                             maps = brene.maps_hidden,
                             fonts = brene.font_modules.len(),
+                            emoji = brene.emoji_applied,
                             "BRENE applied"
                         );
-                        (brene.paths_hidden, brene.font_modules)
+                        (brene.paths_hidden, brene.font_modules, brene.emoji_applied)
                     }
                     Err(e) => {
                         warn!("BRENE application failed (non-fatal): {e}");
-                        (0, Vec::new())
+                        (0, Vec::new(), false)
                     }
                 }
             }
             Err(e) => {
                 debug!("SUSFS probe failed, skipping protections: {e}");
-                (0, Vec::new())
+                (0, Vec::new(), false)
             }
         }
     }
 
-    // Collect stock OEM overlays for runtime state reporting.
-    // Actual hiding requires kernel-side SUSFS extension (pending).
     fn hide_stock_overlays(&self) -> u32 {
         if !self.state.config.mount.hide_stock_overlays {
             debug!("stock overlay hiding disabled in config");
@@ -477,15 +477,47 @@ impl MountController<Mounted> {
             return 0;
         }
 
-        let count = overlays.len() as u32;
+        let client = match crate::susfs::SusfsClient::probe() {
+            Ok(c) if c.features().hide_mount => c,
+            Ok(_) => {
+                info!(
+                    count = overlays.len(),
+                    "stock overlays found but hide_mount not supported by kernel"
+                );
+                return overlays.len() as u32;
+            }
+            Err(e) => {
+                debug!("SUSFS probe failed for stock overlay hiding: {e}");
+                return 0;
+            }
+        };
+
+        let mut hidden = 0u32;
         for overlay in &overlays {
-            debug!(path = %overlay.mount_point, "stock OEM overlay detected");
+            debug!(
+                path = %overlay.mount_point,
+                base_dev = overlay.base_dev,
+                "registering stock overlay with SUSFS hide_mount"
+            );
+            match client.hide_mount(&overlay.mount_point, overlay.base_dev) {
+                Ok(()) => {
+                    hidden += 1;
+                    info!(
+                        path = %overlay.mount_point,
+                        spoofed_dev = overlay.base_dev,
+                        "stock overlay registered for stat+mount hiding"
+                    );
+                }
+                Err(e) => {
+                    warn!(path = %overlay.mount_point, error = %e, "failed to register stock overlay");
+                }
+            }
         }
-        info!(
-            count = count,
-            "stock OEM overlays collected (kernel-side hiding pending)"
-        );
-        count
+
+        if hidden > 0 {
+            info!(hidden, total = overlays.len(), "stock OEM overlays registered with SUSFS");
+        }
+        hidden
     }
 
     fn build_description_summary(&self, font_infos: &[crate::susfs::brene::FontModuleInfo]) -> String {
@@ -632,6 +664,7 @@ impl MountController<Mounted> {
             root_manager: Some(self.state.root_mgr.name().to_string()),
             resolved_storage_mode: crate::mount::storage::get_resolved_storage_mode(),
             stock_overlay_count: 0,
+            emoji_applied: false,
         }
     }
 }
