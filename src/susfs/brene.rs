@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
 use crate::core::types::SusfsMode;
@@ -62,11 +62,6 @@ const DEX2OAT_UMOUNT_PATHS: &[&str] = &[
     "/apex/com.android.art/bin/dex2oat64",
 ];
 
-// /sdcard/Android/data patterns for loop hiding (re-flagged per zygote spawn)
-const SDCARD_DATA_PATTERNS: &[&str] = &[
-    "/sdcard/Android/data",
-    "/storage/emulated/0/Android/data",
-];
 
 /// Summary of all BRENE operations applied during a boot cycle.
 #[derive(Debug, Default)]
@@ -74,6 +69,7 @@ pub struct BreneResult {
     pub paths_hidden: u32,
     pub maps_hidden: u32,
     pub font_modules: Vec<FontModuleInfo>,
+    pub emoji_applied: bool,
     pub uname_spoofed: bool,
     pub avc_spoofed: bool,
     pub log_enabled: bool,
@@ -135,11 +131,6 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
             info!("BRENE: APK paths hidden ({count})");
         }
 
-        if brene.auto_hide_sdcard_data && has_path {
-            let count = paths::hide_paths_loop(client, SDCARD_DATA_PATTERNS).unwrap_or(0);
-            result.paths_hidden += count;
-            info!("BRENE: sdcard data roots hidden ({count})");
-        }
     }
 
     // -- Maps hiding --
@@ -162,6 +153,25 @@ pub fn apply_brene(client: &SusfsClient, config: &ZeroMountConfig, skip_path_hid
         };
         info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
         result.font_modules = fonts;
+    }
+
+    // -- Emoji font replacement --
+    if config.emoji.enabled {
+        info!("BRENE: emoji toggle ON, checking conflicts");
+        if let Some(conflict_id) = super::emoji::check_emoji_font_conflict(&result.font_modules) {
+            warn!("BRENE: emoji SKIPPED — conflicting font module: {conflict_id}");
+        } else {
+            match super::emoji::apply_emoji_fonts(client, &config.mount.overlay_source, fonts_overlay_mounted) {
+                Ok(er) => {
+                    info!("BRENE: emoji applied — strategy={}, mounts={}, redirects={}, vfs={}",
+                          er.strategy, er.mounts, er.redirects, er.vfs_rules);
+                    result.emoji_applied = true;
+                }
+                Err(e) => error!("BRENE: emoji mount failed: {e}"),
+            }
+        }
+    } else {
+        debug!("BRENE: emoji toggle OFF, skipping");
     }
 
     // -- Custom user-defined lists --
@@ -379,7 +389,7 @@ fn stage_font_file(source: &Path, filename: &str) -> Option<PathBuf> {
     }
     let dest = staging_dir.join(filename);
     fs::copy(source, &dest).ok()?;
-    fs::set_permissions(&dest, fs::Permissions::from_mode(0o600)).ok()?;
+    fs::set_permissions(&dest, fs::Permissions::from_mode(0o644)).ok()?;
     Some(dest)
 }
 
@@ -416,9 +426,8 @@ fn bind_mount_font_files(font_dir: &Path, system_font_dir: &str) -> u32 {
             continue;
         }
 
-        // Force system_file context so system_server/zygote can read fonts.
-        // copy_selinux_context can fail silently if the target is already overlaid;
-        // explicit set_selinux_context is more reliable across upgrade reboots.
+        // Bind mount exposes source permissions — must be world-readable for system_server/zygote
+        let _ = fs::set_permissions(&source, fs::Permissions::from_mode(0o644));
         crate::utils::selinux::set_selinux_context(&source, "u:object_r:system_file:s0");
 
         let c_src = match std::ffi::CString::new(source.as_os_str().as_encoded_bytes()) {
@@ -854,12 +863,6 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
         info!("BRENE deferred: APK paths hidden ({count})");
     }
 
-    if brene.auto_hide_sdcard_data && has_path {
-        let count = paths::hide_paths_loop(client, SDCARD_DATA_PATTERNS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE deferred: sdcard data roots hidden ({count})");
-    }
-
     if !brene.custom_sus_paths.is_empty() && has_path {
         let path_refs: Vec<&str> = brene.custom_sus_paths.iter().map(|s| s.as_str()).collect();
         let count = paths::hide_paths(client, &path_refs).unwrap_or(0);
@@ -888,6 +891,26 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
         result.paths_hidden += count;
         if count > 0 {
             info!("BRENE deferred: font replacement paths hidden ({count})");
+        }
+    }
+
+    // -- Emoji app overrides (FB + GBoard + GMS) --
+    if config.emoji.enabled {
+        let status_path = std::path::Path::new("/data/adb/zeromount/.status.json");
+        let has_conflict = std::fs::read_to_string(status_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|v| v.get("font_modules")?.as_array().map(|a| !a.is_empty()))
+            .unwrap_or(false);
+
+        if !has_conflict {
+            info!("BRENE deferred: applying emoji app overrides");
+            let app_result = super::emoji::apply_emoji_app_overrides();
+            info!("BRENE deferred: emoji app overrides — fb={}/{}, gboard={}, gms={}",
+                  app_result.fb_succeeded, app_result.fb_total,
+                  app_result.gboard_ok, app_result.gms_ok);
+        } else {
+            warn!("BRENE deferred: emoji app overrides SKIPPED — font module conflict");
         }
     }
 
@@ -1127,12 +1150,6 @@ mod tests {
     fn zygisk_patterns_include_common_paths() {
         assert!(ZYGISK_MAP_PATTERNS.iter().any(|p| p.contains("zygisk")));
         assert!(ZYGISK_MAP_PATTERNS.iter().any(|p| p.contains("shamiko")));
-    }
-
-    #[test]
-    fn sdcard_patterns_cover_both_paths() {
-        assert!(SDCARD_DATA_PATTERNS.contains(&"/sdcard/Android/data"));
-        assert!(SDCARD_DATA_PATTERNS.contains(&"/storage/emulated/0/Android/data"));
     }
 
     #[test]

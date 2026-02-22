@@ -106,7 +106,7 @@ EMOJI_DIR="$ZM_DATA/emoji"
 mkdir -p "$EMOJI_DIR"
 if [ -f "$MODPATH/emoji/NotoColorEmoji.ttf" ]; then
     cp "$MODPATH/emoji/NotoColorEmoji.ttf" "$EMOJI_DIR/" 2>/dev/null
-    chmod 600 "$EMOJI_DIR/NotoColorEmoji.ttf" 2>/dev/null
+    chmod 644 "$EMOJI_DIR/NotoColorEmoji.ttf" 2>/dev/null
     chcon u:object_r:system_file:s0 "$EMOJI_DIR/NotoColorEmoji.ttf" 2>/dev/null
     zm_print "  ✅ Emoji font staged"
 fi
