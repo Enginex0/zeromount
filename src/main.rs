@@ -65,7 +65,6 @@ fn main() -> Result<()> {
         Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::VoldAppData => cli::handlers::handle_vold_app_data(),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),
-        Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::Version => {
             println!("zeromount v{}", read_version_from_prop());
             Ok(())

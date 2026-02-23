@@ -946,7 +946,7 @@ pub fn apply_brene_deferred(client: &SusfsClient, config: &ZeroMountConfig, _sus
     Ok(result)
 }
 
-fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
+pub fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
     let output = match run_command_with_timeout(
         Command::new("pm").args(["list", "packages", "-3"]),
         CMD_TIMEOUT,

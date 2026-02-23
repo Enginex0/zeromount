@@ -502,7 +502,7 @@ pub fn handle_vold_app_data() -> Result<()> {
         tracing::warn!("vold_app_data: SUSFS unavailable");
         return Ok(());
     };
-    let count = crate::susfs::brene::apply_vold_app_data(&client)?;
+    let count = crate::susfs::brene::emulate_vold_app_data(&client);
     tracing::info!("vold_app_data: {count} paths hidden");
     Ok(())
 }
