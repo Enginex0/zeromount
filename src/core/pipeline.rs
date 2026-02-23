@@ -268,7 +268,16 @@ impl MountController<Planned> {
         let susfs = if config.susfs.enabled {
             match crate::susfs::SusfsClient::probe() {
                 Ok(client) => {
-                    client.ensure_root_paths();
+                    if self.state.config.brene.emulate_vold_app_data
+                        && self.state.detection.capabilities.external_susfs_module
+                            == crate::core::types::ExternalSusfsModule::None
+                    {
+                        client.ensure_root_paths();
+                    } else if self.state.detection.capabilities.external_susfs_module
+                        != crate::core::types::ExternalSusfsModule::None
+                    {
+                        tracing::debug!("skipping ensure_root_paths: deferred to external module");
+                    }
                     Some(client)
                 }
                 Err(_) => None,
@@ -407,12 +416,19 @@ impl MountController<Mounted> {
             return (0, 0, Vec::new(), false);
         }
 
+        let external_module = self.state.detection.capabilities.external_susfs_module;
+
         match crate::susfs::SusfsClient::probe() {
             Ok(client) => {
-                client.ensure_root_paths();
+                // #6, #7: root paths only needed when we own vold emulation
+                if self.state.config.brene.emulate_vold_app_data
+                    && external_module == crate::core::types::ExternalSusfsModule::None
+                {
+                    client.ensure_root_paths();
+                } else if external_module != crate::core::types::ExternalSusfsModule::None {
+                    tracing::debug!("finalize: skipping ensure_root_paths, deferred to {:?}", external_module);
+                }
 
-                // KSU bind mounts serve font files — BRENE only adds stealth (kstat+path_hide).
-                // True when VFS is active (executor defers fonts) or fonts are tagged as Font strategy.
                 let fonts_overlay_mounted = self.state.results.iter().any(|r| {
                     r.strategy_used == MountStrategy::Vfs
                     || r.strategy_used == MountStrategy::Font
@@ -420,7 +436,7 @@ impl MountController<Mounted> {
                 });
 
                 let susfs_mode = self.state.detection.capabilities.susfs_mode;
-                match crate::susfs::brene::apply_brene(&client, &self.state.config, fonts_overlay_mounted, susfs_mode) {
+                match crate::susfs::brene::apply_brene(&client, &self.state.config, true, fonts_overlay_mounted, susfs_mode, external_module) {
                     Ok(brene) => {
                         debug!(
                             paths = brene.paths_hidden,

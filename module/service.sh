@@ -12,6 +12,9 @@ trap 'exit 0' INT TERM
 [ -z "$ABI" ] && exit 1
 [ -x "$BIN" ] || exit 1
 
+# Rust detect phase writes which external SUSFS module (if any) is active
+EXTERNAL_SUSFS=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null)
+
 spoof_props() {
     ENABLED=$("$BIN" config get brene.prop_spoofing 2>/dev/null)
     [ "$ENABLED" != "true" ] && return 0
@@ -72,7 +75,12 @@ spoof_props() {
 
     echo "zeromount: prop spoofing applied" > /dev/kmsg 2>/dev/null
 }
-spoof_props
+# External module handles prop spoofing — skip to avoid redundant resetprop calls
+if [ "$EXTERNAL_SUSFS" = "none" ] || [ -z "$EXTERNAL_SUSFS" ]; then
+    spoof_props
+else
+    echo "zeromount: prop spoofing deferred to external module ($EXTERNAL_SUSFS)" > /dev/kmsg 2>/dev/null
+fi
 
 # Track background PIDs for cleanup
 _bg_pids=""

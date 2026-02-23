@@ -121,34 +121,24 @@ fi
 BRAND=$(getprop ro.product.brand 2>/dev/null | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer 2>/dev/null | tr '[:upper:]' '[:lower:]')
 
-zm_print "🛡️ SUSFS Detection" 0.3 "h"
+zm_print "🛡️ External Module Bridge" 0.3 "h"
 
-# Kernel-first detection — probe the actual kernel, not userspace dirs
-SUSFS_DETECTED=false
-
-# Method 1: ksu_susfs binary probe (fastest, authoritative)
-for susfs_bin in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs; do
-    if [ -x "$susfs_bin" ]; then
-        SUSFS_VER=$("$susfs_bin" show version 2>/dev/null)
-        if [ -n "$SUSFS_VER" ]; then
-            SUSFS_DETECTED=true
-            zm_print "  ✅ SUSFS detected via binary: $SUSFS_VER"
-            break
-        fi
-    fi
-done
-
-# Method 2: /proc/config.gz kernel config check
-if [ "$SUSFS_DETECTED" = false ] && [ -f /proc/config.gz ]; then
-    if zcat /proc/config.gz 2>/dev/null | grep -q 'CONFIG_KSU_SUSFS=y'; then
-        SUSFS_DETECTED=true
-        zm_print "  ✅ SUSFS detected via kernel config"
+# Import VerifiedBootHash from susfs4ksu's standalone file if present
+VBH_FILE="/data/adb/VerifiedBootHash/VerifiedBootHash.txt"
+if [ -f "$VBH_FILE" ]; then
+    VBH=$(cat "$VBH_FILE" 2>/dev/null | head -1 | tr -d '[:space:]')
+    if [ -n "$VBH" ]; then
+        "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
+        zm_print "  ✅ VerifiedBootHash imported"
     fi
 fi
 
 if [ "$SUSFS_DETECTED" != true ]; then
     zm_print "  ⚠️ SUSFS not detected in kernel"
 fi
+
+# Write both external module configs from our config.toml (always, fresh or upgrade)
+"$BIN" bridge init 2>/dev/null && zm_print "  ✅ External configs synced" || zm_print "  ⚠️ Bridge init skipped (binary error)"
 
 zm_print "🚀 Finalizing" 0.3 "h"
 

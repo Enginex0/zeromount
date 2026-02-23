@@ -2,10 +2,11 @@ import type {
   Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo,
   KsuModule, CapabilityFlags, ModuleStatus, MountStrategy,
   BreneSettings, SusfsSettings, UnameSettings, MountSettings, AdbSettings,
+  BridgeValues,
 } from './types';
 
 const CACHE_KEY = 'zm-state-cache';
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 export interface HydratableState {
   scenario: Scenario;
@@ -31,6 +32,8 @@ export interface HydratableState {
   mount: MountSettings;
   adb: AdbSettings;
   verboseLogging: boolean;
+  externalSusfsModule: 'susfs4ksu' | 'brene' | null;
+  bridgeValues: BridgeValues | null;
 }
 
 interface SerializedState extends Omit<HydratableState, 'rules' | 'excludedUids' | 'activity'> {
@@ -69,6 +72,8 @@ export function writeCache(state: HydratableState): void {
       mount: state.mount,
       adb: state.adb,
       verboseLogging: state.verboseLogging,
+      externalSusfsModule: state.externalSusfsModule,
+      bridgeValues: state.bridgeValues,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(serialized));
     console.log('[ZM-Cache] wrote cache at', new Date(serialized._ts).toISOString());
@@ -113,6 +118,8 @@ export function readCache(): HydratableState | null {
       mount: cached.mount,
       adb: cached.adb,
       verboseLogging: cached.verboseLogging,
+      externalSusfsModule: cached.externalSusfsModule ?? null,
+      bridgeValues: cached.bridgeValues ?? null,
     };
   } catch (e) {
     console.warn('[ZM-Cache] readCache failed:', e);

@@ -23,6 +23,12 @@ fi
 
 . "$MODDIR/common.sh"
 
+# Reconcile external SUSFS module config changes made outside zeromount
+EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
+if [ "$EXTERNAL" != "none" ] && [ -n "$ABI" ] && [ -x "$BIN" ]; then
+    "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
+fi
+
 if [ -n "$ABI" ] && [ -x "$BIN" ]; then
     echo "$LOG: starting mount pipeline (pre-zygote)" > /dev/kmsg 2>/dev/null
     timeout 60 "$BIN" mount

@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use tracing::{debug, info};
 
-use crate::core::types::{CapabilityFlags, DetectionResult, Scenario};
+use crate::core::types::{CapabilityFlags, DetectionResult, ExternalSusfsModule, Scenario};
 
 const DETECTION_JSON_PATH: &str = "/data/adb/zeromount/.detection.json";
 
@@ -52,8 +52,7 @@ pub fn detect_scenario() -> Result<DetectionResult> {
         susfs_kstat_redirect: susfs_caps.susfs_kstat_redirect,
         susfs_open_redirect_all: susfs_caps.susfs_open_redirect_all,
         susfs_mode: susfs_caps.susfs_mode,
-        susfs_module_installed: susfs_caps.susfs_module_installed,
-        susfs_module_enabled: susfs_caps.susfs_module_enabled,
+        external_susfs_module: susfs_caps.external_susfs_module,
         susfs_binary_found: susfs_caps.susfs_binary_found,
         overlay_supported: vfs.overlay_supported,
         erofs_supported: vfs.erofs_supported,
@@ -92,7 +91,30 @@ pub fn detect_and_persist() -> Result<DetectionResult> {
         .context("writing detection JSON")?;
 
     debug!("detection result written to {DETECTION_JSON_PATH}");
+
+    write_external_susfs_sentinel(&result.capabilities.external_susfs_module)?;
+
     Ok(result)
+}
+
+const SENTINEL_DIR: &str = "/data/adb/zeromount/flags";
+const SENTINEL_PATH: &str = "/data/adb/zeromount/flags/external_susfs";
+
+fn write_external_susfs_sentinel(module: &ExternalSusfsModule) -> Result<()> {
+    std::fs::create_dir_all(SENTINEL_DIR)
+        .context("creating flags directory")?;
+
+    let value = match module {
+        ExternalSusfsModule::None => "none",
+        ExternalSusfsModule::Susfs4ksu => "susfs4ksu",
+        ExternalSusfsModule::Brene => "brene",
+    };
+
+    std::fs::write(SENTINEL_PATH, value)
+        .context("writing external_susfs sentinel")?;
+
+    debug!("sentinel written: {SENTINEL_PATH} = {value}");
+    Ok(())
 }
 
 /// Read persisted detection result from JSON.

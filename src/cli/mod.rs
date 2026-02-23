@@ -50,6 +50,11 @@ pub enum Commands {
         #[command(subcommand)]
         action: LogAction,
     },
+    /// External module config bridge
+    Bridge {
+        #[command(subcommand)]
+        action: BridgeAction,
+    },
     /// SUSFS feature toggles
     Susfs {
         feature: String,
@@ -149,6 +154,19 @@ pub enum VfsAction {
     List,
     /// Engine enabled state
     QueryStatus,
+}
+
+#[derive(Subcommand)]
+pub enum BridgeAction {
+    /// Write both external module configs from config.toml (install-time)
+    Init,
+    /// Write config.toml values to active external module's config.sh
+    Write,
+    /// Import changes from external module's config.sh into config.toml
+    Reconcile {
+        /// External module id: "susfs4ksu" or "brene"
+        module_id: String,
+    },
 }
 
 #[derive(Subcommand)]

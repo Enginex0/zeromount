@@ -35,6 +35,20 @@ impl Default for SusfsMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalSusfsModule {
+    None,
+    Susfs4ksu,
+    Brene,
+}
+
+impl Default for ExternalSusfsModule {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 // -- Capability Flags --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,8 +65,7 @@ pub struct CapabilityFlags {
     pub susfs_kstat_redirect: bool,
     pub susfs_open_redirect_all: bool,
     pub susfs_mode: SusfsMode,
-    pub susfs_module_installed: bool,
-    pub susfs_module_enabled: bool,
+    pub external_susfs_module: ExternalSusfsModule,
     pub susfs_binary_found: bool,
     pub overlay_supported: bool,
     pub erofs_supported: bool,
@@ -74,8 +87,7 @@ impl Default for CapabilityFlags {
             susfs_kstat_redirect: false,
             susfs_open_redirect_all: false,
             susfs_mode: SusfsMode::Absent,
-            susfs_module_installed: false,
-            susfs_module_enabled: false,
+            external_susfs_module: ExternalSusfsModule::None,
             susfs_binary_found: false,
             overlay_supported: false,
             erofs_supported: false,

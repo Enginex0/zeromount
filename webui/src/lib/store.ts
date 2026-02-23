@@ -1,6 +1,6 @@
 import { createSignal, createRoot, createMemo, createEffect } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse } from './types';
+import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
 import { api, shouldUseMock } from './api';
 import { listPackages, getPackagesInfo, getAppLabelViaAapt } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
@@ -62,6 +62,8 @@ function createAppStore() {
   const [mountSource, _setMountSource] = createSignal<string | null>(null);
   const [resolvedStorageMode, setResolvedStorageMode] = createSignal<string | null>(null);
   const [lastApiError, setLastApiError] = createSignal<{ operation: string; error: unknown; timestamp: Date } | null>(null);
+  const [externalSusfsModule, setExternalSusfsModule] = createSignal<'susfs4ksu' | 'brene' | null>(null);
+  const [bridgeValues, setBridgeValues] = createSignal<BridgeValues | null>(null);
 
   const savedBgOpacity = typeof window !== 'undefined'
     ? parseFloat(localStorage.getItem('zeromount-bgOpacity') ?? '0.35')
@@ -111,6 +113,7 @@ function createAppStore() {
     force_hide_lsposed: true,
     spoof_cmdline: false,
     hide_ksu_loops: true,
+    kernel_umount: true,
     prop_spoofing: true,
     auto_hide_injections: true,
     verified_boot_hash: '',
@@ -238,6 +241,17 @@ function createAppStore() {
     });
   }
 
+  const susfsOwnership = createMemo((): SusfsOwnership => {
+    const caps = capabilities();
+    const external = externalSusfsModule();
+    const enabled = settings.susfs.enabled;
+
+    if (!caps?.susfs_available) return 'disabled';
+    if (enabled) return 'embedded_active';
+    if (external) return 'deferred_external';
+    return 'disabled';
+  });
+
   // Toast notifications
   const [toast, setToast] = createSignal<{ message: string; type: 'success' | 'error' | 'info' | 'warning'; duration: number } | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -278,6 +292,8 @@ function createAppStore() {
     setSettings('mount', prev => ({ ...prev, ...cached.mount }));
     setSettings('adb', prev => ({ ...prev, ...cached.adb }));
     setSettings({ verboseLogging: cached.verboseLogging });
+    if (cached.externalSusfsModule !== undefined) setExternalSusfsModule(cached.externalSusfsModule);
+    if (cached.bridgeValues !== undefined) setBridgeValues(cached.bridgeValues);
     return true;
   };
 
@@ -305,6 +321,8 @@ function createAppStore() {
     mount: { ...settings.mount },
     adb: { ...settings.adb },
     verboseLogging: settings.verboseLogging,
+    externalSusfsModule: externalSusfsModule(),
+    bridgeValues: bridgeValues(),
   });
 
   const applyBatchedResponse = (data: WebUiInitResponse) => {
@@ -400,6 +418,10 @@ function createAppStore() {
       }));
     }
     setEmojiConflict(data.emoji_conflict || null);
+
+    const extMod = s.capabilities?.external_susfs_module;
+    setExternalSusfsModule(extMod && extMod !== 'none' ? extMod : null);
+    setBridgeValues(data.bridge_values ?? null);
 
     if (cfg.logging) {
       setSettings({ verboseLogging: typeof cfg.logging.verbose === 'boolean' ? cfg.logging.verbose : settings.verboseLogging });
@@ -700,7 +722,7 @@ function createAppStore() {
       'auto_hide_rooted_folders', 'auto_hide_recovery', 'auto_hide_tmp',
       'auto_hide_sdcard_data', 'avc_log_spoofing', 'susfs_log',
       'hide_sus_mounts', 'emulate_vold_app_data', 'force_hide_lsposed',
-      'spoof_cmdline', 'hide_ksu_loops', 'prop_spoofing', 'auto_hide_injections',
+      'spoof_cmdline', 'hide_ksu_loops', 'kernel_umount', 'prop_spoofing', 'auto_hide_injections',
     ];
 
     if (dump?.brene && dump?.uname) {
@@ -764,68 +786,43 @@ function createAppStore() {
   const setBreneToggle = async (key: keyof BreneSettings, value: boolean) => {
     setSettings('brene', key, value);
     let kernelSet = false;
-    let configVarSet = false;
     try {
       await api.configSet(`brene.${key}`, String(value));
-      // Chain controlled settings to SUSFS kernel + config.sh
+
+      // Live supercalls for kernel-immediate toggles
       if (key === 'avc_log_spoofing') {
         await api.setSusfsAvcSpoofing(value);
         kernelSet = true;
-        await api.writeSusfsConfigVar('avc_log_spoofing', value ? '1' : '0');
-        configVarSet = true;
       } else if (key === 'susfs_log') {
         await api.setSusfsLog(value);
         kernelSet = true;
-        await api.writeSusfsConfigVar('susfs_log', value ? '1' : '0');
-        configVarSet = true;
       } else if (key === 'hide_sus_mounts') {
         await api.setSusfsHideMounts(value);
         kernelSet = true;
-        await api.writeSusfsConfigVar('hide_sus_mnts_for_all_or_non_su_procs', value ? '1' : '0');
-        configVarSet = true;
-      } else if (key === 'emulate_vold_app_data') {
-        await api.writeSusfsConfigVar('emulate_vold_app_data', value ? '1' : '0');
-        configVarSet = true;
-      } else if (key === 'force_hide_lsposed') {
-        await api.writeSusfsConfigVar('force_hide_lsposed', value ? '1' : '0');
-        configVarSet = true;
-      } else if (key === 'spoof_cmdline') {
-        await api.writeSusfsConfigVar('spoof_cmdline', value ? '1' : '0');
-        configVarSet = true;
-      } else if (key === 'hide_ksu_loops') {
-        await api.writeSusfsConfigVar('hide_loops', value ? '1' : '0');
-        configVarSet = true;
+      } else if (key === 'kernel_umount') {
+        await api.setKernelUmount(value);
+        kernelSet = true;
       }
+
+      // Bridge write syncs config.toml -> external module config.sh
+      await api.bridgeWrite(`brene.${key}`, String(value));
+
       pushActivity('brene_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error('[ZM-Store] setBreneToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('brene', key, !value);
-      // Best-effort rollback: config, kernel, config.sh
       const old = !value;
       api.configSet(`brene.${key}`, String(old)).catch(re => console.warn('[ZM-Store] rollback configSet failed:', re));
       if (kernelSet) {
         const rollbackKernel = key === 'avc_log_spoofing' ? api.setSusfsAvcSpoofing(old)
           : key === 'susfs_log' ? api.setSusfsLog(old)
           : key === 'hide_sus_mounts' ? api.setSusfsHideMounts(old)
+          : key === 'kernel_umount' ? api.setKernelUmount(old)
           : null;
         rollbackKernel?.catch(re => console.warn('[ZM-Store] rollback kernel call failed:', re));
       }
-      if (configVarSet) {
-        const varMap: Record<string, string> = {
-          avc_log_spoofing: 'avc_log_spoofing',
-          susfs_log: 'susfs_log',
-          hide_sus_mounts: 'hide_sus_mnts_for_all_or_non_su_procs',
-          emulate_vold_app_data: 'emulate_vold_app_data',
-          force_hide_lsposed: 'force_hide_lsposed',
-          spoof_cmdline: 'spoof_cmdline',
-          hide_ksu_loops: 'hide_loops',
-        };
-        const varName = varMap[key];
-        if (varName) {
-          api.writeSusfsConfigVar(varName, old ? '1' : '0').catch(re => console.warn('[ZM-Store] rollback config.sh failed:', re));
-        }
-      }
+      api.bridgeWrite(`brene.${key}`, String(old)).catch(re => console.warn('[ZM-Store] rollback bridge write failed:', re));
     }
   };
 
@@ -1048,6 +1045,28 @@ function createAppStore() {
       // Non-fatal: default to false
     }
   };
+
+  const refreshBridgeValues = async () => {
+    const ext = externalSusfsModule();
+    if (!ext) return;
+    const basePath = ext === 'brene'
+      ? '/data/adb/brene/config.sh'
+      : '/data/adb/susfs4ksu/config.sh';
+    try {
+      const values = await api.readAllBridgeValues(basePath);
+      setBridgeValues({ module: ext, values });
+    } catch (e) {
+      console.error('[ZM-Store] refreshBridgeValues() error:', e);
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && externalSusfsModule()) {
+        refreshBridgeValues();
+      }
+    });
+  }
 
   const setMountStorageMode = async (mode: StorageMode) => {
     console.log('[ZM-Store] setMountStorageMode() called:', mode);
@@ -1412,6 +1431,10 @@ function createAppStore() {
     currentTheme,
     toast,
     lastApiError,
+    externalSusfsModule,
+    susfsOwnership,
+    bridgeValues,
+    refreshBridgeValues,
 
     loadInitialData,
     loadInstalledApps,

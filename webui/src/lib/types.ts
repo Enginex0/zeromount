@@ -41,12 +41,18 @@ export interface CapabilityFlags {
   susfs_kstat_redirect: boolean;
   susfs_open_redirect_all: boolean;
   susfs_mode: 'enhanced' | 'embedded' | 'absent';
-  susfs_module_installed: boolean;
-  susfs_module_enabled: boolean;
+  external_susfs_module: 'none' | 'susfs4ksu' | 'brene';
   susfs_binary_found: boolean;
   overlay_supported: boolean;
   erofs_supported: boolean;
   tmpfs_xattr: boolean;
+}
+
+export type SusfsOwnership = 'embedded_active' | 'deferred_external' | 'disabled';
+
+export interface BridgeValues {
+  module: 'susfs4ksu' | 'brene';
+  values: Record<string, string>;
 }
 
 export type MountStrategy = 'Vfs' | 'Overlay' | 'MagicMount' | 'Font';
@@ -125,6 +131,7 @@ export interface BreneSettings {
   force_hide_lsposed: boolean;
   spoof_cmdline: boolean;
   hide_ksu_loops: boolean;
+  kernel_umount: boolean;
   prop_spoofing: boolean;
   auto_hide_injections: boolean;
   verified_boot_hash: string;
@@ -223,4 +230,5 @@ export interface WebUiInitResponse {
     timestamp: string;
   }>;
   modules: KsuModule[];
+  bridge_values: BridgeValues | null;
 }

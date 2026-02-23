@@ -1,3 +1,4 @@
+mod bridge;
 mod cli;
 mod core;
 mod detect;
@@ -55,6 +56,7 @@ fn main() -> Result<()> {
         Commands::Vfs { action } => cli::handlers::handle_vfs(action),
         Commands::Uid { action } => cli::handlers::handle_uid(action),
         Commands::Log { action } => cli::handlers::handle_log(action),
+        Commands::Bridge { action } => cli::handlers::handle_bridge(action),
         Commands::Susfs { feature, state } => cli::handlers::handle_susfs(&feature, &state),
         Commands::Watch => cli::handlers::handle_watch(),
         Commands::Perf => cli::handlers::handle_perf(),
@@ -63,6 +65,7 @@ fn main() -> Result<()> {
         Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::VoldAppData => cli::handlers::handle_vold_app_data(),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),
+        Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::Version => {
             println!("zeromount v{}", read_version_from_prop());
             Ok(())

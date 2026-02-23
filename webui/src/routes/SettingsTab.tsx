@@ -11,7 +11,7 @@ import { store } from '../lib/store';
 import { GITHUB_URL, PATHS } from '../lib/constants';
 import { ksuExec } from '../lib/ksuApi';
 import { escapeShellArg } from '../lib/api';
-import type { BreneSettings, SusfsSettings, UnameMode, MountStrategy, StorageMode, Settings } from '../lib/types';
+import type { BreneSettings, SusfsSettings, UnameMode, MountStrategy, StorageMode, Settings, SusfsOwnership } from '../lib/types';
 import "./SettingsTab.css";
 
 const accentColors = [
@@ -78,6 +78,17 @@ export function SettingsTab() {
   const caps = () => store.capabilities?.() || null;
   const susfsAvailable = () => caps()?.susfs_available ?? false;
   const susfsEnabled = () => susfsAvailable() && store.settings.susfs.enabled;
+  const ownership = () => store.susfsOwnership();
+  const susfsDisabled = () => ownership() !== 'embedded_active';
+  const externalModule = () => store.externalSusfsModule();
+
+  const susfsItemClass = () => {
+    const o = ownership();
+    return o === 'disabled' ? ' settings__item--susfs-unavailable'
+      : o === 'deferred_external' ? ' settings__item--susfs-deferred'
+      : '';
+  };
+
   const handleBreneToggle = (key: keyof BreneSettings, value: boolean) => {
     store.setBreneToggle(key, value);
   };
@@ -481,14 +492,39 @@ export function SettingsTab() {
           </div>
           <Toggle
             checked={susfsEnabled()}
-            onChange={(v) => handleSusfsToggle('enabled', v)}
+            onChange={(v) => {
+              handleSusfsToggle('enabled', v);
+              const ext = externalModule();
+              if (ext) {
+                store.showToast(
+                  v ? 'Taking SUSFS ownership from zeromount' : `Deferred to ${ext}`,
+                  'info'
+                );
+              }
+            }}
             disabled={!susfsAvailable()}
           />
         </div>
 
         <Show when={susfsAvailable()}>
+          <Show when={externalModule()}>
+            <div class="settings__external-notice">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text-accent)">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+              <span>
+                {ownership() === 'deferred_external'
+                  ? `SUSFS managed by ${externalModule()}`
+                  : `Syncing to ${externalModule()}`}
+              </span>
+              <span class="settings__configured-badge">
+                {ownership() === 'deferred_external' ? 'Deferred' : 'Syncing'}
+              </span>
+            </div>
+          </Show>
+
           <div class="settings__sub-toggles">
-            <div class={`settings__item settings__item--sub${!susfsEnabled() ? ' settings__item--disabled' : ''}`}>
+            <div class={`settings__item settings__item--sub${susfsDisabled() ? ' settings__item--disabled' : ''}${susfsItemClass()}`}>
               <div class="settings__item-content">
                 <div class="settings__item-label">Hide Sus Mounts</div>
                 <div class="settings__item-desc">Hide module mounts from non-root processes</div>
@@ -500,21 +536,31 @@ export function SettingsTab() {
                 <div class="settings__item-label">Path Hiding</div>
                 <div class="settings__item-desc">Hide paths from detection apps</div>
               </div>
-              <Toggle checked={store.settings.susfs.path_hide} onChange={(v) => handleSusfsToggle('path_hide', v)} disabled={!susfsEnabled()} />
+              <Toggle checked={store.settings.susfs.path_hide} onChange={(v) => handleSusfsToggle('path_hide', v)} disabled={susfsDisabled()} />
             </div>
-            <div class={`settings__item settings__item--sub${!susfsEnabled() ? ' settings__item--disabled' : ''}`}>
+            <div class={`settings__item settings__item--sub${susfsDisabled() ? ' settings__item--disabled' : ''}${susfsItemClass()}`}>
               <div class="settings__item-content">
                 <div class="settings__item-label">Kstat Spoofing</div>
                 <div class="settings__item-desc">Spoof file metadata for redirected files</div>
               </div>
-              <Toggle checked={store.settings.susfs.kstat} onChange={(v) => handleSusfsToggle('kstat', v)} disabled={!susfsEnabled()} />
+              <Toggle checked={store.settings.susfs.kstat} onChange={(v) => handleSusfsToggle('kstat', v)} disabled={susfsDisabled()} />
             </div>
-            <div class={`settings__item settings__item--sub${!susfsEnabled() ? ' settings__item--disabled' : ''}`}>
+            <div class={`settings__item settings__item--sub${susfsDisabled() ? ' settings__item--disabled' : ''}${susfsItemClass()}`}>
               <div class="settings__item-content">
                 <div class="settings__item-label">Maps Hiding</div>
                 <div class="settings__item-desc">Hide module entries from /proc/maps</div>
               </div>
-              <Toggle checked={store.settings.susfs.maps_hide} onChange={(v) => handleSusfsToggle('maps_hide', v)} disabled={!susfsEnabled()} />
+              <Toggle checked={store.settings.susfs.maps_hide} onChange={(v) => handleSusfsToggle('maps_hide', v)} disabled={susfsDisabled()} />
+            </div>
+            <div class={`settings__item settings__item--sub${susfsDisabled() ? ' settings__item--disabled' : ''}${susfsItemClass()}`}>
+              <div class="settings__item-content">
+                <div class="settings__item-label">Font Redirect</div>
+                <div class="settings__item-desc">Redirect font files via open_redirect</div>
+                <Show when={!susfsAvailable()}>
+                  <div class="settings__susfs-hint">Requires SUSFS kernel support</div>
+                </Show>
+              </div>
+              <Toggle checked={store.settings.susfs.open_redirect} onChange={(v) => handleSusfsToggle('open_redirect', v)} disabled={susfsDisabled()} />
             </div>
           </div>
 
@@ -523,7 +569,7 @@ export function SettingsTab() {
               <path d="M7 10l5 5 5-5z"/>
             </svg>
             <span>Advanced Settings</span>
-            <span class="settings__advanced-badge">14</span>
+            <span class="settings__advanced-badge">15</span>
           </button>
 
           <Show when={showAdvanced()}>
@@ -640,6 +686,13 @@ export function SettingsTab() {
                       <div class="settings__item-desc">Hide sensitive app data on sdcard</div>
                     </div>
                     <Toggle checked={store.settings.brene.auto_hide_sdcard_data} onChange={(v) => handleBreneToggle('auto_hide_sdcard_data', v)} />
+                  </div>
+                  <div class="settings__item">
+                    <div class="settings__item-content">
+                      <div class="settings__item-label">Kernel Umount</div>
+                      <div class="settings__item-desc">Enable kernel-level module unmounting via ksud</div>
+                    </div>
+                    <Toggle checked={store.settings.brene.kernel_umount} onChange={(v) => handleBreneToggle('kernel_umount', v)} />
                   </div>
                 </>}
               />

@@ -4,8 +4,9 @@ use std::path::Path;
 use anyhow::Result;
 use serde::Serialize;
 
+use crate::bridge::BridgeValues;
 use crate::core::config::ZeroMountConfig;
-use crate::core::types::RuntimeState;
+use crate::core::types::{ExternalSusfsModule, RuntimeState};
 
 const MODULES_DIR: &str = "/data/adb/modules";
 const EXCLUSION_FILE: &str = "/data/adb/zeromount/.exclusion_list";
@@ -22,6 +23,7 @@ pub struct WebUiInitResponse {
     pub activity: Vec<WebUiActivityItem>,
     pub modules: Vec<WebUiModule>,
     pub emoji_conflict: Option<String>,
+    pub bridge_values: Option<BridgeValues>,
 }
 
 #[derive(Serialize)]
@@ -83,6 +85,16 @@ pub fn handle_webui_init() -> Result<()> {
 
     let emoji_conflict = status.font_modules.first().cloned();
 
+    let external_module = status.capabilities.external_susfs_module;
+    let bridge_values = match external_module {
+        ExternalSusfsModule::None => None,
+        _ => crate::bridge::read_bridge_values(external_module)
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "failed to read bridge values");
+                None
+            }),
+    };
+
     let response = WebUiInitResponse {
         status,
         config,
@@ -92,6 +104,7 @@ pub fn handle_webui_init() -> Result<()> {
         activity,
         modules,
         emoji_conflict,
+        bridge_values,
     };
 
     let json = serde_json::to_string(&response)?;

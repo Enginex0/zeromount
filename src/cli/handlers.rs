@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use tracing::{debug, warn};
 
-use super::{ConfigAction, EmojiAction, LogAction, ModuleAction, UidAction, VfsAction};
+use super::{BridgeAction, ConfigAction, EmojiAction, LogAction, ModuleAction, UidAction, VfsAction};
 
 pub fn handle_mount() -> Result<()> {
     let _lock = match crate::utils::lock::acquire_instance_lock()? {
@@ -308,6 +308,91 @@ pub fn handle_susfs(feature: &str, state: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn handle_susfs_retry(wait: bool) -> Result<()> {
+    if wait {
+        tracing::info!("--wait flag deprecated: sdcard wait now handled by boot-completed.sh");
+    }
+
+    let _lock = match crate::utils::lock::acquire_instance_lock()? {
+        Some(guard) => guard,
+        None => {
+            warn!("another zeromount instance is running, skipping SUSFS retry");
+            return Ok(());
+        }
+    };
+
+    tracing::info!("deferred SUSFS retry started");
+
+    let mut config = crate::core::config::ZeroMountConfig::load(None)?;
+    if let Err(e) = crate::susfs::brene::import_susfs_config(&mut config) {
+        warn!("SUSFS config import failed: {e}");
+    }
+
+    if !config.susfs.enabled {
+        tracing::info!("SUSFS disabled in config, skipping deferred retry");
+        return Ok(());
+    }
+
+    let client = match crate::susfs::SusfsClient::probe() {
+        Ok(c) if c.is_available() => c,
+        Ok(_) => {
+            tracing::info!("SUSFS not available, skipping retry");
+            return Ok(());
+        }
+        Err(e) => {
+            warn!("SUSFS probe failed: {e}");
+            return Ok(());
+        }
+    };
+
+    if config.brene.emulate_vold_app_data {
+        client.ensure_root_paths();
+    }
+
+    let status_path = Path::new("/data/adb/zeromount/.status.json");
+    let boot_module_ids: Vec<String> = crate::core::types::RuntimeState::read_status_file(status_path)
+        .map(|s| s.modules.iter().map(|m| m.id.clone()).collect())
+        .unwrap_or_default();
+
+    let modules_dir = Path::new("/data/adb/modules");
+    if modules_dir.exists() && !boot_module_ids.is_empty() {
+        if let Ok(modules) = crate::modules::scanner::scan_modules(modules_dir) {
+            for module in &modules {
+                if !module.files.is_empty() && boot_module_ids.contains(&module.id) {
+                    crate::vfs::executor::apply_module_susfs_protections(
+                        &client, module, Some(&config.susfs), true, false,
+                    );
+                }
+            }
+        }
+    }
+
+    let susfs_mode = crate::detect::load_detection()
+        .map(|d| d.capabilities.susfs_mode)
+        .unwrap_or(crate::core::types::SusfsMode::Absent);
+    match crate::susfs::brene::apply_brene_deferred(&client, &config, susfs_mode) {
+        Ok(brene) => {
+            tracing::info!(
+                paths = brene.paths_hidden,
+                "deferred SUSFS retry complete"
+            );
+
+            if let Ok(mut state) = crate::core::types::RuntimeState::read_status_file(status_path) {
+                state.hidden_path_count = brene.paths_hidden;
+                let tmp_path = status_path.with_extension("json.tmp");
+                if let Ok(()) = state.write_status_file(&tmp_path) {
+                    let _ = std::fs::rename(&tmp_path, status_path);
+                }
+            }
+        }
+        Err(e) => {
+            warn!("deferred BRENE failed: {e}");
+        }
+    }
+
+    Ok(())
+}
+
 pub fn handle_perf() -> Result<()> {
     let config = crate::core::config::ZeroMountConfig::load(None)?;
     if !config.perf.enabled {
@@ -419,6 +504,61 @@ pub fn handle_vold_app_data() -> Result<()> {
     };
     let count = crate::susfs::brene::apply_vold_app_data(&client)?;
     tracing::info!("vold_app_data: {count} paths hidden");
+    Ok(())
+}
+
+const SENTINEL_PATH: &str = "/data/adb/zeromount/flags/external_susfs";
+
+pub fn read_sentinel_module() -> crate::core::types::ExternalSusfsModule {
+    use crate::core::types::ExternalSusfsModule;
+
+    std::fs::read_to_string(SENTINEL_PATH)
+        .ok()
+        .and_then(|s| match s.trim() {
+            "susfs4ksu" => Some(ExternalSusfsModule::Susfs4ksu),
+            "brene" => Some(ExternalSusfsModule::Brene),
+            _ => None,
+        })
+        .unwrap_or(ExternalSusfsModule::None)
+}
+
+fn parse_module_id(id: &str) -> Result<crate::core::types::ExternalSusfsModule> {
+    use crate::core::types::ExternalSusfsModule;
+
+    match id {
+        "susfs4ksu" => Ok(ExternalSusfsModule::Susfs4ksu),
+        "brene" => Ok(ExternalSusfsModule::Brene),
+        "none" => Ok(ExternalSusfsModule::None),
+        _ => anyhow::bail!("unknown module id: {id} (expected: susfs4ksu, brene, none)"),
+    }
+}
+
+pub fn handle_bridge(action: BridgeAction) -> Result<()> {
+    match action {
+        BridgeAction::Init => {
+            let config = crate::core::config::ZeroMountConfig::load(None)?;
+            crate::bridge::init_external_configs(&config)?;
+            tracing::info!("bridge init complete");
+            println!("ok");
+        }
+        BridgeAction::Write => {
+            let config = crate::core::config::ZeroMountConfig::load(None)?;
+            let module = read_sentinel_module();
+            crate::bridge::write_to_external(&config, module)?;
+            tracing::info!(module = ?module, "bridge write complete");
+            println!("ok");
+        }
+        BridgeAction::Reconcile { module_id } => {
+            let module = parse_module_id(&module_id)?;
+            let mut config = crate::core::config::ZeroMountConfig::load(None)?;
+            let changed = crate::bridge::reconcile_from_external(module, &mut config)?;
+            if changed {
+                config.save()?;
+                tracing::info!(module = ?module, "bridge reconcile saved config changes");
+            }
+            println!("{}", if changed { "changed" } else { "unchanged" });
+        }
+    }
     Ok(())
 }
 

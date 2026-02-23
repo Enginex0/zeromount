@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use tracing::{debug, warn};
 
-use crate::core::types::{CapabilityFlags, SusfsMode};
+use crate::core::types::{CapabilityFlags, ExternalSusfsModule, SusfsMode};
 use crate::susfs::SusfsClient;
 use crate::utils::platform;
 
@@ -52,19 +52,16 @@ pub fn probe_susfs() -> Result<CapabilityFlags> {
         }
     };
 
-    let module_ids = ["susfs4ksu", "susfs4ksu_next"];
-    let modules_base = Path::new("/data/adb/modules");
-
-    let module_installed = module_ids.iter().any(|id| modules_base.join(id).exists());
-    let module_disabled = module_ids.iter().any(|id| modules_base.join(id).join("disable").exists());
-    let module_enabled = module_installed && !module_disabled;
+    let external_module = detect_external_module();
     let binary_found = binary.is_some();
 
-    caps.susfs_module_installed = module_installed;
-    caps.susfs_module_enabled = module_enabled;
+    caps.external_susfs_module = external_module;
     caps.susfs_binary_found = binary_found;
 
-    caps.susfs_mode = if kernel_has_susfs && module_enabled && binary_found {
+    caps.susfs_mode = if kernel_has_susfs
+        && external_module != ExternalSusfsModule::None
+        && binary_found
+    {
         SusfsMode::Enhanced
     } else if kernel_has_susfs {
         SusfsMode::Embedded
@@ -73,11 +70,39 @@ pub fn probe_susfs() -> Result<CapabilityFlags> {
     };
 
     debug!(
-        "SUSFS mode: {:?} (kernel={}, module_installed={}, module_enabled={}, binary={})",
-        caps.susfs_mode, kernel_has_susfs, module_installed, module_enabled, binary_found
+        "SUSFS mode: {:?} (kernel={}, external={:?}, binary={})",
+        caps.susfs_mode, kernel_has_susfs, external_module, binary_found
     );
 
     Ok(caps)
+}
+
+fn module_is_active(module_dir: &Path) -> bool {
+    module_dir.exists()
+        && !module_dir.join("disable").exists()
+        && !module_dir.join("remove").exists()
+}
+
+fn detect_susfs4ksu_active() -> bool {
+    let base = Path::new("/data/adb/modules");
+    ["susfs4ksu", "susfs4ksu_next"]
+        .iter()
+        .any(|id| module_is_active(&base.join(id)))
+}
+
+fn detect_brene_active() -> bool {
+    module_is_active(Path::new("/data/adb/modules/brene"))
+}
+
+// susfs4ksu wins if both somehow active (BRENE disables susfs4ksu on install)
+fn detect_external_module() -> ExternalSusfsModule {
+    if detect_susfs4ksu_active() {
+        ExternalSusfsModule::Susfs4ksu
+    } else if detect_brene_active() {
+        ExternalSusfsModule::Brene
+    } else {
+        ExternalSusfsModule::None
+    }
 }
 
 /// Locate the SUSFS binary by searching platform-specific paths.

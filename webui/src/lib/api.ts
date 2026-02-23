@@ -750,23 +750,55 @@ echo "]"
     }
   },
 
+  async setKernelUmount(enabled: boolean): Promise<void> {
+    if (shouldUseMock()) return;
+    const ksud = '/data/adb/ksu/bin/ksud';
+    const apKsud = '/data/adb/ap/bin/ksud';
+    await ksuExec(`{ [ -x ${ksud} ] && ${ksud} feature set kernel_umount ${enabled ? 1 : 0}; } || { [ -x ${apKsud} ] && ${apKsud} feature set kernel_umount ${enabled ? 1 : 0}; } || true`);
+  },
+
   async writeSusfsConfigVar(key: string, value: string): Promise<void> {
     if (shouldUseMock()) return;
     const configPath = '/data/adb/susfs4ksu/config.sh';
     await ksuExec(`sed -i 's/^${escapeShellArg(key)}=.*/${escapeShellArg(key)}=${escapeShellArg(value)}/' ${escapeShellArg(configPath)}`);
   },
 
-  async readSusfsConfigVar(key: string): Promise<string | null> {
+  async bridgeWrite(key: string, value: string): Promise<void> {
+    if (shouldUseMock()) return;
+    await ksuExec(`${PATHS.BINARY} bridge write ${escapeShellArg(key)} ${escapeShellArg(value)}`);
+  },
+
+  async readSusfsConfigVar(key: string, basePath = '/data/adb/susfs4ksu/config.sh'): Promise<string | null> {
     if (shouldUseMock()) return null;
     try {
       const { errno, stdout } = await ksuExec(
-        `grep -m1 '^${escapeShellArg(key)}=' /data/adb/susfs4ksu/config.sh | cut -d= -f2`
+        `grep -m1 '^${escapeShellArg(key)}=' ${escapeShellArg(basePath)} | cut -d= -f2`
       );
       if (errno === 0 && stdout.trim()) return stdout.trim();
     } catch (e) {
       console.error('[ZM-API] readSusfsConfigVar() error:', e);
     }
     return null;
+  },
+
+  async readAllBridgeValues(basePath: string): Promise<Record<string, string>> {
+    if (shouldUseMock()) return {};
+    try {
+      const { errno, stdout } = await ksuExec(
+        `grep -E '^[a-zA-Z_]+=.' ${escapeShellArg(basePath)} 2>/dev/null`
+      );
+      if (errno !== 0 || !stdout.trim()) return {};
+      const result: Record<string, string> = {};
+      for (const line of stdout.trim().split('\n')) {
+        const eq = line.indexOf('=');
+        if (eq === -1) continue;
+        result[line.slice(0, eq)] = line.slice(eq + 1);
+      }
+      return result;
+    } catch (e) {
+      console.error('[ZM-API] readAllBridgeValues() error:', e);
+      return {};
+    }
   },
 
   async webuiInit(): Promise<WebUiInitResponse | null> {
