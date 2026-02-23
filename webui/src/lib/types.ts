@@ -25,6 +25,7 @@ export interface EngineStats {
   activeRules: number;
   excludedUids: number;
   hiddenPaths: number;
+  hiddenMaps: number;
 }
 
 export interface CapabilityFlags {
@@ -67,6 +68,7 @@ export interface RuntimeStatus {
   rule_count: number;
   excluded_uid_count: number;
   hidden_path_count: number;
+  hidden_maps_count: number;
   susfs_version: string | null;
   active_strategy: MountStrategy | null;
   modules: ModuleStatus[];

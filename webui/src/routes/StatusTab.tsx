@@ -11,6 +11,8 @@ import './StatusTab.css';
 export function StatusTab() {
   const [animatedActiveRules, setAnimatedActiveRules] = createSignal(0);
   const [animatedExcludedUids, setAnimatedExcludedUids] = createSignal(0);
+  const [animatedPaths, setAnimatedPaths] = createSignal(0);
+  const [animatedMaps, setAnimatedMaps] = createSignal(0);
   const [showAllActivity, setShowAllActivity] = createSignal(false);
   const [showAllModules, setShowAllModules] = createSignal(false);
 
@@ -122,6 +124,8 @@ export function StatusTab() {
     setTimeout(() => {
       animateNumber(store.stats.activeRules, setAnimatedActiveRules);
       animateNumber(store.stats.excludedUids, setAnimatedExcludedUids);
+      animateNumber(store.stats.hiddenPaths, setAnimatedPaths);
+      animateNumber(store.stats.hiddenMaps, setAnimatedMaps);
     }, 300);
   });
 
@@ -330,19 +334,19 @@ export function StatusTab() {
 
             <div class="status-stats__card bg-surface">
               <div class="status-stats__value">
-                {animatedExcludedUids()}
+                {animatedPaths()}
               </div>
               <div class="status-stats__label color-text-tertiary">
-                Excluded Apps
+                Paths Hidden
               </div>
             </div>
 
             <div class="status-stats__card bg-surface">
-              <div class="status-stats__value status-stats__value--small">
-                {store.systemInfo.uptime || '—'}
+              <div class="status-stats__value">
+                {animatedMaps()}
               </div>
               <div class="status-stats__label color-text-tertiary">
-                Uptime
+                Maps Hidden
               </div>
             </div>
           </div>
@@ -540,6 +544,7 @@ export function StatusTab() {
                   const caps = store.capabilities?.();
                   if (!caps) return null;
                   const features = [
+                    { key: 'vfs_driver', active: caps.vfs_driver },
                     { key: 'kstat', active: caps.susfs_kstat },
                     { key: 'path', active: caps.susfs_path },
                     { key: 'maps', active: caps.susfs_maps },

@@ -26,6 +26,7 @@ function createAppStore() {
     activeRules: 0,
     excludedUids: 0,
     hiddenPaths: 0,
+    hiddenMaps: 0,
   });
 
   const [systemInfo, setSystemInfo] = createStore<SystemInfo>({
@@ -326,6 +327,7 @@ function createAppStore() {
       activeRules: s.rule_count,
       excludedUids: s.excluded_uid_count,
       hiddenPaths: s.hidden_path_count,
+      hiddenMaps: s.hidden_maps_count ?? 0,
     });
 
     const si = data.system_info;
@@ -472,6 +474,7 @@ function createAppStore() {
         activeRules: status.rule_count,
         excludedUids: status.excluded_uid_count,
         hiddenPaths: status.hidden_path_count,
+        hiddenMaps: status.hidden_maps_count ?? 0,
       });
     }
     setSystemInfo('kernelVersion', sysInfo.kernelVersion);
@@ -1180,6 +1183,7 @@ function createAppStore() {
         activeRules: status.rule_count,
         excludedUids: status.excluded_uid_count,
         hiddenPaths: status.hidden_path_count,
+        hiddenMaps: status.hidden_maps_count ?? 0,
       });
     } catch (e) {
       console.error('[ZM-Store] loadRuntimeStatus() error:', e);

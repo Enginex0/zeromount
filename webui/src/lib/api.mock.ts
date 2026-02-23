@@ -216,6 +216,7 @@ export const MockAPI = {
       activeRules: mockRules.length,
       excludedUids: mockExcludedUids.length,
       hiddenPaths: 5,
+      hiddenMaps: 3,
     };
   },
 
@@ -284,6 +285,7 @@ export const MockAPI = {
       rule_count: mockRules.length,
       excluded_uid_count: mockExcludedUids.length,
       hidden_path_count: 5,
+      hidden_maps_count: 3,
       susfs_version: 'v2.0.0',
       active_strategy: 'Vfs',
       modules: [

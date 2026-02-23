@@ -439,6 +439,7 @@ export const api = {
       activeRules: rules.length,
       excludedUids: uids.length,
       hiddenPaths: 0,
+      hiddenMaps: 0,
     };
     console.log('[ZM-API] getStats() returning:', stats);
     return stats;

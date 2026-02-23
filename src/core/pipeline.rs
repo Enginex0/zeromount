@@ -388,7 +388,7 @@ impl MountController<Mounted> {
         info!("pipeline: finalize phase");
 
         // 1. SUSFS protections (BRENE)
-        let (hidden_paths, font_infos, emoji_applied) = self.apply_susfs_protections();
+        let (hidden_paths, hidden_maps, font_infos, emoji_applied) = self.apply_susfs_protections();
 
         // 2. Update module description with status summary
         let summary = self.build_description_summary(&font_infos);
@@ -399,6 +399,7 @@ impl MountController<Mounted> {
         // 3. Build RuntimeState and persist atomically (ME07: write tmp then rename)
         let mut runtime_state = self.build_runtime_state(&font_infos);
         runtime_state.hidden_path_count = hidden_paths;
+        runtime_state.hidden_maps_count = hidden_maps;
         runtime_state.emoji_applied = emoji_applied;
         write_status_json_atomic(&runtime_state);
 
@@ -414,10 +415,10 @@ impl MountController<Mounted> {
         })
     }
 
-    fn apply_susfs_protections(&self) -> (u32, Vec<crate::susfs::brene::FontModuleInfo>, bool) {
+    fn apply_susfs_protections(&self) -> (u32, u32, Vec<crate::susfs::brene::FontModuleInfo>, bool) {
         if !self.state.config.susfs.enabled {
             debug!("SUSFS disabled in config, skipping protections");
-            return (0, Vec::new(), false);
+            return (0, 0, Vec::new(), false);
         }
 
         match crate::susfs::SusfsClient::probe() {
@@ -442,17 +443,17 @@ impl MountController<Mounted> {
                             emoji = brene.emoji_applied,
                             "BRENE applied"
                         );
-                        (brene.paths_hidden, brene.font_modules, brene.emoji_applied)
+                        (brene.paths_hidden, brene.maps_hidden, brene.font_modules, brene.emoji_applied)
                     }
                     Err(e) => {
                         warn!("BRENE application failed (non-fatal): {e}");
-                        (0, Vec::new(), false)
+                        (0, 0, Vec::new(), false)
                     }
                 }
             }
             Err(e) => {
                 debug!("SUSFS probe failed, skipping protections: {e}");
-                (0, Vec::new(), false)
+                (0, 0, Vec::new(), false)
             }
         }
     }
@@ -584,6 +585,7 @@ impl MountController<Mounted> {
             rule_count: total_rules,
             excluded_uid_count: 0,
             hidden_path_count: 0,
+            hidden_maps_count: 0,
             susfs_version: det.capabilities.susfs_version.clone(),
             active_strategy,
             mount_source: match active_strategy {

@@ -84,6 +84,8 @@ if [ "$FRESH_INSTALL" = true ]; then
     "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
 else
     zm_print "  ✅ Existing config preserved"
+    # Merge new keys: load fills defaults for missing fields, dump writes them back
+    "$BIN" config dump > "$ZM_DATA/config.toml.tmp" 2>/dev/null && mv "$ZM_DATA/config.toml.tmp" "$ZM_DATA/config.toml"
 fi
 
 if [ "$IS_UPGRADE" = true ]; then
