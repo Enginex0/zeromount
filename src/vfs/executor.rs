@@ -49,20 +49,6 @@ impl VfsExecutor {
         let total_failed: u32 = results.iter().map(|r| r.rules_failed).sum();
         info!(applied = total_applied, failed = total_failed, "rule injection complete");
 
-        // Phase 2: SUSFS protections (if available)
-        if let Some(ref susfs) = self.susfs {
-            if susfs.is_available() {
-                info!("phase 2: applying SUSFS protections");
-                for module in modules {
-                    self.apply_susfs_protections(susfs, module);
-                }
-            } else {
-                debug!("phase 2: SUSFS not available, skipping protections");
-            }
-        } else {
-            debug!("phase 2: no SUSFS client, skipping protections");
-        }
-
         // Phase 3: Enable engine
         info!("phase 3: enabling VFS engine");
         self.driver.enable().context("failed to enable VFS engine")?;
@@ -118,6 +104,13 @@ impl VfsExecutor {
 
             let is_dir = file.file_type == ModuleFileType::Directory;
 
+            // Directory rules redirect opendir() to the module's directory, hiding
+            // stock content (GPU drivers, linker libs). The kernel's auto_inject_parent()
+            // handles directory visibility in readdir via dirs_ht — no rule needed.
+            if is_dir {
+                continue;
+            }
+
             // source: the module's file on disk
             let source = module.path.join(&file.relative_path);
 
@@ -144,7 +137,7 @@ impl VfsExecutor {
                 }
             }
 
-            match self.driver.add_rule(&source, &target, is_dir) {
+            match self.driver.add_rule(&target, &source, is_dir) {
                 Ok(()) => {
                     applied += 1;
                     mount_paths.push(target.display().to_string());
@@ -289,15 +282,32 @@ pub fn apply_module_susfs_protections(
     }
 }
 
-/// Resolve a module's relative path (e.g. system/bin/foo) to the absolute
-/// filesystem target (e.g. /system/bin/foo).
-///
-/// The relative_path from ScannedModule starts with the partition name
-/// (system, vendor, etc.), so we prepend "/" to get the real path.
+// On SAR (System-as-Root) Android, /system/vendor is a symlink to /vendor.
+// VFS rules targeting /system/vendor/... create dirs_ht entries sharing inodes
+// with /vendor/..., corrupting directory lookups for GPU drivers and other
+// critical partition content. Canonicalize these alias paths upfront.
+const SAR_ALIAS_PARTITIONS: &[&str] = &[
+    "system/vendor",
+    "system/product",
+    "system/system_ext",
+    "system/odm",
+];
+
+/// Resolve a module's relative path to the absolute filesystem target,
+/// canonicalizing SAR alias paths (system/vendor → /vendor, etc.).
 pub(crate) fn resolve_target_path(relative: &Path) -> Option<PathBuf> {
     let s = relative.to_str()?;
     if s.is_empty() {
         return None;
+    }
+    for alias in SAR_ALIAS_PARTITIONS {
+        let canonical = &alias["system/".len()..];
+        if s == *alias {
+            return Some(PathBuf::from(format!("/{canonical}")));
+        }
+        if let Some(rest) = s.strip_prefix(alias).and_then(|r| r.strip_prefix('/')) {
+            return Some(PathBuf::from(format!("/{canonical}/{rest}")));
+        }
     }
     Some(PathBuf::from(format!("/{s}")))
 }
@@ -324,6 +334,52 @@ mod tests {
     fn resolve_target_empty_returns_none() {
         let rel = PathBuf::from("");
         assert_eq!(resolve_target_path(&rel), None);
+    }
+
+    #[test]
+    fn resolve_target_sar_system_vendor_file() {
+        let rel = PathBuf::from("system/vendor/lib64/soundfx/libv4a_fx.so");
+        assert_eq!(
+            resolve_target_path(&rel),
+            Some(PathBuf::from("/vendor/lib64/soundfx/libv4a_fx.so"))
+        );
+    }
+
+    #[test]
+    fn resolve_target_sar_system_vendor_bare_dir() {
+        let rel = PathBuf::from("system/vendor");
+        assert_eq!(resolve_target_path(&rel), Some(PathBuf::from("/vendor")));
+    }
+
+    #[test]
+    fn resolve_target_sar_system_product() {
+        let rel = PathBuf::from("system/product/app/SomeApp.apk");
+        assert_eq!(
+            resolve_target_path(&rel),
+            Some(PathBuf::from("/product/app/SomeApp.apk"))
+        );
+    }
+
+    #[test]
+    fn resolve_target_sar_system_ext() {
+        let rel = PathBuf::from("system/system_ext/lib/libfoo.so");
+        assert_eq!(
+            resolve_target_path(&rel),
+            Some(PathBuf::from("/system_ext/lib/libfoo.so"))
+        );
+    }
+
+    #[test]
+    fn resolve_target_non_sar_system_paths_unaffected() {
+        // system/bin, system/app, system/etc etc. must remain under /system/
+        assert_eq!(
+            resolve_target_path(&PathBuf::from("system/bin/ls")),
+            Some(PathBuf::from("/system/bin/ls"))
+        );
+        assert_eq!(
+            resolve_target_path(&PathBuf::from("system/etc/audio_effects.conf")),
+            Some(PathBuf::from("/system/etc/audio_effects.conf"))
+        );
     }
 
     #[test]

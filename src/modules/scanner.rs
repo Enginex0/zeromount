@@ -163,7 +163,9 @@ fn walk_module_tree(
 
         // Recurse into directories (but not opaque ones -- their contents
         // are irrelevant since the entire subtree is replaced)
-        if path.is_dir() && file_type != ModuleFileType::OpaqueDir {
+        // Never recurse into symlinks — following them outside the module dir
+        // creates self-circular VFS rules (e.g. system/vendor -> /vendor).
+        if path.is_dir() && file_type != ModuleFileType::OpaqueDir && file_type != ModuleFileType::Symlink {
             walk_module_tree(&path, module_root, module_id, files)?;
         }
     }

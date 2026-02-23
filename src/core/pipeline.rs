@@ -234,20 +234,6 @@ impl MountController<Planned> {
         // NOTE: gap_filler and try_umount were removed — both created
         // unhidden mounts visible in app namespaces that NativeTest detects.
 
-        // Per-module SUSFS kstat spoofing for non-VFS strategies (font kstat, etc.)
-        let has_non_vfs = results.iter().any(|r| {
-            r.success && !matches!(r.strategy_used, MountStrategy::Vfs | MountStrategy::Font)
-        });
-        if has_non_vfs && config.susfs.enabled {
-            if let Ok(client) = crate::susfs::SusfsClient::probe() {
-                for module in &self.state.modules {
-                    crate::vfs::executor::apply_module_susfs_protections(
-                        &client, module, Some(&config.susfs), false, true,
-                    );
-                }
-            }
-        }
-
         Ok(MountController {
             state: Mounted {
                 config: self.state.config,
