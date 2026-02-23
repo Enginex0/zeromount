@@ -112,6 +112,8 @@ function createAppStore() {
     hide_ksu_loops: true,
     prop_spoofing: true,
     auto_hide_injections: true,
+    kernel_umount: true,
+    verified_boot_hash: '',
   };
 
   const defaultSusfs: SusfsSettings = {
@@ -339,7 +341,11 @@ function createAppStore() {
       for (const key of Object.keys(cfg.brene) as (keyof BreneSettings)[]) {
         if (key in cfg.brene) {
           const v = cfg.brene[key];
-          brene[key] = typeof v === 'boolean' ? v : String(v) === 'true';
+          if (key === 'verified_boot_hash') {
+            brene.verified_boot_hash = String(v ?? '');
+          } else {
+            (brene as any)[key] = typeof v === 'boolean' ? v : String(v) === 'true';
+          }
         }
       }
       setSettings('brene', prev => ({ ...prev, ...brene }));
@@ -693,6 +699,7 @@ function createAppStore() {
       'auto_hide_sdcard_data', 'avc_log_spoofing', 'susfs_log',
       'hide_sus_mounts', 'emulate_vold_app_data', 'force_hide_lsposed',
       'spoof_cmdline', 'hide_ksu_loops', 'prop_spoofing', 'auto_hide_injections',
+      'kernel_umount',
     ];
 
     if (dump?.brene && dump?.uname) {
@@ -700,8 +707,11 @@ function createAppStore() {
       for (const key of breneKeys) {
         if (key in dump.brene) {
           const v = dump.brene[key];
-          brene[key] = typeof v === 'boolean' ? v : String(v) === 'true';
+          (brene as any)[key] = typeof v === 'boolean' ? v : String(v) === 'true';
         }
+      }
+      if (dump.brene.verified_boot_hash != null) {
+        brene.verified_boot_hash = String(dump.brene.verified_boot_hash);
       }
       setSettings('brene', prev => ({ ...prev, ...brene }));
 
@@ -716,6 +726,7 @@ function createAppStore() {
     // Fallback: individual configGet calls
     const results = await Promise.allSettled([
       ...breneKeys.map(k => api.configGet(`brene.${k}`)),
+      api.configGet('brene.verified_boot_hash'),
       api.configGet('uname.mode'),
       api.configGet('uname.release'),
       api.configGet('uname.version'),
@@ -724,14 +735,18 @@ function createAppStore() {
     breneKeys.forEach((key, i) => {
       const r = results[i];
       if (r.status === 'fulfilled' && r.value !== null) {
-        brene[key] = r.value === 'true';
+        (brene as any)[key] = r.value === 'true';
       }
     });
+    const vbhResult = results[breneKeys.length];
+    if (vbhResult.status === 'fulfilled' && vbhResult.value !== null) {
+      brene.verified_boot_hash = vbhResult.value;
+    }
     setSettings('brene', prev => ({ ...prev, ...brene }));
 
-    const unameMode = results[breneKeys.length];
-    const unameRelease = results[breneKeys.length + 1];
-    const unameVersion = results[breneKeys.length + 2];
+    const unameMode = results[breneKeys.length + 1];
+    const unameRelease = results[breneKeys.length + 2];
+    const unameVersion = results[breneKeys.length + 3];
     const uname: Partial<UnameSettings> = {};
     if (unameMode.status === 'fulfilled' && unameMode.value !== null) {
       uname.mode = unameMode.value as UnameMode;
@@ -810,6 +825,19 @@ function createAppStore() {
           api.writeSusfsConfigVar(varName, old ? '1' : '0').catch(re => console.warn('[ZM-Store] rollback config.sh failed:', re));
         }
       }
+    }
+  };
+
+  const setBreneField = async (key: 'verified_boot_hash', value: string) => {
+    const prev = settings.brene[key];
+    setSettings('brene', key, value);
+    try {
+      await api.configSet(`brene.${key}`, value);
+      pushActivity('setting_changed', `${key} → ${value || '(empty)'}`);
+    } catch (e) {
+      console.error('[ZM-Store] setBreneField() error:', e);
+      showToast(`Failed to save ${key}`, 'error');
+      setSettings('brene', key, prev);
     }
   };
 
@@ -1388,6 +1416,7 @@ function createAppStore() {
     loadRuntimeStatus,
     loadBreneSettings,
     setBreneToggle,
+    setBreneField,
     setSusfsToggle,
     setPerfToggle,
     setEmojiToggle,

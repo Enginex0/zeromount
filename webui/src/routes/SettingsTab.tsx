@@ -33,6 +33,7 @@ export function SettingsTab() {
   const [showOverlaySheet, setShowOverlaySheet] = createSignal(false);
   const [showStagingSheet, setShowStagingSheet] = createSignal(false);
   const [glassOpen, setGlassOpen] = createSignal(false);
+  const [showVbh, setShowVbh] = createSignal(false);
   const selectedAccent = () => store.settings.accentColor;
 
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'auto' | 'amoled') => {
@@ -522,15 +523,24 @@ export function SettingsTab() {
               <path d="M7 10l5 5 5-5z"/>
             </svg>
             <span>Advanced Settings</span>
-            <span class="settings__advanced-badge">15</span>
+            <span class="settings__advanced-badge">16</span>
           </button>
 
           <Show when={showAdvanced()}>
             <div class="settings__advanced-content">
               <CollapsibleSubgroup
                 label="SUSFS Control"
-                hiddenCount={6}
+                hiddenCount={7}
                 defaultItems={
+                  <div class="settings__item">
+                    <div class="settings__item-content">
+                      <div class="settings__item-label">Kernel Umount</div>
+                      <div class="settings__item-desc">KSU automatic overlay umount for app namespaces</div>
+                    </div>
+                    <Toggle checked={store.settings.brene.kernel_umount} onChange={(v) => handleBreneToggle('kernel_umount', v)} />
+                  </div>
+                }
+                expandedItems={<>
                   <div class="settings__item">
                     <div class="settings__item-content">
                       <div class="settings__item-label">Emulate Vold App Data</div>
@@ -538,8 +548,6 @@ export function SettingsTab() {
                     </div>
                     <Toggle checked={store.settings.brene.emulate_vold_app_data} onChange={(v) => handleBreneToggle('emulate_vold_app_data', v)} />
                   </div>
-                }
-                expandedItems={<>
                   <div class="settings__item">
                     <div class="settings__item-content">
                       <div class="settings__item-label">Force Hide LSPosed</div>
@@ -710,6 +718,26 @@ export function SettingsTab() {
           </div>
           <Toggle checked={store.settings.brene.prop_spoofing} onChange={(v) => handleBreneToggle('prop_spoofing', v)} />
         </div>
+        <Show when={store.settings.brene.prop_spoofing}>
+          <div class="settings__glass-row" onClick={() => setShowVbh(!showVbh())}>
+            <div class="settings__item-content">
+              <div class="settings__item-label">Verified Boot Hash</div>
+              <div class="settings__item-desc">Stock vbmeta digest for Play Integrity</div>
+            </div>
+            <svg class={`settings__glass-chevron${showVbh() ? ' settings__glass-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </div>
+          <Show when={showVbh()}>
+            <div class="settings__glass-slider">
+              <Input
+                value={store.settings.brene.verified_boot_hash}
+                placeholder="SHA256 hex digest (64 chars)"
+                onBlur={(e) => store.setBreneField('verified_boot_hash', e.currentTarget.value)}
+              />
+            </div>
+          </Show>
+        </Show>
         <div class="settings__item">
           <div class="settings__item-content">
             <div class="settings__item-label">Hide USB Debugging</div>
