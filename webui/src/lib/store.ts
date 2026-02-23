@@ -111,6 +111,7 @@ function createAppStore() {
     spoof_cmdline: false,
     hide_ksu_loops: true,
     prop_spoofing: true,
+    auto_hide_injections: true,
   };
 
   const defaultSusfs: SusfsSettings = {
@@ -691,7 +692,7 @@ function createAppStore() {
       'auto_hide_rooted_folders', 'auto_hide_recovery', 'auto_hide_tmp',
       'auto_hide_sdcard_data', 'avc_log_spoofing', 'susfs_log',
       'hide_sus_mounts', 'emulate_vold_app_data', 'force_hide_lsposed',
-      'spoof_cmdline', 'hide_ksu_loops', 'prop_spoofing',
+      'spoof_cmdline', 'hide_ksu_loops', 'prop_spoofing', 'auto_hide_injections',
     ];
 
     if (dump?.brene && dump?.uname) {

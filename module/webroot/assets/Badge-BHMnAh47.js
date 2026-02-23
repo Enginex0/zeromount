@@ -1,1 +1,0 @@
-import{l as i,i as c,e as l,f as o,t as d}from"./index-Bcgo_tnz.js";var m=d("<span>");function f(s){const[a]=i(s,["variant","size","children"]),t=()=>a.variant||"default",r=()=>a.size||"medium",n=()=>`badge badge--${r()} badge--${t()}`;return(()=>{var e=m();return c(e,()=>a.children),l(()=>o(e,n())),e})()}export{f as B};

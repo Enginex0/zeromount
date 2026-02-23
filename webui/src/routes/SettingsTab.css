@@ -399,16 +399,6 @@
   }
 }
 
-.settings__group-label {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-top: 20px;
-  margin-bottom: 8px;
-}
-
 .settings__prop-note {
   margin-bottom: 16px;
   font-style: italic;

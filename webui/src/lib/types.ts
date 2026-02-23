@@ -124,6 +124,7 @@ export interface BreneSettings {
   spoof_cmdline: boolean;
   hide_ksu_loops: boolean;
   prop_spoofing: boolean;
+  auto_hide_injections: boolean;
 }
 
 export interface SusfsSettings {
