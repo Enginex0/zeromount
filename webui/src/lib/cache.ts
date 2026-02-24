@@ -76,9 +76,7 @@ export function writeCache(state: HydratableState): void {
       bridgeValues: state.bridgeValues,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(serialized));
-    console.log('[ZM-Cache] wrote cache at', new Date(serialized._ts).toISOString());
   } catch (e) {
-    console.warn('[ZM-Cache] writeCache failed:', e);
   }
 }
 
@@ -93,7 +91,6 @@ export function readCache(): HydratableState | null {
       return null;
     }
 
-    console.log('[ZM-Cache] hydrating from cache written at', new Date(cached._ts).toISOString());
     return {
       scenario: cached.scenario,
       engineActive: cached.engineActive,
@@ -122,7 +119,6 @@ export function readCache(): HydratableState | null {
       bridgeValues: cached.bridgeValues ?? null,
     };
   } catch (e) {
-    console.warn('[ZM-Cache] readCache failed:', e);
     localStorage.removeItem(CACHE_KEY);
     return null;
   }

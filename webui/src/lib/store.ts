@@ -7,7 +7,6 @@ import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accent
 import { readCache, writeCache, type HydratableState } from './cache';
 
 function createAppStore() {
-  console.log('[ZM-Store] createAppStore() initializing...');
   const [activeTab, setActiveTab] = createSignal<Tab>('status');
 
   const [engineActive, setEngineActive] = createSignal(false);
@@ -268,7 +267,6 @@ function createAppStore() {
     const cached = readCache();
     if (!cached) return false;
 
-    console.log('[ZM-Store] hydrating from cache');
     setScenario(cached.scenario);
     setEngineActive(cached.engineActive);
     setCapabilities(cached.capabilities);
@@ -463,7 +461,6 @@ function createAppStore() {
   };
 
   const loadInitialDataLegacy = async () => {
-    console.log('[ZM-Store] loadInitialDataLegacy() fallback');
 
     const criticalResults = await Promise.allSettled([
       api.getRuntimeStatus(),
@@ -553,7 +550,6 @@ function createAppStore() {
   };
 
   const loadInitialData = async () => {
-    console.log('[ZM-Store] loadInitialData() starting...');
     setLoading({ status: true, rules: true, activity: true, modules: true });
 
     hydrateFromCache();
@@ -574,9 +570,7 @@ function createAppStore() {
 
       writeCache(buildCacheState());
       setLastApiError(null);
-      console.log('[ZM-Store] loadInitialData() complete');
     } catch (err) {
-      console.error('[ZM-Store] loadInitialData() error:', err);
       setLastApiError({ operation: 'loadInitialData', error: err, timestamp: new Date() });
       showToast('Failed to load data', 'error');
     } finally {
@@ -588,16 +582,13 @@ function createAppStore() {
     if (loading.engine) return;
 
     const newState = !engineActive();
-    console.log('[ZM-Store] toggleEngine() called, newState:', newState);
     setEngineActive(newState);
     pushActivity(newState ? 'engine_enabled' : 'engine_disabled', newState ? 'Engine → ON' : 'Engine → OFF');
     setLoading('engine', true);
     try {
       await api.toggleEngine(newState);
-      console.log('[ZM-Store] toggleEngine() success, engine now:', newState);
       showToast(newState ? 'Engine activated' : 'Engine deactivated', 'success');
     } catch (err) {
-      console.error('[ZM-Store] toggleEngine() error:', err);
       setEngineActive(!newState);
       showToast('Failed to toggle engine', 'error');
     } finally {
@@ -606,14 +597,11 @@ function createAppStore() {
   };
 
   const excludeUid = async (uid: number, packageName: string, appName: string) => {
-    console.log('[ZM-Store] excludeUid() called:', { uid, packageName, appName });
     if (uid <= 0) {
-      console.warn('[ZM-Store] Cannot exclude invalid UID:', uid);
       showToast('Cannot exclude app with unknown UID', 'error');
       return null;
     }
     if (pendingUidOperations.has(uid)) {
-      console.log('[ZM-Store] Operation pending for UID:', uid);
       return null;
     }
     pendingUidOperations.add(uid);
@@ -622,12 +610,10 @@ function createAppStore() {
       const excluded = await api.excludeUid(uid, packageName, appName);
       setExcludedUids(prev => [...prev, excluded]);
       setStats('excludedUids', s => s + 1);
-      console.log('[ZM-Store] excludeUid() success');
       pushActivity('uid_excluded', `${appName} (UID ${uid})`);
       showToast(`Excluded ${appName}`, 'success');
       return excluded;
     } catch (err) {
-      console.error('[ZM-Store] excludeUid() error:', err);
       showToast('Failed to exclude UID', 'error');
       throw err;
     } finally {
@@ -637,14 +623,11 @@ function createAppStore() {
   };
 
   const includeUid = async (uid: number) => {
-    console.log('[ZM-Store] includeUid() called:', uid);
     if (uid <= 0) {
-      console.warn('[ZM-Store] Cannot include invalid UID:', uid);
       showToast('Cannot include app with unknown UID', 'error');
       return;
     }
     if (pendingUidOperations.has(uid)) {
-      console.log('[ZM-Store] Operation pending for UID:', uid);
       return;
     }
     pendingUidOperations.add(uid);
@@ -653,11 +636,9 @@ function createAppStore() {
       await api.includeUid(uid);
       setExcludedUids(prev => prev.filter(u => u.uid !== uid));
       setStats('excludedUids', s => s - 1);
-      console.log('[ZM-Store] includeUid() success');
       pushActivity('uid_included', `UID ${uid} included`);
       showToast('UID included', 'success');
     } catch (err) {
-      console.error('[ZM-Store] includeUid() error:', err);
       showToast('Failed to include UID', 'error');
     } finally {
       pendingUidOperations.delete(uid);
@@ -666,17 +647,14 @@ function createAppStore() {
   };
 
   const clearAllRules = async () => {
-    console.log('[ZM-Store] clearAllRules() called');
     setLoading('rules', true);
     try {
       await api.clearAllRules();
       setRules([]);
       setStats('activeRules', 0);
-      console.log('[ZM-Store] clearAllRules() success');
       pushActivity('rule_removed', 'All rules cleared');
       showToast('All rules cleared', 'success');
     } catch (err) {
-      console.error('[ZM-Store] clearAllRules() error:', err);
       const msg = String(err).includes('errno') || String(err).includes('No such')
         ? 'ZeroMount VFS unavailable' : 'Failed to clear rules';
       showToast(msg, 'error');
@@ -686,7 +664,6 @@ function createAppStore() {
   };
 
   const updateSettings = (updates: Partial<Settings>) => {
-    console.log('[ZM-Store] updateSettings() called:', updates);
     setSettings(updates);
     if (updates.theme) pushActivity('theme_changed', `Theme → ${updates.theme}`);
     if (updates.accentColor) pushActivity('theme_changed', `Accent → ${accentNames[updates.accentColor] || updates.accentColor}`);
@@ -700,7 +677,6 @@ function createAppStore() {
         setSettings({ accentColor: systemColor });
       }
     } catch (e) {
-      console.error('[ZM-Store] fetchSystemColor() error:', e);
     }
   };
 
@@ -710,7 +686,6 @@ function createAppStore() {
       await api.setVerboseLogging(enabled);
       pushActivity('setting_changed', `Verbose logging → ${enabled ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setVerboseLogging() error:', e);
       setSettings({ verboseLogging: !enabled });
       showToast('Failed to set verbose logging', 'error');
     }
@@ -809,20 +784,34 @@ function createAppStore() {
 
       pushActivity('brene_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setBreneToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('brene', key, !value);
       const old = !value;
-      api.configSet(`brene.${key}`, String(old)).catch(re => console.warn('[ZM-Store] rollback configSet failed:', re));
+      api.configSet(`brene.${key}`, String(old)).catch(() => {});
       if (kernelSet) {
         const rollbackKernel = key === 'avc_log_spoofing' ? api.setSusfsAvcSpoofing(old)
           : key === 'susfs_log' ? api.setSusfsLog(old)
           : key === 'hide_sus_mounts' ? api.setSusfsHideMounts(old)
           : key === 'kernel_umount' ? api.setKernelUmount(old)
           : null;
-        rollbackKernel?.catch(re => console.warn('[ZM-Store] rollback kernel call failed:', re));
+        rollbackKernel?.catch(() => {});
       }
-      api.bridgeWrite(`brene.${key}`, String(old)).catch(re => console.warn('[ZM-Store] rollback bridge write failed:', re));
+      api.bridgeWrite(`brene.${key}`, String(old)).catch(() => {});
+      if (configVarSet) {
+        const varMap: Record<string, string> = {
+          avc_log_spoofing: 'avc_log_spoofing',
+          susfs_log: 'susfs_log',
+          hide_sus_mounts: 'hide_sus_mnts_for_all_or_non_su_procs',
+          emulate_vold_app_data: 'emulate_vold_app_data',
+          force_hide_lsposed: 'force_hide_lsposed',
+          spoof_cmdline: 'spoof_cmdline',
+          hide_ksu_loops: 'hide_loops',
+        };
+        const varName = varMap[key];
+        if (varName) {
+          api.writeSusfsConfigVar(varName, old ? '1' : '0').catch(() => {});
+        }
+      }
     }
   };
 
@@ -833,7 +822,6 @@ function createAppStore() {
       await api.configSet(`brene.${key}`, value);
       pushActivity('setting_changed', `${key} → ${value || '(empty)'}`);
     } catch (e) {
-      console.error('[ZM-Store] setBreneField() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('brene', key, prev);
     }
@@ -845,7 +833,6 @@ function createAppStore() {
       await api.configSet(`susfs.${key}`, String(value));
       pushActivity('susfs_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setSusfsToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('susfs', key, !value);
     }
@@ -857,7 +844,6 @@ function createAppStore() {
       await api.configSet(`perf.${key}`, String(value));
       pushActivity('setting_changed', `perf.${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setPerfToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('perf', key, !value);
     }
@@ -869,7 +855,6 @@ function createAppStore() {
       await api.configSet(`emoji.${key}`, String(value));
       pushActivity('setting_changed', `emoji.${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setEmojiToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('emoji', key, !value);
     }
@@ -881,7 +866,6 @@ function createAppStore() {
       await api.configSet(`adb.${key}`, String(value));
       pushActivity('setting_changed', `adb.${key} → ${value ? 'ON' : 'OFF'}`);
     } catch (e) {
-      console.error('[ZM-Store] setAdbToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('adb', key, !value);
     }
@@ -894,7 +878,6 @@ function createAppStore() {
       await api.configSet('uname.mode', mode);
       pushActivity('setting_changed', `Uname mode → ${mode}`);
     } catch (e) {
-      console.error('[ZM-Store] setUnameMode() error:', e);
       showToast('Failed to save uname mode', 'error');
       setSettings('uname', 'mode', prev);
     }
@@ -907,7 +890,6 @@ function createAppStore() {
       await api.configSet(`uname.${field}`, value);
       pushActivity('setting_changed', `Uname ${field} → ${value || '(empty)'}`);
     } catch (e) {
-      console.error('[ZM-Store] setUnameField() error:', e);
       showToast(`Failed to save uname ${field}`, 'error');
       setSettings('uname', field, prev);
     }
@@ -983,7 +965,6 @@ function createAppStore() {
   };
 
   const loadMountSettings = async (dump?: Record<string, any> | null) => {
-    console.log('[ZM-Store] loadMountSettings() starting...');
 
     if (dump?.mount) {
       const m = dump.mount;
@@ -995,7 +976,6 @@ function createAppStore() {
       if (m.mount_source != null) mount.mount_source = String(m.mount_source);
       if (m.overlay_source != null) mount.overlay_source = String(m.overlay_source);
       setSettings('mount', prev => ({ ...prev, ...mount }));
-      console.log('[ZM-Store] loadMountSettings() loaded from dump:', mount);
       return;
     }
 
@@ -1028,7 +1008,6 @@ function createAppStore() {
       mount.overlay_source = overlaySourceResult.value;
     }
     setSettings('mount', prev => ({ ...prev, ...mount }));
-    console.log('[ZM-Store] loadMountSettings() loaded:', mount);
   };
 
   const loadVerboseState = async (dump?: Record<string, any> | null) => {
@@ -1069,30 +1048,24 @@ function createAppStore() {
   }
 
   const setMountStorageMode = async (mode: StorageMode) => {
-    console.log('[ZM-Store] setMountStorageMode() called:', mode);
     const prev = settings.mount.storage_mode;
     setSettings('mount', 'storage_mode', mode);
     try {
       await api.configSet('mount.storage_mode', mode);
       pushActivity('setting_changed', `Storage mode → ${mode}`);
-      console.log('[ZM-Store] setMountStorageMode() saved:', mode);
     } catch (e) {
-      console.error('[ZM-Store] setMountStorageMode() error:', e);
       showToast('Failed to save storage mode', 'error');
       setSettings('mount', 'storage_mode', prev);
     }
   };
 
   const setMountToggle = async (key: 'overlay_preferred' | 'magic_mount_fallback' | 'random_mount_paths', value: boolean) => {
-    console.log('[ZM-Store] setMountToggle() called:', key, value);
     const prev = settings.mount[key];
     setSettings('mount', key, value);
     try {
       await api.configSet(`mount.${key}`, String(value));
       pushActivity('setting_changed', `${key} → ${value ? 'ON' : 'OFF'}`);
-      console.log('[ZM-Store] setMountToggle() saved:', key, value);
     } catch (e) {
-      console.error('[ZM-Store] setMountToggle() error:', e);
       showToast(`Failed to save ${key}`, 'error');
       setSettings('mount', key, prev);
     }
@@ -1123,7 +1096,6 @@ function createAppStore() {
   };
 
   const setMountStrategy = async (strategy: MountStrategy) => {
-    console.log('[ZM-Store] setMountStrategy() called:', strategy);
     const prevOverlay = settings.mount.overlay_preferred;
     const prevMagic = settings.mount.magic_mount_fallback;
 
@@ -1144,9 +1116,7 @@ function createAppStore() {
       ]);
       pushActivity('mount_strategy_changed', `Strategy → ${strategy}`);
       showToast('Mount strategy changed — reboot to apply', 'warning');
-      console.log('[ZM-Store] setMountStrategy() saved:', strategy, '→ overlay_preferred:', newOverlay, 'magic_mount_fallback:', newMagic);
     } catch (e) {
-      console.error('[ZM-Store] setMountStrategy() error:', e);
       showToast('Failed to save mount strategy', 'error');
       setSettings('mount', 'overlay_preferred', prevOverlay);
       setSettings('mount', 'magic_mount_fallback', prevMagic);
@@ -1203,7 +1173,6 @@ function createAppStore() {
         hiddenMaps: status.hidden_maps_count ?? 0,
       });
     } catch (e) {
-      console.error('[ZM-Store] loadRuntimeStatus() error:', e);
       setLastApiError({ operation: 'loadRuntimeStatus', error: e, timestamp: new Date() });
     }
   };
@@ -1286,7 +1255,6 @@ function createAppStore() {
             const currentCount = new Set([...userPkgs, ...systemPkgs]).size;
             const lastCount = lastKnownPackages.size;
             if (currentCount !== lastCount) {
-              console.log('[ZM-Store] Package count changed, refreshing');
               await refreshApps();
             }
           }
@@ -1301,12 +1269,10 @@ function createAppStore() {
 
         // Trigger changed - daemon signaled a refresh
         if (newTrigger !== lastTriggerTimestamp) {
-          console.log('[ZM-Store] Trigger file changed, refreshing app list');
           lastTriggerTimestamp = newTrigger;
           await refreshApps();
         }
       } catch (e) {
-        console.error('[ZM-Store] Polling error:', e);
       }
     }, 2000);
   };
@@ -1321,29 +1287,24 @@ function createAppStore() {
 
   const loadInstalledApps = async () => {
     if (appFetchInProgress) {
-      console.log('[ZM-Store] App fetch already in progress, skipping');
       return;
     }
     appFetchInProgress = true;
-    console.log('[ZM-Store] loadInstalledApps() called');
     setLoading('apps', true);
     try {
       if (shouldUseMock()) {
         const mockApps = await api.getInstalledApps();
         setInstalledApps(mockApps);
-        console.log('[ZM-Store] loadInstalledApps() loaded', mockApps.length, 'mock apps');
         return;
       }
 
       const apps = await fetchAppsViaKsuApi();
       setInstalledApps(apps);
-      console.log('[ZM-Store] loadInstalledApps() loaded', apps.length, 'apps via KSU API');
 
       // Initialize lastKnownPackages for change detection polling
       lastKnownPackages = new Set(apps.map(a => a.packageName));
       startTriggerPolling();
     } catch (err) {
-      console.error('[ZM-Store] loadInstalledApps() error:', err);
       showToast('Failed to load apps', 'error');
     } finally {
       appFetchInProgress = false;
@@ -1352,14 +1313,11 @@ function createAppStore() {
   };
 
   const scanKsuModules = async () => {
-    console.log('[ZM-Store] scanKsuModules() called');
     setLoading('modules', true);
     try {
       const mods = await api.scanKsuModules();
       setKsuModules(mods);
-      console.log('[ZM-Store] scanKsuModules() loaded', mods.length, 'modules');
     } catch (err) {
-      console.error('[ZM-Store] scanKsuModules() error:', err);
       showToast('Failed to scan modules', 'error');
     } finally {
       setLoading('modules', false);
@@ -1367,36 +1325,30 @@ function createAppStore() {
   };
 
   const loadKsuModule = async (moduleName: string, modulePath: string) => {
-    console.log('[ZM-Store] loadKsuModule() called:', { moduleName, modulePath });
     try {
       const count = await api.loadKsuModule(moduleName, modulePath);
       setKsuModules(prev => prev.map(m =>
         m.path === modulePath ? { ...m, isLoaded: true } : m
       ));
       setStats('activeRules', s => s + count);
-      console.log('[ZM-Store] loadKsuModule() success, added', count, 'rules');
       showToast(`Loaded ${moduleName} (${count} rules)`, 'success');
       return count;
     } catch (err) {
-      console.error('[ZM-Store] loadKsuModule() error:', err);
       showToast(`Failed to load ${moduleName}`, 'error');
       throw err;
     }
   };
 
   const unloadKsuModule = async (moduleName: string, modulePath: string) => {
-    console.log('[ZM-Store] unloadKsuModule() called:', { moduleName, modulePath });
     try {
       const count = await api.unloadKsuModule(moduleName, modulePath);
       setKsuModules(prev => prev.map(m =>
         m.path === modulePath ? { ...m, isLoaded: false } : m
       ));
       setStats('activeRules', s => Math.max(0, s - count));
-      console.log('[ZM-Store] unloadKsuModule() success, removed', count, 'rules');
       showToast(`Unloaded ${moduleName} (${count} rules)`, 'success');
       return count;
     } catch (err) {
-      console.error('[ZM-Store] unloadKsuModule() error:', err);
       showToast(`Failed to unload ${moduleName}`, 'error');
       throw err;
     }
@@ -1472,6 +1424,4 @@ function createAppStore() {
   };
 }
 
-console.log('[ZM-Store] Creating store root...');
 export const store = createRoot(createAppStore);
-console.log('[ZM-Store] Store created successfully');

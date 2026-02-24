@@ -60,13 +60,6 @@ impl StorageHandle {
         self.base_path.join(module_id).join(partition)
     }
 
-    /// Keep staging alive — overlay lowerdirs and magic skeleton bind mounts
-    /// reference data inside this tmpfs for the lifetime of the mounts.
-    #[allow(dead_code)]
-    pub fn suppress_cleanup(&mut self) {
-        self.cleaned_up = true;
-    }
-
     /// Lazy-unmount staging: disappears from mountinfo, kernel keeps inodes
     /// alive via overlay/bind mount references. Matches Mountify's approach.
     pub fn detach_staging(&mut self) {
@@ -263,15 +256,6 @@ fn try_mode_ext4(base_path: &Path, overlay_source: &str) -> Option<StorageHandle
             None
         }
     }
-}
-
-/// Explicitly clean up storage. Used by Drop; overlay/magic callers
-/// use suppress_cleanup() instead to keep staging alive.
-#[allow(dead_code)]
-pub fn cleanup_storage(handle: &mut StorageHandle) -> Result<()> {
-    cleanup_storage_inner(&handle.base_path, handle.mode, handle.apex_mounts.as_ref())?;
-    handle.cleaned_up = true;
-    Ok(())
 }
 
 fn cleanup_storage_inner(base_path: &Path, _mode: StorageMode, apex_mounts: Option<&(PathBuf, PathBuf)>) -> Result<()> {

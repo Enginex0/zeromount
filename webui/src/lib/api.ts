@@ -19,7 +19,6 @@ export function shouldUseMock(): boolean {
 
 
 function parseRulesOutput(stdout: string): VfsRule[] {
-  console.log('[ZM-API] parseRulesOutput() input:', stdout?.slice(0, 200));
   const lines = stdout.trim().split('\n').filter(line => line.trim());
   // Kernel outputs: real_path->virtual_path (zeromount-core.patch:1021)
   // source = real_path (module file providing content)
@@ -36,7 +35,6 @@ function parseRulesOutput(stdout: string): VfsRule[] {
       createdAt: new Date(),
     };
   });
-  console.log('[ZM-API] parseRulesOutput() parsed', rules.length, 'rules');
   return rules;
 }
 
@@ -58,28 +56,21 @@ function withMetaLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function parseExclusionFiles(): Promise<ExcludedUid[]> {
-  console.log('[ZM-API] parseExclusionFiles() called');
   try {
     const { errno: listErr, stdout: listOut } = await ksuExec(`cat "${PATHS.EXCLUSION_FILE}"`);
-    console.log('[ZM-API] parseExclusionFiles() list result:', { errno: listErr, stdout: listOut?.slice(0, 100) });
     if (listErr !== 0 || !listOut.trim()) {
-      console.log('[ZM-API] parseExclusionFiles() no exclusions found');
       return [];
     }
 
     const uids = listOut.trim().split('\n').map(line => parseInt(line.trim(), 10)).filter(uid => !isNaN(uid));
-    console.log('[ZM-API] parseExclusionFiles() parsed UIDs:', uids);
 
     let meta: ExclusionMeta = {};
     try {
       const { errno: metaErr, stdout: metaOut } = await ksuExec(`cat "${PATHS.EXCLUSION_META}"`);
-      console.log('[ZM-API] parseExclusionFiles() meta result:', { errno: metaErr, stdout: metaOut?.slice(0, 100) });
       if (metaErr === 0 && metaOut.trim()) {
         meta = JSON.parse(metaOut);
-        console.log('[ZM-API] parseExclusionFiles() parsed meta for', Object.keys(meta).length, 'UIDs');
       }
     } catch (e) {
-      console.log('[ZM-API] parseExclusionFiles() meta parse error (optional):', e);
       // Meta file optional
     }
 
@@ -92,21 +83,16 @@ async function parseExclusionFiles(): Promise<ExcludedUid[]> {
         excludedAt: info?.excludedAt ? new Date(info.excludedAt) : new Date(),
       };
     });
-    console.log('[ZM-API] parseExclusionFiles() returning', result.length, 'exclusions');
     return result;
   } catch (e) {
-    console.error('[ZM-API] parseExclusionFiles() error:', e);
     return [];
   }
 }
 
 async function parseActivityLog(): Promise<ActivityItem[]> {
-  console.log('[ZM-API] parseActivityLog() called');
   try {
     const { errno, stdout } = await ksuExec(`tail -10 "${PATHS.ACTIVITY_LOG}"`);
-    console.log('[ZM-API] parseActivityLog() result:', { errno, stdout: stdout?.slice(0, 100) });
     if (errno !== 0 || !stdout.trim()) {
-      console.log('[ZM-API] parseActivityLog() no activity found');
       return [];
     }
 
@@ -128,10 +114,8 @@ async function parseActivityLog(): Promise<ActivityItem[]> {
       });
     }
     items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    console.log('[ZM-API] parseActivityLog() parsed', items.length, 'activity items');
     return items.slice(0, 10);
   } catch (e) {
-    console.error('[ZM-API] parseActivityLog() error:', e);
     return [];
   }
 }
@@ -143,33 +127,26 @@ async function logActivity(type: string, message: string): Promise<void> {
     const line = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
     await ksuExec(`echo ${escapeShellArg(line)} >> "${PATHS.ACTIVITY_LOG}"`);
   } catch (e) {
-    console.error('[ZM-API] logActivity() error:', e);
   }
 }
 
 export const api = {
   async getVersion(): Promise<string> {
-    console.log('[ZM-API] getVersion() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getVersion();
     }
     try {
       const { errno, stdout } = await ksuExec(`${PATHS.BINARY} version`);
       if (errno === 0 && stdout) {
-        console.log('[ZM-API] getVersion() returning:', stdout.trim());
         return stdout.trim();
       }
-      console.log('[ZM-API] getVersion() command failed, using fallback');
     } catch (e) {
-      console.error('[ZM-API] getVersion() error:', e);
       // Fallback
     }
-    console.log('[ZM-API] getVersion() returning fallback:', `v${APP_VERSION}`);
     return `v${APP_VERSION}`;
   },
 
   async getSystemInfo(): Promise<SystemInfo> {
-    console.log('[ZM-API] getSystemInfo() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getSystemInfo();
     }
@@ -185,7 +162,6 @@ export const api = {
     };
 
     try {
-      console.log('[ZM-API] getSystemInfo() fetching system info...');
       const [verRes, kernRes, uptimeRes, modelRes, androidRes, selinuxRes, susfsRes] = await Promise.all([
         ksuExec(`${PATHS.BINARY} version`).catch(() => ({ errno: 1, stdout: '', stderr: '' })),
         ksuExec('uname -r').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
@@ -222,9 +198,7 @@ export const api = {
       if (susfsRes.errno === 0 && susfsRes.stdout.trim()) {
         info.susfsVersion = susfsRes.stdout.trim();
       }
-      console.log('[ZM-API] getSystemInfo() returning:', info);
     } catch (e) {
-      console.error('[ZM-API] getSystemInfo() error:', e);
     }
 
     return info;
@@ -276,61 +250,46 @@ export const api = {
         if (parts[6]) info.susfsVersion = parts[6];
       }
     } catch (e) {
-      console.error('[ZM-API] getSystemInfoBatched() error:', e);
     }
 
     return info;
   },
 
   async getRules(): Promise<VfsRule[]> {
-    console.log('[ZM-API] getRules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getRules();
     }
     try {
       const { errno, stdout } = await ksuExec(`${PATHS.BINARY} vfs list`);
       if (errno === 0 && stdout.trim()) {
-        const rules = parseRulesOutput(stdout);
-        console.log('[ZM-API] getRules() returning', rules.length, 'rules');
-        return rules;
+        return parseRulesOutput(stdout);
       }
-      console.log('[ZM-API] getRules() command returned no data');
     } catch (e) {
-      console.error('[ZM-API] getRules() error:', e);
       // Fallback
     }
-    console.log('[ZM-API] getRules() returning empty array');
     return [];
   },
 
   async clearAllRules(): Promise<void> {
-    console.log('[ZM-API] clearAllRules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).clearAllRules();
     }
 
     const cmd = `${PATHS.BINARY} vfs clear`;
-    console.log('[ZM-API] clearAllRules() executing:', cmd);
     const { errno, stderr } = await ksuExec(cmd);
     if (errno !== 0) {
-      console.error('[ZM-API] clearAllRules() failed:', { errno, stderr });
       throw new Error(stderr || 'Failed to clear rules');
     }
-    console.log('[ZM-API] clearAllRules() success');
   },
 
   async getExcludedUids(): Promise<ExcludedUid[]> {
-    console.log('[ZM-API] getExcludedUids() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getExcludedUids();
     }
-    const result = await parseExclusionFiles();
-    console.log('[ZM-API] getExcludedUids() returning', result.length, 'exclusions');
-    return result;
+    return parseExclusionFiles();
   },
 
   async excludeUid(uid: number, packageName: string, appName: string): Promise<ExcludedUid> {
-    console.log('[ZM-API] excludeUid() called:', { uid, packageName, appName, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return (await getMock()).excludeUid(uid, packageName, appName);
     }
@@ -339,16 +298,12 @@ export const api = {
     if (!Number.isInteger(uid) || uid < 0) throw new Error('Invalid UID');
 
     const cmd = `${PATHS.BINARY} uid block ${escapeShellArg(String(uid))}`;
-    console.log('[ZM-API] excludeUid() executing:', cmd);
     const { errno, stderr } = await ksuExec(cmd);
     if (errno !== 0) {
-      console.error('[ZM-API] excludeUid() failed:', { errno, stderr });
       throw new Error(stderr || 'Failed to exclude UID');
     }
 
-    console.log('[ZM-API] excludeUid() success');
-
-    await ksuExec(`echo ${escapeShellArg(String(uid))} >> "${PATHS.EXCLUSION_FILE}"`).catch(e => console.error('[ZM-API] Exclusion persistence failed:', e));
+    await ksuExec(`echo ${escapeShellArg(String(uid))} >> "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
 
     await withMetaLock(async () => {
       try {
@@ -358,14 +313,12 @@ export const api = {
           try {
             meta = JSON.parse(metaOut);
           } catch (parseErr) {
-            console.error('[ZM-API] Metadata parse error, starting fresh:', parseErr);
             meta = {};
           }
         }
         meta[String(uid)] = { packageName, appName, excludedAt: new Date().toISOString() };
         await ksuExec(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
       } catch (e) {
-        console.error('[ZM-API] Metadata save failed:', e);
       }
     });
 
@@ -378,22 +331,18 @@ export const api = {
   },
 
   async includeUid(uid: number): Promise<void> {
-    console.log('[ZM-API] includeUid() called:', { uid, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return (await getMock()).includeUid(uid);
     }
 
     const cmd = `${PATHS.BINARY} uid unblock ${escapeShellArg(String(uid))}`;
-    console.log('[ZM-API] includeUid() executing:', cmd);
     const { errno, stderr } = await ksuExec(cmd);
     if (errno !== 0) {
-      console.error('[ZM-API] includeUid() failed:', { errno, stderr });
       throw new Error(stderr || 'Failed to include UID');
     }
-    console.log('[ZM-API] includeUid() success');
 
     if (!/^\d+$/.test(String(uid))) throw new Error('invalid uid');
-    await ksuExec(`sed -i '/^${uid}$/d' "${PATHS.EXCLUSION_FILE}"`).catch(e => console.error('[ZM-API] Exclusion removal failed:', e));
+    await ksuExec(`sed -i '/^${uid}$/d' "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
 
     await withMetaLock(async () => {
       try {
@@ -404,28 +353,22 @@ export const api = {
             delete meta[String(uid)];
             await ksuExec(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
           } catch (parseErr) {
-            console.error('[ZM-API] Metadata parse error during cleanup:', parseErr);
           }
         }
       } catch (e) {
-        console.error('[ZM-API] Metadata cleanup failed:', e);
       }
     });
 
   },
 
   async getActivity(): Promise<ActivityItem[]> {
-    console.log('[ZM-API] getActivity() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getActivity();
     }
-    const result = await parseActivityLog();
-    console.log('[ZM-API] getActivity() returning', result.length, 'items');
-    return result;
+    return parseActivityLog();
   },
 
   async getStats(): Promise<EngineStats> {
-    console.log('[ZM-API] getStats() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).getStats();
     }
@@ -435,30 +378,24 @@ export const api = {
       this.getExcludedUids(),
     ]);
 
-    const stats = {
+    return {
       activeRules: rules.length,
       excludedUids: uids.length,
       hiddenPaths: 0,
       hiddenMaps: 0,
     };
-    console.log('[ZM-API] getStats() returning:', stats);
-    return stats;
   },
 
   async toggleEngine(enable: boolean): Promise<void> {
-    console.log('[ZM-API] toggleEngine() called:', { enable, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return (await getMock()).toggleEngine(enable);
     }
 
     const cmd = enable ? `${PATHS.BINARY} vfs enable` : `${PATHS.BINARY} vfs disable`;
-    console.log('[ZM-API] toggleEngine() executing:', cmd);
     const { errno, stderr } = await ksuExec(cmd);
     if (errno !== 0) {
-      console.error('[ZM-API] toggleEngine() failed:', { errno, stderr });
       throw new Error(stderr || 'Failed to toggle engine');
     }
-    console.log('[ZM-API] toggleEngine() success');
   },
 
   async setVerboseLogging(enabled: boolean): Promise<void> {
@@ -512,7 +449,6 @@ export const api = {
   },
 
   async scanKsuModules(): Promise<KsuModule[]> {
-    console.log('[ZM-API] scanKsuModules() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).scanKsuModules();
     }
@@ -561,7 +497,6 @@ echo "]"
 `;
       const { errno, stdout } = await ksuExec(script);
       if (errno !== 0) {
-        console.log('[ZM-API] scanKsuModules() script failed');
         return [];
       }
 
@@ -574,16 +509,13 @@ echo "]"
         seen.add(m.path);
         return true;
       });
-      console.log('[ZM-API] scanKsuModules() returning', modules.length, 'modules');
       return modules;
     } catch (e) {
-      console.error('[ZM-API] scanKsuModules() error:', e);
       return [];
     }
   },
 
   async loadKsuModule(moduleName: string, modulePath: string): Promise<number> {
-    console.log('[ZM-API] loadKsuModule() called:', { moduleName, modulePath, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return (await getMock()).loadKsuModule(moduleName, modulePath);
     }
@@ -606,16 +538,13 @@ echo "]"
       }
 
       await logActivity('MODULE_LOADED', `${moduleName}: ${addedCount} rules added`);
-      console.log('[ZM-API] loadKsuModule() added', addedCount, 'rules');
       return addedCount;
     } catch (e) {
-      console.error('[ZM-API] loadKsuModule() error:', e);
       throw e;
     }
   },
 
   async unloadKsuModule(moduleName: string, modulePath: string): Promise<number> {
-    console.log('[ZM-API] unloadKsuModule() called:', { moduleName, modulePath, mock: shouldUseMock() });
     if (shouldUseMock()) {
       return (await getMock()).unloadKsuModule(moduleName, modulePath);
     }
@@ -632,16 +561,13 @@ echo "]"
       }
 
       await logActivity('MODULE_UNLOADED', `${moduleName}: ${removedCount} rules removed`);
-      console.log('[ZM-API] unloadKsuModule() removed', removedCount, 'rules');
       return removedCount;
     } catch (e) {
-      console.error('[ZM-API] unloadKsuModule() error:', e);
       throw e;
     }
   },
 
   async fetchSystemColor(): Promise<string | null> {
-    console.log('[ZM-API] fetchSystemColor() called, mock:', shouldUseMock());
     if (shouldUseMock()) {
       return (await getMock()).fetchSystemColor();
     }
@@ -649,20 +575,11 @@ echo "]"
       const { errno, stdout } = await ksuExec(
         'settings get secure theme_customization_overlay_packages'
       );
-      if (errno !== 0 || !stdout.trim()) {
-        console.log('[ZM-API] fetchSystemColor() no system color found');
-        return null;
-      }
+      if (errno !== 0 || !stdout.trim()) return null;
       const match = /#?([0-9a-fA-F]{6,8})/i.exec(stdout);
-      if (match) {
-        const color = '#' + match[1].slice(0, 6);
-        console.log('[ZM-API] fetchSystemColor() found:', color);
-        return color;
-      }
-      console.log('[ZM-API] fetchSystemColor() no hex color in output');
+      if (match) return '#' + match[1].slice(0, 6);
       return null;
     } catch (e) {
-      console.error('[ZM-API] fetchSystemColor() error:', e);
       return null;
     }
   },
@@ -677,7 +594,6 @@ echo "]"
         return JSON.parse(stdout.trim()) as RuntimeStatus;
       }
     } catch (e) {
-      console.error('[ZM-API] getRuntimeStatus() error:', e);
     }
     return null;
   },
@@ -690,7 +606,6 @@ echo "]"
         return JSON.parse(stdout.trim());
       }
     } catch (e) {
-      console.error('[ZM-API] configDump() error:', e);
     }
     return null;
   },
@@ -707,7 +622,6 @@ echo "]"
         return stdout.trim();
       }
     } catch (e) {
-      console.error('[ZM-API] configGet() error:', e);
     }
     return null;
   },
@@ -725,10 +639,7 @@ echo "]"
   },
 
   async setSusfsAvcSpoofing(enabled: boolean): Promise<void> {
-    if (shouldUseMock()) {
-      console.log(`[ZM-API] mock: ksu_susfs enable_avc_log_spoofing ${enabled ? 1 : 0}`);
-      return;
-    }
+    if (shouldUseMock()) return;
     await ksuExec(`ksu_susfs enable_avc_log_spoofing ${enabled ? 1 : 0}`);
   },
 
@@ -776,7 +687,6 @@ echo "]"
       );
       if (errno === 0 && stdout.trim()) return stdout.trim();
     } catch (e) {
-      console.error('[ZM-API] readSusfsConfigVar() error:', e);
     }
     return null;
   },
@@ -802,18 +712,13 @@ echo "]"
   },
 
   async webuiInit(): Promise<WebUiInitResponse | null> {
-    console.log('[ZM-API] webuiInit() called');
     if (shouldUseMock()) return null;
     try {
       const { errno, stdout } = await ksuExec(`${PATHS.BINARY} webui-init`, 10000);
       if (errno === 0 && stdout.trim()) {
-        const parsed = JSON.parse(stdout.trim()) as WebUiInitResponse;
-        console.log('[ZM-API] webuiInit() success');
-        return parsed;
+        return JSON.parse(stdout.trim()) as WebUiInitResponse;
       }
-      console.log('[ZM-API] webuiInit() command failed, errno:', errno);
     } catch (e) {
-      console.error('[ZM-API] webuiInit() error:', e);
     }
     return null;
   },
