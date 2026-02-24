@@ -231,8 +231,6 @@ impl MountController<Planned> {
         let failed = results.iter().filter(|r| !r.success).count();
         info!(succeeded, failed, "execution complete");
 
-        // NOTE: gap_filler and try_umount were removed — both created
-        // unhidden mounts visible in app namespaces that NativeTest detects.
 
         Ok(MountController {
             state: Mounted {
