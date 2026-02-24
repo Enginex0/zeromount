@@ -65,11 +65,11 @@ export function StatusTab() {
   });
 
   const mountModeColor = createMemo(() => {
-    const t = store.currentTheme();
+    const theme = store.currentTheme();
     switch (effectiveMode()) {
-      case 'vfs': return t.colorSuccess;
-      case 'overlay': return t.colorInfo || '#3b82f6';
-      case 'magicmount': return t.colorInfo || '#3b82f6';
+      case 'vfs': return theme.colorSuccess;
+      case 'overlay': return theme.colorInfo || '#3b82f6';
+      case 'magicmount': return theme.colorInfo || '#3b82f6';
       case 'susfs_only': return '#FF8E53';
     }
   });
@@ -140,19 +140,19 @@ export function StatusTab() {
   };
 
   const getActivityIcon = (type: string) => {
-    const t = store.currentTheme();
+    const theme = store.currentTheme();
     switch (type) {
       case 'rule_added':
       case 'rule_removed':
         return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorSuccess}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={theme.colorSuccess}>
             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
           </svg>
         );
       case 'uid_excluded':
       case 'uid_included':
         return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorError}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={theme.colorError}>
             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
           </svg>
         );
@@ -161,19 +161,19 @@ export function StatusTab() {
       case 'susfs_toggle':
       case 'mount_strategy_changed':
         return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorInfo || '#3b82f6'}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={theme.colorInfo || '#3b82f6'}>
             <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
           </svg>
         );
       case 'theme_changed':
         return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.textAccent}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={theme.textAccent}>
             <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/>
           </svg>
         );
       default:
         return (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={t.colorWarning}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={theme.colorWarning}>
             <path d="M7 10l5 5 5-5z"/>
           </svg>
         );

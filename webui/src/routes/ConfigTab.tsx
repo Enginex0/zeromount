@@ -10,7 +10,7 @@ import type { InstalledApp } from '../lib/types';
 import type {} from '../lib/ksu.d.ts';
 import "./ConfigTab.css";
 
-const t = () => store.currentTheme();
+const theme = () => store.currentTheme();
 
 const iconCache = new Map<string, string>();
 const observers = new Set<IntersectionObserver>();
@@ -82,7 +82,7 @@ const AppIcon = (props: { packageName: string; size?: number }) => {
         width={fallbackSize}
         height={fallbackSize}
         viewBox="0 0 24 24"
-        fill={t().textTertiary}
+        fill={theme().textTertiary}
         class="config__icon-fallback"
       >
         <path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z" />
@@ -170,7 +170,7 @@ export function ConfigTab() {
             width="20"
             height="20"
             viewBox="0 0 24 24"
-            fill={t().textTertiary}
+            fill={theme().textTertiary}
             class="config__search-icon"
           >
             <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
@@ -184,7 +184,7 @@ export function ConfigTab() {
           onClick={() => setExcludedExpanded(!excludedExpanded())}
         >
           <h3 class="config__section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={t().colorError}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={theme().colorError}>
               <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
             </svg>
             Excluded Apps
@@ -198,7 +198,7 @@ export function ConfigTab() {
               width="20"
               height="20"
               viewBox="0 0 24 24"
-              fill={t().textTertiary}
+              fill={theme().textTertiary}
             >
               <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
             </svg>
@@ -231,7 +231,7 @@ export function ConfigTab() {
                       variant="ghost"
                       size="small"
                       onClick={(e) => { e.stopPropagation(); store.includeUid(item.uid); }}
-                      style={`color: ${t().colorError}; padding: 6px 10px;`}
+                      style={`color: ${theme().colorError}; padding: 6px 10px;`}
                     >
                       REMOVE
                     </Button>
@@ -246,7 +246,7 @@ export function ConfigTab() {
       <Card>
         <div class="config__section-header">
           <h3 class="config__section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={t().textAccent}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={theme().textAccent}>
               <path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z" />
             </svg>
             {showSystemApps() ? 'All Apps' : 'User Apps'}

@@ -228,8 +228,6 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
     }
 
     while let Some((path, staging_rel, node, force_descend)) = queue.pop_front() {
-        let total_contributors = count_all_contributors(node);
-
         let mount_here = !force_descend && (node.has_files || should_mount_here(node));
 
         if mount_here {
@@ -250,7 +248,7 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
                 staging_rel,
                 contributing_modules: contributors,
             });
-        } else if !total_contributors.is_empty() {
+        } else if has_any_contributors(node) {
             if force_descend {
                 debug!(mount_point = %path.display(), "sensitive partition path — descending to subdirs");
             }
@@ -317,7 +315,9 @@ fn collect_all_modules(node: &DirNode) -> BTreeSet<String> {
     modules
 }
 
-/// Count all unique contributors in a node subtree.
-fn count_all_contributors(node: &DirNode) -> BTreeSet<String> {
-    collect_all_modules(node)
+fn has_any_contributors(node: &DirNode) -> bool {
+    if !node.contributing_modules.is_empty() {
+        return true;
+    }
+    node.children.values().any(has_any_contributors)
 }
