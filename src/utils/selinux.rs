@@ -50,6 +50,7 @@ pub fn copy_selinux_context(source: &Path, dest: &Path) {
         }
     }
 
+    // Include the NUL terminator — Android libselinux passes strlen+1 to lsetxattr.
     let context = b"u:object_r:system_data_file:s0\0";
     // SAFETY: CStrings are non-null NUL-terminated; context is a static NUL-terminated byte literal.
     unsafe {
@@ -57,7 +58,7 @@ pub fn copy_selinux_context(source: &Path, dest: &Path) {
             dst_c.as_ptr(),
             attr_ptr,
             context.as_ptr() as *const libc::c_void,
-            context.len() - 1,
+            context.len(),
             0,
         );
         if ret != 0 {
@@ -75,14 +76,21 @@ pub fn set_selinux_context(path: &Path, context: &str) {
         Ok(c) => c,
         Err(_) => return,
     };
+    // Android libselinux always passes strlen+1 (including NUL) to lsetxattr for
+    // security.selinux. Use CString to guarantee NUL-termination and get the right size.
+    let c_ctx = match CString::new(context) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
     let attr = b"security.selinux\0";
     // SAFETY: CStrings are non-null NUL-terminated; attr is a static NUL-terminated byte literal.
     unsafe {
+        let ctx_bytes = c_ctx.as_bytes_with_nul();
         let ret = libc::lsetxattr(
             c_path.as_ptr(),
             attr.as_ptr() as *const libc::c_char,
-            context.as_ptr() as *const libc::c_void,
-            context.len(),
+            ctx_bytes.as_ptr() as *const libc::c_void,
+            ctx_bytes.len(),
             0,
         );
         if ret != 0 {

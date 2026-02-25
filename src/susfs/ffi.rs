@@ -262,6 +262,24 @@ mod tests {
     }
 
     #[test]
+    fn sus_kstat_layout() {
+        // C: bool(1) + pad(7) + ulong(8) + char[256] + ulong(8) + ulong(8)
+        //    + uint(4) + pad(4) + llong(8)*7 + ulong(8) + ullong(8) + int(4) + pad(4) = 376
+        assert_eq!(mem::size_of::<StSusfsSusKstat>(), 376);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, is_statically), 0);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, target_ino), 8);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, target_pathname), 16);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_ino), 272);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_dev), 280);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_nlink), 288);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_size), 296);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_atime_tv_sec), 304);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_blksize), 352);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, spoofed_blocks), 360);
+        assert_eq!(mem::offset_of!(StSusfsSusKstat, err), 368);
+    }
+
+    #[test]
     fn sus_map_layout() {
         // C: char[256] + int (4) = 260
         assert_eq!(mem::size_of::<StSusfsSusMap>(), 260);

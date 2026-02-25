@@ -1013,11 +1013,17 @@ fn hide_ksu_loop_devices(client: &SusfsClient) -> u32 {
 }
 
 fn truncate_uname(s: &str) -> String {
-    if s.len() > 64 {
-        s[..64].to_string()
-    } else {
-        s.to_string()
+    if s.len() <= 64 {
+        return s.to_string();
     }
+    // Truncate at the last char boundary at or before byte 64 to avoid splitting
+    // multi-byte sequences. In practice uname strings are ASCII, but be safe.
+    let boundary = s.char_indices()
+        .take_while(|(i, _)| *i < 64)
+        .last()
+        .map(|(i, c)| i + c.len_utf8())
+        .unwrap_or(0);
+    s[..boundary].to_string()
 }
 
 #[cfg(test)]
