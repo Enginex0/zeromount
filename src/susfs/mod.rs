@@ -64,14 +64,8 @@ impl SusfsClient {
         let baseline = calibrate_probe_baseline();
         debug!("probe baseline: {:?}", baseline);
 
-        client.features.kstat_redirect = probe_command(
-            SusfsCommand::AddSusKstatRedirect,
-            &baseline,
-        );
-        client.features.open_redirect_all = probe_command(
-            SusfsCommand::AddOpenRedirectAll,
-            &baseline,
-        );
+        client.features.kstat_redirect = probe_kstat_redirect(&baseline);
+        client.features.open_redirect_all = probe_open_redirect_all(&baseline);
 
         debug!("SUSFS features: {:?}", client.features);
 
@@ -615,14 +609,6 @@ fn calibrate_probe_baseline() -> ProbeBaseline {
                 ProbeBaseline::ErrSet(err_after)
             }
         }
-    }
-}
-
-fn probe_command(cmd: SusfsCommand, baseline: &ProbeBaseline) -> bool {
-    match cmd {
-        SusfsCommand::AddSusKstatRedirect => probe_kstat_redirect(baseline),
-        SusfsCommand::AddOpenRedirectAll => probe_open_redirect_all(baseline),
-        _ => false,
     }
 }
 

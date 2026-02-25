@@ -200,7 +200,7 @@ impl MountController<Planned> {
                             &self.state.modules,
                             self.state.root_mgr.mount_mode(),
                         );
-                        self.execute_magic(&self.state.modules, &self.state.plan, config, false)
+                        self.execute_magic(&self.state.modules, &self.state.plan, config)
                     }
                     _ => {
                         let capabilities = &self.state.detection.capabilities;
@@ -217,7 +217,7 @@ impl MountController<Planned> {
                 match user_override {
                     Some(MountStrategy::MagicMount) => {
                         info!("user preference: magic mount (no VFS available)");
-                        self.execute_magic(&self.state.modules, &self.state.plan, config, false)
+                        self.execute_magic(&self.state.modules, &self.state.plan, config)
                     }
                     _ => {
                         self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
@@ -316,7 +316,7 @@ impl MountController<Planned> {
             }
         }
 
-        self.execute_magic(modules, plan, config, true)
+        self.execute_magic(modules, plan, config)
     }
 
     fn execute_magic(
@@ -324,14 +324,8 @@ impl MountController<Planned> {
         modules: &[ScannedModule],
         plan: &MountPlan,
         config: &ZeroMountConfig,
-        is_fallback: bool,
     ) -> Result<Vec<MountResult>> {
         let caps = &self.state.detection.capabilities;
-        if is_fallback {
-            info!("executing via magic mount (fallback)");
-        } else {
-            info!("executing via magic mount (user preference)");
-        }
         crate::mount::executor::execute_plan(
             plan, modules, MountStrategy::MagicMount, caps, &config.mount,
         )

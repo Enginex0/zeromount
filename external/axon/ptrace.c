@@ -140,9 +140,6 @@ int ptrace_write(pid_t pid, uintptr_t addr, const void* vptr, int len) {
   int count = 0;
   long word = 0;
 
-  // TODO:
-  // assert(!(len % sizeof(word)));
-
   while (count < len) {
     memcpy(&word, (const char*)vptr + count, sizeof(word));
     word = ptrace(PTRACE_POKETEXT, pid, addr + count, word);

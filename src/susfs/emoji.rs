@@ -11,6 +11,7 @@ use super::brene::FontModuleInfo;
 use super::kstat;
 use super::SusfsClient;
 use crate::utils::command::run_command_with_timeout;
+use crate::utils::hash::fnv1a_ino;
 
 const EMOJI_STAGING_DIR: &str = "/data/adb/zeromount/emoji";
 const EMOJI_FONT_NAME: &str = "NotoColorEmoji.ttf";
@@ -189,10 +190,7 @@ pub fn apply_emoji_fonts(
                 Ok(mut spoof) => {
                     if let Some(dev) = stock_dev {
                         spoof.dev = Some(dev);
-                        let hash: u64 = target_path.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-                            (h ^ b as u64).wrapping_mul(0x100000001b3)
-                        });
-                        spoof.ino = Some(hash % 2_147_483_647);
+                        spoof.ino = Some(fnv1a_ino(&target_path));
                     }
                     if let Err(e) = client.add_sus_kstat_redirect(&target_path, &replacement, &spoof) {
                         debug!("emoji: kstat redirect failed for {}: {}", target_name, e);
@@ -348,7 +346,6 @@ fn clear_gboard_caches() {
         }
     }
 
-    // Force-stop GBoard
     let mut cmd = Command::new("am");
     cmd.args(["force-stop", GBOARD_PACKAGE]);
     let _ = run_command_with_timeout(&mut cmd, Duration::from_secs(5));

@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use tracing::debug;
 
 use super::{KstatValues, SusfsClient};
+use crate::utils::hash::fnv1a_ino;
 
 /// Apply kstat spoofing with the best available method.
 /// If kstat_redirect (0x55573) is available and both paths exist, use it.
@@ -65,15 +66,7 @@ pub fn build_kstat_values_from_paths(virtual_path: &str, real_path: &str) -> Res
             let ancestor_meta = find_existing_ancestor(virtual_path)
                 .with_context(|| format!("no existing ancestor for '{virtual_path}'"))?;
 
-            let synthetic_ino = {
-                // FNV-1a: stable across runs, deterministic per path
-                let mut hash: u64 = 0xcbf29ce484222325;
-                for byte in virtual_path.as_bytes() {
-                    hash ^= *byte as u64;
-                    hash = hash.wrapping_mul(0x100000001b3);
-                }
-                (hash % 2_147_483_647).max(1)
-            };
+            let synthetic_ino = fnv1a_ino(virtual_path);
 
             debug!("virtual path absent, using parent-derived metadata: ino={synthetic_ino}");
 

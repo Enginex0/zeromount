@@ -9,6 +9,7 @@ use tracing::{debug, error, info, warn};
 use crate::core::config::{UnameConfig, UnameMode, ZeroMountConfig};
 use crate::core::types::{ExternalSusfsModule, SusfsMode};
 use crate::utils::command::{run_command_with_timeout, CMD_TIMEOUT};
+use crate::utils::hash::fnv1a_ino;
 use super::SusfsClient;
 use super::fonts;
 use super::kstat;
@@ -579,10 +580,7 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
                     Ok(mut spoof) => {
                         if let Some(dev) = stock_dev {
                             spoof.dev = Some(dev);
-                            let hash: u64 = target.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-                                (h ^ b as u64).wrapping_mul(0x100000001b3)
-                            });
-                            spoof.ino = Some(hash % 2_147_483_647);
+                            spoof.ino = Some(fnv1a_ino(&target));
                         }
                         if let Err(e) = client.add_sus_kstat_redirect(&target, &replacement, &spoof) {
                             debug!("overlay font kstat failed for {filename}: {e}");
