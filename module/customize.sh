@@ -90,7 +90,11 @@ zm_print "  ✅ Data directory ready"
 if [ "$FRESH_INSTALL" = true ]; then
     zm_print "  🔧 Writing default config"
     "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
-    # Randomize vbmeta_size per-install to prevent fingerprinting
+    # Snapshot current Android settings so boot-completed doesn't override them
+    [ "$(settings get global development_settings_enabled 2>/dev/null)" = "1" ] && \
+        "$BIN" config set adb.developer_options true 2>/dev/null
+    [ "$(settings get global adb_enabled 2>/dev/null)" = "1" ] && \
+        "$BIN" config set adb.usb_debugging true 2>/dev/null
     VBS=$(( 4096 + (RANDOM % 8) * 1024 ))
     "$BIN" config set brene.vbmeta_size "$VBS" 2>/dev/null
     zm_print "  ✅ vbmeta_size randomized: $VBS"

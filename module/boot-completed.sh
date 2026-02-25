@@ -26,17 +26,15 @@ else
 fi
 
 # Android settings toggles — require framework, immediate on toggle via webUI
-if [ "$("$BIN" config get adb.developer_options 2>/dev/null)" = "true" ]; then
-    settings put global development_settings_enabled 1
-else
-    settings put global development_settings_enabled 0
-fi
+case "$("$BIN" config get adb.developer_options 2>/dev/null)" in
+    true)  settings put global development_settings_enabled 1 ;;
+    false) settings put global development_settings_enabled 0 ;;
+esac
 
-if [ "$("$BIN" config get adb.usb_debugging 2>/dev/null)" = "true" ]; then
-    settings put global adb_enabled 1
-else
-    settings put global adb_enabled 0
-fi
+case "$("$BIN" config get adb.usb_debugging 2>/dev/null)" in
+    true)  settings put global adb_enabled 1 ;;
+    false) settings put global adb_enabled 0 ;;
+esac
 
 # Emoji needs pm (package manager), only available post-boot
 "$BIN" emoji apply-apps 2>/dev/null || true
