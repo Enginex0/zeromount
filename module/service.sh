@@ -167,6 +167,14 @@ if [ "$("$BIN" config get perf.enabled 2>/dev/null)" = "true" ]; then
     _bg_pids="$_bg_pids $!"
 fi
 
-# Final trap covers all background PIDs
+# Magisk has no boot-completed callback — emulate it
+if [ -z "$KSU" ] && [ -z "$APATCH" ]; then
+    (
+        while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done
+        sh "$MODDIR/boot-completed.sh"
+    ) &
+    _bg_pids="$_bg_pids $!"
+fi
+
 trap 'kill $_bg_pids 2>/dev/null; rm -f "$LOCKFILE"' EXIT
 wait

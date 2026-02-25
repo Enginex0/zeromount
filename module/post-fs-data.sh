@@ -7,6 +7,22 @@ MODDIR="${0%/*}"
 
 "$BIN" detect
 
+# Magisk has no metamount.sh — run mount pipeline here
+if [ -z "$KSU" ] && [ -z "$APATCH" ]; then
+    if [ ! -f "/dev/zeromount_metamount_lock" ]; then
+        touch "/dev/zeromount_metamount_lock"
+        COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
+        if [ "$COUNT" -eq 0 ]; then
+            EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
+            [ "$EXTERNAL" != "none" ] && "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
+            timeout 60 "$BIN" mount
+            echo "zeromount: magisk mount pipeline exited (rc=$?)" > /dev/kmsg 2>/dev/null
+        else
+            echo "zeromount: bootloop guard (count=$COUNT), skipping" > /dev/kmsg 2>/dev/null
+        fi
+    fi
+fi
+
 # ADB Root via axon injection
 ADB_ROOT=$("$BIN" config get adb.adb_root 2>/dev/null)
 if [ "$ADB_ROOT" != "true" ]; then
