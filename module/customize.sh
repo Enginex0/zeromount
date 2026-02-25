@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# ZeroMount install hook — runs during KSU/APatch module installation.
+# ZeroMount install hook — runs during module installation.
 SKIPUNZIP=1
 
 zm_print() {
@@ -21,6 +21,10 @@ zm_print() {
 
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
 
+for _mgr_bin in /data/adb/ksu/bin /data/adb/ap/bin /data/adb/magisk; do
+    [ -d "$_mgr_bin" ] && export PATH="$_mgr_bin:$PATH"
+done
+
 ZM_VERSION=$(grep '^version=' "$MODPATH/module.prop" | cut -d= -f2)
 
 ui_print ""
@@ -28,7 +32,7 @@ ui_print "==========================================="
 ui_print "  ⚡ ZeroMount ${ZM_VERSION} ⚡"
 ui_print "==========================================="
 ui_print "  🛡️  Ghost-level mount management"
-ui_print "  ✅ KSU / APatch compatible"
+ui_print "  ✅ KSU / APatch / Magisk"
 ui_print "==========================================="
 ui_print ""
 sleep 0.5
