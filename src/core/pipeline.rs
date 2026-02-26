@@ -261,7 +261,6 @@ impl MountController<Planned> {
             }
         };
 
-        // Probe SUSFS if enabled
         let executor = crate::vfs::VfsExecutor::new(driver);
         executor.execute(plan, modules)
     }
