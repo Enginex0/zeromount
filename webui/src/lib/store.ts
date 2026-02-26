@@ -330,7 +330,7 @@ function createAppStore() {
     setDegradationReason(s.degradation_reason);
     setEngineActive(s.engine_active ?? false);
     if (s.driver_version !== null) setSystemInfo('driverVersion', `v${s.driver_version}`);
-    if (s.susfs_version) setSystemInfo('susfsVersion', s.susfs_version);
+    setSystemInfo('susfsVersion', s.susfs_version || '');
     setRootManager(s.root_manager);
     setRuntimeStrategy(s.active_strategy ?? null);
     _setMountSource(s.mount_source ?? null);
@@ -481,7 +481,7 @@ function createAppStore() {
       setDegradationReason(status.degradation_reason);
       setEngineActive(status.engine_active ?? false);
       if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
-      if (status.susfs_version) setSystemInfo('susfsVersion', status.susfs_version);
+      setSystemInfo('susfsVersion', status.susfs_version || '');
       setRootManager(status.root_manager);
       setRuntimeStrategy(status.active_strategy ?? null);
       _setMountSource(status.mount_source ?? null);
@@ -1172,9 +1172,7 @@ function createAppStore() {
       if (status.driver_version !== null) {
         setSystemInfo('driverVersion', `v${status.driver_version}`);
       }
-      if (status.susfs_version) {
-        setSystemInfo('susfsVersion', status.susfs_version);
-      }
+      setSystemInfo('susfsVersion', status.susfs_version || '');
       setStats({
         activeRules: status.rule_count,
         excludedUids: status.excluded_uid_count,

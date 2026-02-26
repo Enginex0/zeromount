@@ -59,9 +59,13 @@ export function StatusTab() {
     const statuses = store.moduleStatuses();
     if (statuses.some(m => m.strategy !== 'Font')) return 'Active';
 
-    const s = store.scenario?.() || 'none';
-    if (s === 'none') return 'Unavailable';
-    return 'Selected';
+    const caps = store.capabilities?.();
+    const modeSupported = mode === 'overlay' ? caps?.overlay_supported
+      : mode === 'vfs' ? caps?.vfs_driver
+      : true;
+
+    if (!modeSupported) return 'Unavailable';
+    return 'Standby';
   });
 
   const mountModeColor = createMemo(() => {
@@ -397,7 +401,7 @@ export function StatusTab() {
             <div class="status-mode__label">
               <span
                 class="status-mode__dot"
-                style={{ background: store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
+                style={{ background: store.capabilities?.()?.susfs_available
                   ? store.currentTheme().colorSuccess
                   : store.currentTheme().colorError }}
               />
@@ -406,8 +410,8 @@ export function StatusTab() {
               </span>
             </div>
             <span class="status-mode__value color-text-accent">
-              {store.systemInfo.susfsVersion && store.systemInfo.susfsVersion !== 'N/A'
-                ? `${store.systemInfo.susfsVersion} (${
+              {store.capabilities?.()?.susfs_available
+                ? `${(store.capabilities?.()?.susfs_version ?? store.systemInfo.susfsVersion) || '?'} (${
                     store.capabilities?.()?.susfs_kstat_redirect
                       ? 'Extended' : 'Stock'
                   })`
