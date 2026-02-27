@@ -148,7 +148,6 @@ function createAppStore() {
   const defaultAdb: AdbSettings = {
     usb_debugging: false,
     developer_options: false,
-    invisible_debugging: false,
     adb_root: false,
     hide_usb_debugging: false,
   };

@@ -52,7 +52,7 @@ pub fn write_config(dir: &Path, config: &ZeroMountConfig) -> Result<()> {
             lines.push(format!("{CONFIG_PREFIX}{key}={val}"));
         }
     }
-    let hide = config.adb.invisible_debugging;
+    let hide = config.adb.hide_usb_debugging;
     lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(!hide && config.adb.developer_options)));
 
     lines.push(String::new());
@@ -129,7 +129,7 @@ pub fn merge_config(
             lines.push(format!("{CONFIG_PREFIX}{key}={val}"));
         }
     }
-    let hide = config.adb.invisible_debugging;
+    let hide = config.adb.hide_usb_debugging;
     lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(!hide && config.adb.developer_options)));
     lines.push(String::new());
     fs::write(&path, lines.join("\n"))
@@ -174,7 +174,7 @@ pub fn config_to_keys(config: &ZeroMountConfig) -> HashMap<String, String> {
 
     m.insert("hide_zygisk_modules".into(), translate::bool_to_int(config.brene.auto_hide_zygisk).to_string());
     m.insert("hide_injections".into(), translate::bool_to_int(config.brene.auto_hide_injections).to_string());
-    let hide = config.adb.invisible_debugging;
+    let hide = config.adb.hide_usb_debugging;
     m.insert("usb_debugging".into(), translate::bool_to_int(!hide && config.adb.usb_debugging).to_string());
     m.insert("developer_options".into(), translate::bool_to_int(!hide && config.adb.developer_options).to_string());
     m.insert("enable_log".into(), translate::bool_to_int(config.brene.susfs_log).to_string());
