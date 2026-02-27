@@ -3,24 +3,6 @@ pub struct PropEntry {
     pub value: &'static str,
 }
 
-// Runtime-volatile props that HAL/init reset after boot — monitored continuously
-pub static USB_WATCH: &[PropEntry] = &[
-    PropEntry { name: "init.svc.adbd", value: "stopped" },
-    PropEntry { name: "init.svc_debug_pid.adbd", value: "" },
-    PropEntry { name: "sys.usb.config", value: "mtp" },
-    PropEntry { name: "sys.usb.state", value: "mtp" },
-    PropEntry { name: "sys.usb.ffs.ready", value: "0" },
-    PropEntry { name: "sys.usb.ffs.adb.ready", value: "0" },
-    PropEntry { name: "service.adb.root", value: "0" },
-    PropEntry { name: "service.adb.tcp.port", value: "-1" },
-    PropEntry { name: "persist.sys.usb.config", value: "mtp" },
-    PropEntry { name: "persist.sys.usb.reboot.func", value: "mtp" },
-    PropEntry { name: "persist.service.adb.enable", value: "0" },
-    PropEntry { name: "persist.adb.tcp.port", value: "" },
-    PropEntry { name: "persist.vendor.usb.config", value: "none" },
-    PropEntry { name: "vendor.usb.config", value: "none" },
-];
-
 // Static debug props — set once when hide_usb_debugging is enabled
 pub static HIDE_DEBUG: &[PropEntry] = &[
     PropEntry { name: "ro.debuggable", value: "0" },

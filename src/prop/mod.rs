@@ -1,5 +1,4 @@
 mod enforcer;
-mod ffi;
 mod table;
 
 use std::fs;
@@ -23,7 +22,6 @@ pub fn run_prop_watch() -> Result<()> {
         return Ok(());
     }
 
-    // Phase 1: one-time general prop spoofing
     if prop_spoof && !has_external_susfs() {
         let props: Vec<(&str, &str)> = table::GENERAL
             .iter()
@@ -54,7 +52,6 @@ pub fn run_prop_watch() -> Result<()> {
         return Ok(());
     }
 
-    // Phase 1b: static debug props (one-time)
     let static_props: Vec<(&str, &str)> = table::HIDE_DEBUG
         .iter()
         .map(|p| (p.name, p.value))
@@ -64,16 +61,8 @@ pub fn run_prop_watch() -> Result<()> {
     let dynamic = scan_build_props();
     debug!(count = dynamic, "dynamic build.prop props overridden");
 
-    // Wait for boot_completed before Settings.Global + watch loop
-    wait_boot_completed();
-    apply_settings_global();
-
-    // Phase 2: event-driven property monitoring (never returns)
-    let watch: Vec<(&'static str, &'static str)> = table::USB_WATCH
-        .iter()
-        .map(|p| (p.name, p.value))
-        .collect();
-    enforcer::watch_loop(&watch);
+    info!("stealth debug props applied (Zygisk handles Settings.Global)");
+    Ok(())
 }
 
 fn has_external_susfs() -> bool {
@@ -83,32 +72,6 @@ fn has_external_susfs() -> bool {
             !v.is_empty() && v != "none"
         })
         .unwrap_or(false)
-}
-
-fn wait_boot_completed() {
-    loop {
-        if let Ok(output) = Command::new("getprop").arg("sys.boot_completed").output() {
-            if String::from_utf8_lossy(&output.stdout).trim() == "1" {
-                break;
-            }
-        }
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-    info!("boot completed, starting USB prop enforcement");
-}
-
-fn apply_settings_global() {
-    for (ns, key, val) in &[
-        ("global", "adb_enabled", "0"),
-        ("global", "development_settings_enabled", "0"),
-        ("global", "adb_wifi_enabled", "0"),
-    ] {
-        trace!(namespace = ns, key, value = val, "settings put");
-        let _ = Command::new("settings")
-            .args(["put", ns, key, val])
-            .output();
-    }
-    debug!("Settings.Global ADB entries cleared");
 }
 
 fn scan_build_props() -> usize {
