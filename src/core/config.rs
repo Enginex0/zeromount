@@ -9,6 +9,26 @@ const BACKUP_CONFIG_PATH: &str = "/data/adb/zeromount/config.toml.bak";
 const BOOTCOUNT_PATH: &str = "/data/adb/zeromount/.bootcount";
 const BOOTLOOP_THRESHOLD: u32 = 3;
 
+fn migrate_config_keys(raw: &str) -> String {
+    let mut saw_hide = false;
+    let mut lines: Vec<&str> = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("hide_usb_debugging") {
+            if trimmed.contains("true") {
+                saw_hide = true;
+            }
+            continue;
+        }
+        lines.push(line);
+    }
+    let mut out = lines.join("\n");
+    if saw_hide && !out.contains("invisible_debugging = true") {
+        out = out.replace("invisible_debugging = false", "invisible_debugging = true");
+    }
+    out
+}
+
 // -- Top-level config --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -303,7 +323,7 @@ pub struct AdbConfig {
     pub usb_debugging: bool,
     #[serde(default)]
     pub developer_options: bool,
-    #[serde(default, alias = "hide_usb_debugging")]
+    #[serde(default)]
     pub invisible_debugging: bool,
     #[serde(default)]
     pub adb_root: bool,
@@ -396,6 +416,7 @@ impl ZeroMountConfig {
 
         let content = std::fs::read_to_string(&config_path)
             .with_context(|| format!("reading {}", config_path.display()))?;
+        let content = migrate_config_keys(&content);
         let config: Self = toml::from_str(&content)
             .with_context(|| format!("parsing {}", config_path.display()))?;
         config.brene.validate_paths()

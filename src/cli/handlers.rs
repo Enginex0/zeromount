@@ -190,6 +190,9 @@ pub fn handle_config(action: ConfigAction) -> Result<()> {
         ConfigAction::Set { key, value } => {
             config.set(&key, &value)?;
             config.save()?;
+            if key == "adb.invisible_debugging" || key == "adb.hide_usb_debugging" {
+                crate::susfs::brene::apply_hide_usb_debugging(config.adb.invisible_debugging);
+            }
             println!("ok");
         }
         ConfigAction::Restore => {
