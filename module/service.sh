@@ -66,9 +66,6 @@ spoof_props() {
     set_prop ro.boot.vbmeta.avb_version 1.3
     set_prop ro.boot.vbmeta.invalidate_on_error yes
     set_prop sys.oem_unlock_allowed 0
-    set_prop init.svc.adbd stopped
-    set_prop init.svc_debug_pid.adbd ""
-    set_prop persist.sys.usb.config mtp
 
     for prop in ro.warranty_bit ro.vendor.boot.warranty_bit \
                 ro.vendor.warranty_bit ro.boot.warranty_bit; do

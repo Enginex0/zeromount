@@ -7,6 +7,7 @@
 #include <functional>
 
 #include "lsplant.hpp"
+#include "dobby.h"
 
 #define TAG "ZeroMount-Settings"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -73,29 +74,15 @@ static void *art_resolver(std::string_view name) {
     return dlsym(libart, std::string(name).c_str());
 }
 
-// Dobby inline hooker — required by LSPlant for ART method replacement.
-// Dobby is typically available in ZygiskNext/KSU environments.
-static void *(*s_dobby_hook)(void *target, void *replace)  = nullptr;
-static bool (*s_dobby_destroy)(void *target)               = nullptr;
-
-static bool load_dobby() {
-    void *lib = dlopen("libdobby.so", RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
-    if (!lib) lib = dlopen("libdobby.so", RTLD_NOW | RTLD_GLOBAL);
-    if (!lib) return false;
-
-    s_dobby_hook    = reinterpret_cast<void *(*)(void *, void *)>(dlsym(lib, "DobbyHook"));
-    s_dobby_destroy = reinterpret_cast<bool (*)(void *)>(dlsym(lib, "DobbyDestroy"));
-    return s_dobby_hook != nullptr;
-}
-
+// Dobby is statically linked — no dlopen needed
 static void *inline_hook(void *target, void *hooker) {
-    if (!s_dobby_hook) return nullptr;
-    return s_dobby_hook(target, hooker);
+    void *origin = nullptr;
+    if (DobbyHook(target, hooker, &origin) == 0) return origin;
+    return nullptr;
 }
 
 static bool inline_unhook(void *func) {
-    if (!s_dobby_destroy) return false;
-    return s_dobby_destroy(func);
+    return DobbyDestroy(func) == 0;
 }
 
 // Load a class from the on-disk hooker dex bundled alongside the module.
@@ -170,13 +157,6 @@ bool install_settings_hook(JNIEnv *env) {
         return false;
     }
     LOGI("Hook target verified: Settings$NameValueCache.getStringForUser");
-
-    // Initialize LSPlant with Dobby as the inline hooker
-    if (!load_dobby()) {
-        LOGE("Dobby not available — LSPlant hook not possible");
-        env->DeleteLocalRef(cache_class);
-        return false;
-    }
 
     lsplant::InitInfo init_info{
         .inline_hooker              = inline_hook,

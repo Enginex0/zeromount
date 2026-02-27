@@ -6,10 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(LSPLANT_ROOT ${CMAKE_SOURCE_DIR}/../../external/lsplant)
 set(LSPLANT_JNI  ${LSPLANT_ROOT}/lsplant/src/main/jni)
+set(DOBBY_ROOT   ${CMAKE_SOURCE_DIR}/../../external/dobby)
 
-# LSPlant builds as a static library with its own C++23 standard
 set(LSPLANT_BUILD_SHARED OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(${LSPLANT_JNI} lsplant_build)
+add_subdirectory(${DOBBY_ROOT} dobby_build)
 
 set(CXA_ATEXIT_ROOT ${CMAKE_SOURCE_DIR}/external/cxa_atexit)
 
@@ -22,10 +23,12 @@ add_library(zeromount_zygisk SHARED
 target_include_directories(zeromount_zygisk PRIVATE
     include
     ${LSPLANT_JNI}/include
+    ${DOBBY_ROOT}/include
 )
 
 target_link_libraries(zeromount_zygisk
     lsplant_static
+    dobby_static
     android
     log
 )
