@@ -155,6 +155,7 @@ export interface AdbSettings {
   developer_options: boolean;
   invisible_debugging: boolean;
   adb_root: boolean;
+  hide_usb_debugging: boolean;
 }
 
 export type UnameMode = 'disabled' | 'static' | 'dynamic';

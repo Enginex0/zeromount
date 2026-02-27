@@ -90,68 +90,10 @@ pub fn apply_brene(
     external_module: ExternalSusfsModule,
 ) -> Result<BreneResult> {
     let mut result = BreneResult::default();
-
-    if !client.is_available() {
-        debug!("SUSFS unavailable, skipping BRENE application");
-        return Ok(result);
-    }
-
-    // External module present => skip toggle/state supercalls it already handles
-    let defer_supercalls = external_module != ExternalSusfsModule::None;
-    // BRENE standalone lacks cmdline/APK/KSU-loops/LSPosed — we fill those gaps
-    let run_complement = external_module != ExternalSusfsModule::Susfs4ksu;
-
-    if defer_supercalls {
-        info!("BRENE: deferring supercall ops to external module ({:?})", external_module);
-    }
-    if !run_complement {
-        info!("BRENE: skipping complement ops (susfs4ksu handles cmdline/APK/loops/LSPosed)");
-    }
-
     let brene = &config.brene;
-    let susfs_cfg = &config.susfs;
 
-    let has_path = client.features().path && susfs_cfg.path_hide;
-    let has_maps = client.features().maps && susfs_cfg.maps_hide;
-    let _has_kstat = client.features().kstat && susfs_cfg.kstat;
-
-    // -- Additive ops: always RUN (idempotent, kernel deduplicates) --
-
-    if brene.auto_hide_rooted_folders && has_path {
-        let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: rooted folders hidden ({count})");
-    }
-
-    if brene.auto_hide_recovery && has_path {
-        let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: recovery paths hidden ({count})");
-    }
-
-    // Hide contents of /data/local/tmp via loop (matches BRENE: re-flags per zygote spawn)
-    if brene.auto_hide_tmp && has_path {
-        let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: tmp children hidden via loop ({count})");
-    }
-
-    if run_complement {
-        if brene.auto_hide_apk && has_path {
-            let count = hide_apk_paths(client);
-            result.paths_hidden += count;
-            info!("BRENE: APK paths hidden ({count})");
-        }
-    }
-
-    // #13: Zygisk .so maps hiding
-    if brene.auto_hide_zygisk && has_maps {
-        let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
-        result.maps_hidden += count;
-        info!("BRENE: zygisk maps hidden ({count})");
-    }
-
-    // #16, #17: Font kstat spoofing + font path hiding — always RUN
+    // Fonts and emoji use bind mounts / overlayfs — standard Linux ops that
+    // work on any kernel. SUSFS kstat/path is layered on top when available.
     if brene.auto_hide_fonts {
         let fonts = if fonts_overlay_mounted {
             hide_font_modules_overlay(client)
@@ -162,7 +104,6 @@ pub fn apply_brene(
         result.font_modules = fonts;
     }
 
-    // Emoji font replacement — SUSFS-independent, always RUN
     if config.emoji.enabled {
         info!("BRENE: emoji toggle ON, checking conflicts");
         if let Some(conflict_id) = super::emoji::check_emoji_font_conflict(&result.font_modules) {
@@ -179,6 +120,61 @@ pub fn apply_brene(
         }
     } else {
         debug!("BRENE: emoji toggle OFF, skipping");
+    }
+
+    apply_hide_usb_debugging(config.adb.hide_usb_debugging);
+
+    if !client.is_available() {
+        debug!("SUSFS unavailable, skipping remaining BRENE protections");
+        return Ok(result);
+    }
+
+    let defer_supercalls = external_module != ExternalSusfsModule::None;
+    let run_complement = external_module != ExternalSusfsModule::Susfs4ksu;
+
+    if defer_supercalls {
+        info!("BRENE: deferring supercall ops to external module ({:?})", external_module);
+    }
+    if !run_complement {
+        info!("BRENE: skipping complement ops (susfs4ksu handles cmdline/APK/loops/LSPosed)");
+    }
+
+    let susfs_cfg = &config.susfs;
+
+    let has_path = client.features().path && susfs_cfg.path_hide;
+    let has_maps = client.features().maps && susfs_cfg.maps_hide;
+    let _has_kstat = client.features().kstat && susfs_cfg.kstat;
+
+    if brene.auto_hide_rooted_folders && has_path {
+        let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE: rooted folders hidden ({count})");
+    }
+
+    if brene.auto_hide_recovery && has_path {
+        let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE: recovery paths hidden ({count})");
+    }
+
+    if brene.auto_hide_tmp && has_path {
+        let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
+        result.paths_hidden += count;
+        info!("BRENE: tmp children hidden via loop ({count})");
+    }
+
+    if run_complement {
+        if brene.auto_hide_apk && has_path {
+            let count = hide_apk_paths(client);
+            result.paths_hidden += count;
+            info!("BRENE: APK paths hidden ({count})");
+        }
+    }
+
+    if brene.auto_hide_zygisk && has_maps {
+        let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
+        result.maps_hidden += count;
+        info!("BRENE: zygisk maps hidden ({count})");
     }
 
     if !brene.custom_sus_paths.is_empty() && has_path {
@@ -202,9 +198,6 @@ pub fn apply_brene(
         info!("BRENE: custom sus_maps hidden ({count}/{})", path_refs.len());
     }
 
-    // -- Deferred ops: external module handles these supercalls --
-
-    // #1: Hide sus mounts
     if !defer_supercalls {
         match client.hide_sus_mounts(brene.hide_sus_mounts) {
             Ok(()) => info!("BRENE: hide_sus_mounts set to {}", brene.hide_sus_mounts),
@@ -212,7 +205,6 @@ pub fn apply_brene(
         }
     }
 
-    // #2: AVC log spoofing
     if !defer_supercalls {
         if brene.avc_log_spoofing {
             match client.enable_avc_log_spoofing(true) {
@@ -225,7 +217,6 @@ pub fn apply_brene(
         }
     }
 
-    // #3: SUSFS debug log
     if !defer_supercalls {
         if brene.susfs_log {
             match client.enable_log(true) {
@@ -238,14 +229,12 @@ pub fn apply_brene(
         }
     }
 
-    // #5: Cmdline spoofing — complement op
     if run_complement {
         if brene.spoof_cmdline {
             apply_spoof_cmdline(client);
         }
     }
 
-    // #18: KSU loop device hiding — complement op
     if run_complement {
         if brene.hide_ksu_loops && client.features().path {
             let count = hide_ksu_loop_devices(client);
@@ -256,19 +245,16 @@ pub fn apply_brene(
         }
     }
 
-    // #19: Force hide LSPosed — complement op
     if run_complement {
         if brene.force_hide_lsposed {
             apply_force_hide_lsposed();
         }
     }
 
-    // #4: Uname spoofing
     if !defer_supercalls {
         apply_uname(client, &config.uname, &mut result)?;
     }
 
-    // Sync controlled settings to SUSFS config.sh
     if let Err(e) = sync_susfs_config(config) {
         warn!("BRENE: SUSFS config sync failed: {e}");
     }
@@ -672,6 +658,36 @@ fn build_dynamic_uname() -> Result<(String, String)> {
     Ok((release, version))
 }
 
+const HIDE_USB_DEBUGGING_SENTINEL: &str = "/data/adb/zeromount/flags/hide_usb_debugging";
+const HIDE_ADB_SYSFS_KNOB: &str = "/sys/kernel/zeromount/hide_adb";
+
+pub fn apply_hide_usb_debugging(enabled: bool) {
+    let sentinel = Path::new(HIDE_USB_DEBUGGING_SENTINEL);
+
+    if enabled {
+        if let Some(parent) = sentinel.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if let Err(e) = fs::write(sentinel, "1") {
+            warn!("hide_usb_debugging: sentinel write failed: {e}");
+        }
+        if let Err(e) = fs::write(HIDE_ADB_SYSFS_KNOB, "1") {
+            debug!("hide_usb_debugging: sysfs knob unavailable: {e}");
+        }
+        info!("hide_usb_debugging: enabled");
+    } else {
+        if sentinel.exists() {
+            if let Err(e) = fs::remove_file(sentinel) {
+                warn!("hide_usb_debugging: sentinel removal failed: {e}");
+            }
+        }
+        if let Err(e) = fs::write(HIDE_ADB_SYSFS_KNOB, "0") {
+            debug!("hide_usb_debugging: sysfs knob unavailable: {e}");
+        }
+        info!("hide_usb_debugging: disabled");
+    }
+}
+
 const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";
 const SUSFS_CONFIG_DIR: &str = "/data/adb/susfs4ksu";
 
@@ -1041,7 +1057,7 @@ mod tests {
     }
 
     #[test]
-    fn brene_skips_when_susfs_unavailable() {
+    fn brene_skips_susfs_ops_when_unavailable() {
         let client = SusfsClient::new_for_test(false, SusfsFeatures::default());
         let config = ZeroMountConfig::default();
         let result = apply_brene(&client, &config, false, SusfsMode::Enhanced, ExternalSusfsModule::None).expect("should not error");

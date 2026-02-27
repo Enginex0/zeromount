@@ -95,7 +95,7 @@ export function SettingsTab() {
         </div>
         <CollapsibleSubgroup
           label="Android Settings"
-          hiddenCount={4}
+          hiddenCount={5}
           defaultItems={<></>}
           expandedItems={<>
             <div class="settings__item">
@@ -142,6 +142,16 @@ export function SettingsTab() {
               <Toggle
                 checked={store.settings.adb.invisible_debugging}
                 onChange={(v) => store.setAdbToggle('invisible_debugging', v)}
+              />
+            </div>
+            <div class="settings__item">
+              <div class="settings__item-content">
+                <div class="settings__item-label">Hide USB Debugging</div>
+                <div class="settings__item-desc">Spoof ADB state for third-party apps</div>
+              </div>
+              <Toggle
+                checked={store.settings.adb.hide_usb_debugging}
+                onChange={(v) => store.setAdbToggle('hide_usb_debugging', v)}
               />
             </div>
           </>}

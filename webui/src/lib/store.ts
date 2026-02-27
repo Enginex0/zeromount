@@ -150,6 +150,7 @@ function createAppStore() {
     developer_options: false,
     invisible_debugging: false,
     adb_root: false,
+    hide_usb_debugging: false,
   };
 
   const [settings, setSettings] = createStore<Settings>({
@@ -409,9 +410,10 @@ function createAppStore() {
     if (cfg.adb) {
       setSettings('adb', prev => ({
         ...prev,
-        usb_debugging: typeof (cfg.adb as any).usb_debugging === 'boolean' ? (cfg.adb as any).usb_debugging : typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.usb_debugging,
+        usb_debugging: typeof (cfg.adb as any).usb_debugging === 'boolean' ? (cfg.adb as any).usb_debugging : prev.usb_debugging,
         developer_options: typeof cfg.adb.developer_options === 'boolean' ? cfg.adb.developer_options : prev.developer_options,
         adb_root: typeof cfg.adb.adb_root === 'boolean' ? cfg.adb.adb_root : prev.adb_root,
+        hide_usb_debugging: typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.hide_usb_debugging,
       }));
     }
     setEmojiConflict(data.emoji_conflict || null);
@@ -940,7 +942,7 @@ function createAppStore() {
       } else if ('hide_usb_debugging' in a) {
         adb.usb_debugging = typeof a.hide_usb_debugging === 'boolean' ? a.hide_usb_debugging : String(a.hide_usb_debugging) === 'true';
       }
-      for (const key of ['developer_options', 'adb_root'] as (keyof AdbSettings)[]) {
+      for (const key of ['developer_options', 'adb_root', 'hide_usb_debugging'] as (keyof AdbSettings)[]) {
         if (key in a) {
           const v = a[key];
           adb[key] = typeof v === 'boolean' ? v : String(v) === 'true';
@@ -948,7 +950,7 @@ function createAppStore() {
       }
       setSettings('adb', prev => ({ ...prev, ...adb }));
     } else {
-      const keys: (keyof AdbSettings)[] = ['usb_debugging', 'developer_options', 'adb_root'];
+      const keys: (keyof AdbSettings)[] = ['usb_debugging', 'developer_options', 'adb_root', 'hide_usb_debugging'];
       const results = await Promise.allSettled(keys.map(k => api.configGet(`adb.${k}`)));
       const adb: Partial<AdbSettings> = {};
       results.forEach((r, i) => {
