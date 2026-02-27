@@ -6,6 +6,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 add_compile_options($<$<CONFIG:RELEASE>:-Os> -fno-exceptions -fno-rtti)
 add_link_options($<$<CONFIG:RELEASE>:-s>)
 
+add_compile_definitions(LINE_MAX=2048)
 add_subdirectory(Dobby)
 
 add_library(prop_spoof SHARED
