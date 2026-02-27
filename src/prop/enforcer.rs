@@ -2,7 +2,7 @@ use std::ffi::{c_char, c_void, CStr, CString};
 use std::process::Command;
 use std::ptr;
 
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use super::ffi::{self, PropInfo};
 
@@ -44,10 +44,10 @@ pub fn watch_loop(props: &[(&'static str, &'static str)]) -> ! {
         })
         .collect();
 
-    // Initial enforcement pass
     for wp in &watched {
         let current = read_prop_value(wp.pi);
         if current.as_deref() != Some(wp.target) {
+            trace!(prop = wp.display, from = ?current, to = wp.target, "initial enforce");
             resetprop(wp.display, wp.target);
         }
     }
@@ -77,6 +77,7 @@ pub fn watch_loop(props: &[(&'static str, &'static str)]) -> ! {
 
             let current = read_prop_value(wp.pi);
             if current.as_deref() != Some(wp.target) {
+                trace!(prop = wp.display, from = ?current, to = wp.target, "reverted");
                 resetprop(wp.display, wp.target);
                 reverted += 1;
             }

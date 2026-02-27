@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader};
 use std::process::Command;
 
 use anyhow::Result;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::core::config::ZeroMountConfig;
 
@@ -32,9 +32,11 @@ pub fn run_prop_watch() -> Result<()> {
         enforcer::enforce_once(&props);
 
         let size = config.brene.vbmeta_size.to_string();
+        trace!(prop = "ro.boot.vbmeta.size", value = %size, "setting vbmeta size");
         enforcer::resetprop("ro.boot.vbmeta.size", &size);
 
         if !config.brene.verified_boot_hash.is_empty() {
+            trace!(prop = "ro.boot.vbmeta.digest", "setting verified boot hash");
             enforcer::resetprop("ro.boot.vbmeta.digest", &config.brene.verified_boot_hash);
         }
 
@@ -101,6 +103,7 @@ fn apply_settings_global() {
         ("global", "development_settings_enabled", "0"),
         ("global", "adb_wifi_enabled", "0"),
     ] {
+        trace!(namespace = ns, key, value = val, "settings put");
         let _ = Command::new("settings")
             .args(["put", ns, key, val])
             .output();
@@ -120,9 +123,13 @@ fn scan_build_props() -> usize {
             if !line.starts_with("ro.") { continue; }
 
             if line.contains("userdebug") {
-                overrides.push(line.replace("userdebug", "user"));
+                let fixed = line.replace("userdebug", "user");
+                trace!(original = %line, replacement = %fixed, "build.prop override");
+                overrides.push(fixed);
             } else if line.contains("test-keys") {
-                overrides.push(line.replace("test-keys", "release-keys"));
+                let fixed = line.replace("test-keys", "release-keys");
+                trace!(original = %line, replacement = %fixed, "build.prop override");
+                overrides.push(fixed);
             }
         }
     }
