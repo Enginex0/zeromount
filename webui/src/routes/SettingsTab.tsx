@@ -137,21 +137,11 @@ export function SettingsTab() {
             <div class="settings__item">
               <div class="settings__item-content">
                 <div class="settings__item-label">Invisible Debugging</div>
-                <div class="settings__item-desc">Hide all debugging mode from prop level + libc hook - use with HMA-OSS for full coverage</div>
+                <div class="settings__item-desc">Zero Traces of any debugging mode</div>
               </div>
               <Toggle
                 checked={store.settings.adb.invisible_debugging}
                 onChange={(v) => store.setAdbToggle('invisible_debugging', v)}
-              />
-            </div>
-            <div class="settings__item">
-              <div class="settings__item-content">
-                <div class="settings__item-label">Hide USB Debugging</div>
-                <div class="settings__item-desc">Spoof ADB state for third-party apps</div>
-              </div>
-              <Toggle
-                checked={store.settings.adb.hide_usb_debugging}
-                onChange={(v) => store.setAdbToggle('hide_usb_debugging', v)}
               />
             </div>
           </>}

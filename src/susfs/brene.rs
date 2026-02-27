@@ -122,7 +122,7 @@ pub fn apply_brene(
         debug!("BRENE: emoji toggle OFF, skipping");
     }
 
-    apply_hide_usb_debugging(config.adb.hide_usb_debugging);
+    apply_hide_usb_debugging(config.adb.invisible_debugging);
 
     if !client.is_available() {
         debug!("SUSFS unavailable, skipping remaining BRENE protections");

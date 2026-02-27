@@ -303,12 +303,10 @@ pub struct AdbConfig {
     pub usb_debugging: bool,
     #[serde(default)]
     pub developer_options: bool,
-    #[serde(default)]
+    #[serde(default, alias = "hide_usb_debugging")]
     pub invisible_debugging: bool,
     #[serde(default)]
     pub adb_root: bool,
-    #[serde(default)]
-    pub hide_usb_debugging: bool,
 }
 
 impl Default for AdbConfig {
@@ -318,7 +316,6 @@ impl Default for AdbConfig {
             developer_options: false,
             invisible_debugging: false,
             adb_root: false,
-            hide_usb_debugging: false,
         }
     }
 }
@@ -548,9 +545,8 @@ impl ZeroMountConfig {
             // adb.*
             "adb.usb_debugging" => Some(self.adb.usb_debugging.to_string()),
             "adb.developer_options" => Some(self.adb.developer_options.to_string()),
-            "adb.invisible_debugging" => Some(self.adb.invisible_debugging.to_string()),
+            "adb.invisible_debugging" | "adb.hide_usb_debugging" => Some(self.adb.invisible_debugging.to_string()),
             "adb.adb_root" => Some(self.adb.adb_root.to_string()),
-            "adb.hide_usb_debugging" => Some(self.adb.hide_usb_debugging.to_string()),
 
             // per_module.<id>.<field>
             k if k.starts_with("per_module.") => self.get_module_key(k),
@@ -622,9 +618,8 @@ impl ZeroMountConfig {
             // adb.*
             "adb.usb_debugging" => self.adb.usb_debugging = value.parse()?,
             "adb.developer_options" => self.adb.developer_options = value.parse()?,
-            "adb.invisible_debugging" => self.adb.invisible_debugging = value.parse()?,
+            "adb.invisible_debugging" | "adb.hide_usb_debugging" => self.adb.invisible_debugging = value.parse()?,
             "adb.adb_root" => self.adb.adb_root = value.parse()?,
-            "adb.hide_usb_debugging" => self.adb.hide_usb_debugging = value.parse()?,
 
             // per_module.<id>.<field>
             k if k.starts_with("per_module.") => self.set_module_key(k, value)?,
@@ -796,7 +791,6 @@ mod tests {
         assert!(!config.adb.usb_debugging);
         assert!(!config.adb.developer_options);
         assert!(!config.adb.adb_root);
-        assert!(!config.adb.hide_usb_debugging);
         assert!(config.per_module.is_empty());
     }
 
@@ -839,6 +833,9 @@ mod tests {
 
         config.set("adb.adb_root", "true").unwrap();
         assert_eq!(config.get("adb.adb_root").unwrap(), "true");
+
+        config.set("adb.invisible_debugging", "true").unwrap();
+        assert_eq!(config.get("adb.invisible_debugging").unwrap(), "true");
 
         config.set("adb.hide_usb_debugging", "true").unwrap();
         assert_eq!(config.get("adb.hide_usb_debugging").unwrap(), "true");
@@ -958,7 +955,6 @@ kstat = false
         assert!(!config.adb.usb_debugging);
         assert!(!config.adb.developer_options);
         assert!(!config.adb.adb_root);
-        assert!(!config.adb.hide_usb_debugging);
     }
 
     #[test]

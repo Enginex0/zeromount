@@ -150,7 +150,6 @@ function createAppStore() {
     developer_options: false,
     invisible_debugging: false,
     adb_root: false,
-    hide_usb_debugging: false,
   };
 
   const [settings, setSettings] = createStore<Settings>({
@@ -412,8 +411,8 @@ function createAppStore() {
         ...prev,
         usb_debugging: typeof (cfg.adb as any).usb_debugging === 'boolean' ? (cfg.adb as any).usb_debugging : prev.usb_debugging,
         developer_options: typeof cfg.adb.developer_options === 'boolean' ? cfg.adb.developer_options : prev.developer_options,
+        invisible_debugging: typeof cfg.adb.invisible_debugging === 'boolean' ? cfg.adb.invisible_debugging : typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.invisible_debugging,
         adb_root: typeof cfg.adb.adb_root === 'boolean' ? cfg.adb.adb_root : prev.adb_root,
-        hide_usb_debugging: typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.hide_usb_debugging,
       }));
     }
     setEmojiConflict(data.emoji_conflict || null);
@@ -859,6 +858,12 @@ function createAppStore() {
     try {
       await api.configSet(`adb.${key}`, String(value));
       pushActivity('setting_changed', `adb.${key} → ${value ? 'ON' : 'OFF'}`);
+
+      if (key === 'adb_root' && value && !settings.adb.invisible_debugging) {
+        setSettings('adb', 'invisible_debugging', true);
+        await api.configSet('adb.invisible_debugging', 'true');
+        pushActivity('setting_changed', 'adb.invisible_debugging → ON (auto)');
+      }
     } catch (e) {
       showToast(`Failed to save ${key}`, 'error');
       setSettings('adb', key, !value);
@@ -939,10 +944,8 @@ function createAppStore() {
       const adb: Partial<AdbSettings> = {};
       if ('usb_debugging' in a) {
         adb.usb_debugging = typeof a.usb_debugging === 'boolean' ? a.usb_debugging : String(a.usb_debugging) === 'true';
-      } else if ('hide_usb_debugging' in a) {
-        adb.usb_debugging = typeof a.hide_usb_debugging === 'boolean' ? a.hide_usb_debugging : String(a.hide_usb_debugging) === 'true';
       }
-      for (const key of ['developer_options', 'adb_root', 'hide_usb_debugging'] as (keyof AdbSettings)[]) {
+      for (const key of ['developer_options', 'invisible_debugging', 'adb_root'] as (keyof AdbSettings)[]) {
         if (key in a) {
           const v = a[key];
           adb[key] = typeof v === 'boolean' ? v : String(v) === 'true';
@@ -950,7 +953,7 @@ function createAppStore() {
       }
       setSettings('adb', prev => ({ ...prev, ...adb }));
     } else {
-      const keys: (keyof AdbSettings)[] = ['usb_debugging', 'developer_options', 'adb_root', 'hide_usb_debugging'];
+      const keys: (keyof AdbSettings)[] = ['usb_debugging', 'developer_options', 'invisible_debugging', 'adb_root'];
       const results = await Promise.allSettled(keys.map(k => api.configGet(`adb.${k}`)));
       const adb: Partial<AdbSettings> = {};
       results.forEach((r, i) => {

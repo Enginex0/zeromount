@@ -93,9 +93,9 @@ _bg_pids=""
 # Supplemental enforcer — primary spoof runs in post-fs-data.sh before Zygote fork.
 # This handles USB HAL events that reset sys.usb.* props at runtime after boot_completed.
 hide_usb_debugging() {
-    ENABLED=$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)
+    ENABLED=$("$BIN" config get adb.invisible_debugging 2>/dev/null)
     if [ "$ENABLED" != "true" ]; then
-        echo "zeromount: hide_usb_debugging disabled, skipping" > /dev/kmsg 2>/dev/null
+        echo "zeromount: invisible_debugging disabled, skipping" > /dev/kmsg 2>/dev/null
         return 0
     fi
 

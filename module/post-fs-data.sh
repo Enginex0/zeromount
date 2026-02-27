@@ -8,7 +8,7 @@ MODDIR="${0%/*}"
 "$BIN" detect
 
 spoof_usb_debug_early() {
-    [ "$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)" = "true" ] || return 0
+    [ "$("$BIN" config get adb.invisible_debugging 2>/dev/null)" = "true" ] || return 0
 
     if ! command -v resetprop >/dev/null 2>&1; then
         echo "zeromount: resetprop not found, skipping early USB debug spoof" > /dev/kmsg 2>/dev/null
