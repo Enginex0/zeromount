@@ -167,6 +167,81 @@ build_axon() {
     echo "==> [axon] All targets built"
 }
 
+build_zygisk() {
+    local zygisk_src="$MODULE_DIR/zygisk"
+    if [ ! -f "$zygisk_src/CMakeLists.txt" ]; then
+        echo "WARN: zygisk source not found, skipping" >&2
+        return 0
+    fi
+
+    # LSPlant needs C++23 modules — requires NDK r29+ (Clang 21)
+    local ndk_root=""
+    for candidate in /home/president/Android/Sdk/ndk/29.* /opt/android-ndk-r29*; do
+        if [ -f "$candidate/build/cmake/android.toolchain.cmake" ]; then
+            ndk_root="$candidate"
+            break
+        fi
+    done
+    if [ -z "$ndk_root" ]; then
+        echo "WARN: NDK r29+ not found, skipping zygisk build" >&2
+        return 0
+    fi
+
+    local build_dir="$PROJECT_ROOT/target/zygisk"
+    local build_tools="${BUILD_TOOLS:-/home/president/Android/Sdk/build-tools/34.0.0}"
+    local android_jar="${ANDROID_JAR:-/home/president/Android/Sdk/platforms/android-34/android.jar}"
+    local strip="$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+
+    # Only arm64 — 32-bit Zygisk companion is rare and LSPlant doesn't target it
+    local abi="arm64-v8a"
+    local cmake_build="$build_dir/$abi"
+
+    echo "==> [zygisk] Building $abi (NDK: $(basename "$ndk_root"))"
+
+    # Ensure LSPlant submodules are populated
+    local dex_builder="$PROJECT_ROOT/external/lsplant/lsplant/src/main/jni/external/dex_builder"
+    if [ ! -f "$dex_builder/CMakeLists.txt" ]; then
+        echo "==> [zygisk] Initializing LSPlant submodules"
+        (cd "$PROJECT_ROOT/external/lsplant" && git submodule update --init --recursive 2>&1)
+    fi
+
+    rm -rf "$cmake_build"
+    mkdir -p "$cmake_build"
+    cmake -G Ninja \
+        -DCMAKE_TOOLCHAIN_FILE="$ndk_root/build/cmake/android.toolchain.cmake" \
+        -DANDROID_ABI="$abi" \
+        -DANDROID_PLATFORM=android-26 \
+        -DANDROID_STL=c++_static \
+        -DLSPLANT_BUILD_SHARED=OFF \
+        -S "$zygisk_src" \
+        -B "$cmake_build" 2>&1 | grep -E "^(--|CMake Error)" || true
+
+    ninja -C "$cmake_build" -j"$(nproc)" 2>&1
+    "$strip" "$cmake_build/libzeromount_zygisk.so"
+
+    # Build hooker.dex
+    local dex_out="$build_dir/dex"
+    rm -rf "$dex_out"
+    mkdir -p "$dex_out/classes"
+    javac -source 8 -target 8 \
+        -bootclasspath "$android_jar" \
+        -classpath "$android_jar" \
+        -d "$dex_out/classes" \
+        "$zygisk_src/java/com/zeromount/hook/SettingsHooker.java" 2>&1
+    "$build_tools/d8" \
+        --output "$dex_out" \
+        --min-api 26 \
+        "$dex_out/classes/com/zeromount/hook/SettingsHooker.class" 2>&1
+    mv "$dex_out/classes.dex" "$dex_out/hooker.dex"
+
+    # Stage into module dir
+    mkdir -p "$MODULE_DIR/zygisk"
+    cp "$cmake_build/libzeromount_zygisk.so" "$MODULE_DIR/zygisk/$abi.so"
+    cp "$dex_out/hooker.dex" "$MODULE_DIR/zygisk/hooker.dex"
+
+    echo "==> [zygisk] Built: $abi.so ($(du -h "$MODULE_DIR/zygisk/$abi.so" | cut -f1)), hooker.dex"
+}
+
 # Package one ZIP from a given Rust profile
 package_zip() {
     local profile="$1"
@@ -278,6 +353,14 @@ package_zip() {
         cp -r "$MODULE_DIR/emoji" "$staging/emoji"
     fi
 
+    # Zygisk companion — only ship built artifacts, not source
+    if [ -f "$MODULE_DIR/zygisk/arm64-v8a.so" ]; then
+        mkdir -p "$staging/zygisk"
+        cp "$MODULE_DIR/zygisk/arm64-v8a.so" "$staging/zygisk/"
+        [ -f "$MODULE_DIR/zygisk/hooker.dex" ] && \
+            cp "$MODULE_DIR/zygisk/hooker.dex" "$staging/zygisk/"
+    fi
+
     # META-INF
     mkdir -p "$staging/META-INF/com/google/android"
     cat > "$staging/META-INF/com/google/android/update-binary" << 'UPDATER'
@@ -317,10 +400,15 @@ UPDATER
         lkm_count=$(ls "$MODULE_DIR/lkm"/*.ko 2>/dev/null | wc -l)
     fi
 
+    local zygisk_status="absent"
+    [ -d "$staging/../" ] || true
+    [ -f "$MODULE_DIR/zygisk/arm64-v8a.so" ] && zygisk_status="arm64-v8a"
+
     echo "    Output:  $out_path"
     echo "    Size:    $(du -h "$out_path" | cut -f1)"
     echo "    Bins:    $found_bins/4"
     echo "    WebUI:   present"
+    echo "    Zygisk:  $zygisk_status"
     echo "    LKM:     $lkm_count kernel modules"
 }
 
@@ -335,6 +423,7 @@ if [ "$BUILD" = true ]; then
     build_rust "release"
 
     build_axon
+    build_zygisk
 
     if [ -f "$WEBUI_DIR/package.json" ]; then
         echo "==> Building WebUI"
