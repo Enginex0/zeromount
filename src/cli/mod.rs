@@ -94,7 +94,7 @@ pub enum EmojiAction {
 
 #[derive(Subcommand)]
 pub enum LogAction {
-    /// Enable kernel debug logging (sysfs=1, .verbose=touch)
+    /// Enable kernel debug logging (sysfs=2, .verbose=touch)
     Enable,
     /// Disable kernel debug logging (sysfs=0, .verbose=remove)
     Disable,
@@ -102,6 +102,8 @@ pub enum LogAction {
     Level { level: u32 },
     /// Show current kernel debug level and .verbose state
     Status,
+    /// Collect logs, dmesg, config, and diagnostics to /sdcard (stealth-named dir)
+    Dump,
 }
 
 #[derive(Subcommand)]

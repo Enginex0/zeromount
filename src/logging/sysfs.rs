@@ -58,9 +58,15 @@ fn try_write_sysfs(level: u32) -> &'static str {
 }
 
 pub fn enable() -> Result<()> {
-    let sysfs = try_write_sysfs(1);
+    // Level 2 = ZM_DBG active (full verbose kernel logging)
+    let sysfs = try_write_sysfs(2);
     set_verbose_marker(true)?;
     persist_verbose_config(true);
+    if let Ok(client) = crate::susfs::SusfsClient::probe() {
+        if let Err(e) = client.enable_log(true) {
+            eprintln!("warning: SUSFS log toggle failed: {e}");
+        }
+    }
     println!("logging enabled (sysfs={sysfs}, .verbose=present, config=true)");
     Ok(())
 }
@@ -69,14 +75,28 @@ pub fn disable() -> Result<()> {
     let sysfs = try_write_sysfs(0);
     set_verbose_marker(false)?;
     persist_verbose_config(false);
+    if let Ok(client) = crate::susfs::SusfsClient::probe() {
+        if let Err(e) = client.enable_log(false) {
+            eprintln!("warning: SUSFS log toggle failed: {e}");
+        }
+    }
     println!("logging disabled (sysfs={sysfs}, .verbose=removed, config=false)");
     Ok(())
 }
 
 pub fn set_level(level: u32) -> Result<()> {
-    let sysfs = try_write_sysfs(level);
-    set_verbose_marker(level > 0)?;
-    persist_verbose_config(level > 0);
+    // Kernel sysfs accepts 0/1/2 only; level 3 (VERBOSE) maps to sysfs=2
+    let sysfs_level = level.min(2);
+    let sysfs = try_write_sysfs(sysfs_level);
+    // Only VERBOSE (level 3) persists across reboots and activates SUSFS logging
+    let verbose = level >= 3;
+    set_verbose_marker(verbose)?;
+    persist_verbose_config(verbose);
+    if let Ok(client) = crate::susfs::SusfsClient::probe() {
+        if let Err(e) = client.enable_log(verbose) {
+            eprintln!("warning: SUSFS log toggle failed: {e}");
+        }
+    }
     println!("debug level set to {level} (sysfs={sysfs})");
     Ok(())
 }

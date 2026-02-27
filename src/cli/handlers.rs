@@ -36,6 +36,7 @@ pub fn handle_log(action: LogAction) -> Result<()> {
         LogAction::Disable => crate::logging::sysfs::disable(),
         LogAction::Level { level } => crate::logging::sysfs::set_level(level),
         LogAction::Status => crate::logging::sysfs::status(),
+        LogAction::Dump => crate::logging::dump::execute_dump(),
     }
 }
 

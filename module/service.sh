@@ -12,6 +12,11 @@ trap 'exit 0' INT TERM
 [ -z "$ABI" ] && exit 1
 [ -x "$BIN" ] || exit 1
 
+if [ -f /data/adb/zeromount/.verbose ]; then
+    echo "zeromount: restoring verbose mode from marker" > /dev/kmsg
+    $BIN log level 3
+fi
+
 # Rust detect phase writes which external SUSFS module (if any) is active
 EXTERNAL_SUSFS=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null)
 

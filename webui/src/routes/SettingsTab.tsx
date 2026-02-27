@@ -52,6 +52,13 @@ export function SettingsTab() {
               }}
             />
           </div>
+          {store.settings.verboseLogging && (
+            <div class="settings__item-desc color-text-tertiary">
+              {store.verboseDumpPath()
+                ? `Logs at: ${store.verboseDumpPath()}/`
+                : 'Verbose mode active'}
+            </div>
+          )}
 
           <Button
             variant="danger"

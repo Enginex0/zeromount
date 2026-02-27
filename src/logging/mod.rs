@@ -1,3 +1,4 @@
+pub mod dump;
 mod kmsg;
 mod rotating;
 pub mod sysfs;
@@ -23,8 +24,9 @@ pub fn init(verbose_flag: bool, config: &LoggingConfig) -> Result<()> {
         .from_env_lossy();
 
     let log_dir = config.log_dir.to_string_lossy();
-    let max_size = (config.max_log_size_mb as u64) * 1024 * 1024;
-    let max_files = config.max_log_files as usize;
+    // Verbose sessions generate ~10x more events; bump rotation budget to 5MB x 5 = 25MB
+    let (max_size_mb, max_files) = if verbose { (5u64, 5usize) } else { (config.max_log_size_mb as u64, config.max_log_files as usize) };
+    let max_size = max_size_mb * 1024 * 1024;
 
     let kmsg_layer = kmsg::KmsgLayer::new();
     let file_layer = rotating::RotatingFileLayer::new(&log_dir, max_size, max_files);

@@ -63,6 +63,7 @@ function createAppStore() {
   const [lastApiError, setLastApiError] = createSignal<{ operation: string; error: unknown; timestamp: Date } | null>(null);
   const [externalSusfsModule, setExternalSusfsModule] = createSignal<'susfs4ksu' | 'brene' | null>(null);
   const [bridgeValues, setBridgeValues] = createSignal<BridgeValues | null>(null);
+  const [verboseDumpPath, setVerboseDumpPath] = createSignal<string | null>(null);
 
   const savedBgOpacity = typeof window !== 'undefined'
     ? parseFloat(localStorage.getItem('zeromount-bgOpacity') ?? '0.35')
@@ -683,6 +684,14 @@ function createAppStore() {
     try {
       await api.setVerboseLogging(enabled);
       pushActivity('setting_changed', `Verbose logging → ${enabled ? 'ON' : 'OFF'}`);
+      if (enabled) {
+        showToast('Verbose logging enabled. Reboot for full coverage.', 'info');
+      } else {
+        showToast('Verbose logging disabled.', 'info');
+        setVerboseDumpPath(null);
+      }
+      const dumpPath = await api.getVerboseDumpPath();
+      setVerboseDumpPath(dumpPath);
     } catch (e) {
       setSettings({ verboseLogging: !enabled });
       showToast('Failed to set verbose logging', 'error');
@@ -1023,14 +1032,18 @@ function createAppStore() {
     if (dump?.logging && 'verbose' in dump.logging) {
       const v = dump.logging.verbose;
       setSettings({ verboseLogging: typeof v === 'boolean' ? v : String(v) === 'true' });
-      return;
+    } else {
+      try {
+        const verbose = await api.getVerboseLogging();
+        setSettings({ verboseLogging: verbose });
+      } catch (e) {
+        // Non-fatal: default to false
+      }
     }
-    // Fallback: individual call
     try {
-      const verbose = await api.getVerboseLogging();
-      setSettings({ verboseLogging: verbose });
+      const dumpPath = await api.getVerboseDumpPath();
+      setVerboseDumpPath(dumpPath);
     } catch (e) {
-      // Non-fatal: default to false
     }
   };
 
@@ -1426,6 +1439,7 @@ function createAppStore() {
     updateSettings,
     fetchSystemColor,
     setVerboseLogging,
+    verboseDumpPath,
     showToast,
     stopPolling: stopTriggerPolling,
   };

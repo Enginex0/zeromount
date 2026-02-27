@@ -424,6 +424,16 @@ export const api = {
     return stdout.trim() === 'true';
   },
 
+  async getVerboseDumpPath(): Promise<string | null> {
+    if (shouldUseMock()) return null;
+    try {
+      const { errno, stdout } = await ksuExec(`cat /data/adb/zeromount/.dump_path 2>/dev/null`);
+      if (errno === 0 && stdout.trim()) return stdout.trim();
+    } catch (e) {
+    }
+    return null;
+  },
+
   async getInstalledApps(): Promise<InstalledApp[]> {
     if (shouldUseMock()) return (await getMock()).getInstalledApps();
     return [];
