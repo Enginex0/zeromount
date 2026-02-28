@@ -95,7 +95,7 @@ export function SettingsTab() {
         </div>
         <CollapsibleSubgroup
           label="Android Settings"
-          hiddenCount={5}
+          hiddenCount={4}
           defaultItems={<></>}
           expandedItems={<>
             <div class="settings__item">

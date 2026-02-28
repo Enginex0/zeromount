@@ -106,7 +106,7 @@ export function SusfsSection() {
             <path d="M7 10l5 5 5-5z"/>
           </svg>
           <span>Advanced Settings</span>
-          <span class="settings__advanced-badge">15</span>
+          <span class="settings__advanced-badge">17</span>
         </button>
 
         <Show when={showAdvanced()}>

@@ -136,21 +136,22 @@
     background-size: 200% 200%;
     animation: rainbowShift 4s ease infinite;
     border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: none;
+}
+
+.toggle-track--rainbow.toggle-track--active .toggle-thumb {
     box-shadow:
-        0 0 16px rgba(255, 107, 107, 0.25),
-        0 0 16px rgba(0, 214, 143, 0.15),
-        inset 0 0 10px rgba(255, 255, 255, 0.1);
+        0 2px 8px rgba(0, 0, 0, 0.25),
+        0 1px 2px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .toggle-track--rainbow.toggle-track--active .toggle-thumb::after {
     background: linear-gradient(135deg, #FF6B6B, #00D68F);
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+    box-shadow: none;
 }
 
 .custom-toggle:hover .toggle-track--rainbow.toggle-track--active {
     filter: brightness(1.15);
-    box-shadow:
-        0 0 24px rgba(255, 107, 107, 0.35),
-        0 0 24px rgba(0, 214, 143, 0.2),
-        inset 0 0 10px rgba(255, 255, 255, 0.1);
+    box-shadow: none;
 }

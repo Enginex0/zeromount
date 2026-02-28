@@ -136,7 +136,7 @@ pub fn apply_emoji_fonts(
 
         if !Path::new(&target_path).exists() {
             if let Some(ref driver) = vfs_driver {
-                match driver.add_rule(&source, Path::new(&target_path), false) {
+                match driver.add_rule(Path::new(&target_path), &source, false) {
                     Ok(()) => {
                         debug!("emoji: VFS rule for {} (target doesn't exist, staged)", target_name);
                         result.vfs_rules += 1;
