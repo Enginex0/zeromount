@@ -1,10 +1,9 @@
-pub struct PropEntry {
+pub(super) struct PropEntry {
     pub name: &'static str,
     pub value: &'static str,
 }
 
-// Static debug props — set once when hide_usb_debugging is enabled
-pub static HIDE_DEBUG: &[PropEntry] = &[
+pub(super) static HIDE_DEBUG: &[PropEntry] = &[
     PropEntry { name: "ro.debuggable", value: "0" },
     PropEntry { name: "persist.sys.debuggable", value: "0" },
     PropEntry { name: "persist.service.debuggerd.enable", value: "0" },
@@ -19,8 +18,7 @@ pub static HIDE_DEBUG: &[PropEntry] = &[
     PropEntry { name: "ro.bootmode", value: "normal" },
 ];
 
-// General prop spoofing — boot state, build fingerprint, verified boot
-pub static GENERAL: &[PropEntry] = &[
+pub(super) static GENERAL: &[PropEntry] = &[
     PropEntry { name: "ro.debuggable", value: "0" },
     PropEntry { name: "ro.secure", value: "1" },
     PropEntry { name: "ro.build.type", value: "user" },
@@ -49,10 +47,27 @@ pub static GENERAL: &[PropEntry] = &[
     PropEntry { name: "sys.oem_unlock_allowed", value: "0" },
     PropEntry { name: "ro.vendor.boot.warranty_bit", value: "0" },
     PropEntry { name: "ro.vendor.warranty_bit", value: "0" },
+    PropEntry { name: "ro.boot.warranty_bit", value: "0" },
+    PropEntry { name: "ro.warranty_bit", value: "0" },
 ];
 
-// build.prop files to scan for userdebug/test-keys
-pub static BUILD_PROP_PATHS: &[&str] = &[
+// Dynamic props the system resets — need persistent __system_property_wait enforcement
+pub(super) static DYNAMIC_USB: &[PropEntry] = &[
+    PropEntry { name: "init.svc.adbd", value: "stopped" },
+    PropEntry { name: "sys.usb.config", value: "mtp" },
+    PropEntry { name: "sys.usb.state", value: "mtp" },
+    PropEntry { name: "sys.usb.ffs.ready", value: "0" },
+    PropEntry { name: "sys.usb.ffs.adb.ready", value: "0" },
+    PropEntry { name: "persist.sys.usb.config", value: "mtp" },
+    PropEntry { name: "persist.sys.usb.reboot.func", value: "mtp" },
+    PropEntry { name: "service.adb.root", value: "0" },
+    PropEntry { name: "service.adb.tcp.port", value: "-1" },
+    PropEntry { name: "persist.service.adb.enable", value: "0" },
+    PropEntry { name: "persist.vendor.usb.config", value: "none" },
+    PropEntry { name: "vendor.usb.config", value: "none" },
+];
+
+pub(super) static BUILD_PROP_PATHS: &[&str] = &[
     "/default.prop",
     "/system/build.prop",
     "/vendor/build.prop",

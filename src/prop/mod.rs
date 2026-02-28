@@ -4,9 +4,10 @@ mod table;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
+use std::thread;
 
 use anyhow::Result;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 use crate::core::config::ZeroMountConfig;
 
@@ -22,7 +23,9 @@ pub fn run_prop_watch() -> Result<()> {
         return Ok(());
     }
 
-    if prop_spoof && !has_external_susfs() {
+    let ext = has_external_susfs();
+
+    if prop_spoof && !ext {
         let props: Vec<(&str, &str)> = table::GENERAL
             .iter()
             .map(|p| (p.name, p.value))
@@ -30,17 +33,10 @@ pub fn run_prop_watch() -> Result<()> {
         enforcer::enforce_once(&props);
 
         let size = config.brene.vbmeta_size.to_string();
-        trace!(prop = "ro.boot.vbmeta.size", value = %size, "setting vbmeta size");
         enforcer::resetprop("ro.boot.vbmeta.size", &size);
 
         if !config.brene.verified_boot_hash.is_empty() {
-            trace!(prop = "ro.boot.vbmeta.digest", "setting verified boot hash");
             enforcer::resetprop("ro.boot.vbmeta.digest", &config.brene.verified_boot_hash);
-        }
-
-        for prop in &["ro.warranty_bit", "ro.vendor.boot.warranty_bit",
-                       "ro.vendor.warranty_bit", "ro.boot.warranty_bit"] {
-            enforcer::resetprop(prop, "0");
         }
 
         info!("general prop spoofing applied");
@@ -52,17 +48,21 @@ pub fn run_prop_watch() -> Result<()> {
         return Ok(());
     }
 
-    let static_props: Vec<(&str, &str)> = table::HIDE_DEBUG
-        .iter()
-        .map(|p| (p.name, p.value))
-        .collect();
-    enforcer::enforce_once(&static_props);
+    enforcer::enforce_once(
+        &table::HIDE_DEBUG.iter().map(|p| (p.name, p.value)).collect::<Vec<_>>(),
+    );
 
     let dynamic = scan_build_props();
-    debug!(count = dynamic, "dynamic build.prop props overridden");
+    debug!(count = dynamic, "build.prop overrides applied");
 
-    info!("stealth debug props applied (Zygisk handles Settings.Global)");
-    Ok(())
+    for entry in table::DYNAMIC_USB {
+        enforcer::watch_prop(entry.name, entry.value);
+    }
+    info!("USB stealth active ({} watchers)", table::DYNAMIC_USB.len());
+
+    loop {
+        thread::park();
+    }
 }
 
 fn has_external_susfs() -> bool {
@@ -86,13 +86,9 @@ fn scan_build_props() -> usize {
             if !line.starts_with("ro.") { continue; }
 
             if line.contains("userdebug") {
-                let fixed = line.replace("userdebug", "user");
-                trace!(original = %line, replacement = %fixed, "build.prop override");
-                overrides.push(fixed);
+                overrides.push(line.replace("userdebug", "user"));
             } else if line.contains("test-keys") {
-                let fixed = line.replace("test-keys", "release-keys");
-                trace!(original = %line, replacement = %fixed, "build.prop override");
-                overrides.push(fixed);
+                overrides.push(line.replace("test-keys", "release-keys"));
             }
         }
     }
