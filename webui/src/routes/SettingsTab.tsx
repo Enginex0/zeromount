@@ -137,7 +137,7 @@ export function SettingsTab() {
             <div class="settings__item">
               <div class="settings__item-content">
                 <div class="settings__item-label">Hide USB Debugging</div>
-                <div class="settings__item-desc">Full ADB concealment — kernel sysfs, prop enforcement, Settings.Global, SUSFS path-hide, and BRENE bridge masking</div>
+                <div class="settings__item-desc">Full ADB concealment — kernel sysfs, prop enforcement - use with HMA-OSS</div>
               </div>
               <Toggle
                 checked={store.settings.adb.hide_usb_debugging}
