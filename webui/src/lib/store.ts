@@ -409,11 +409,10 @@ function createAppStore() {
     if (cfg.adb) {
       setSettings('adb', prev => ({
         ...prev,
-        usb_debugging: typeof (cfg.adb as any).usb_debugging === 'boolean' ? (cfg.adb as any).usb_debugging : prev.usb_debugging,
+        usb_debugging: typeof cfg.adb.usb_debugging === 'boolean' ? cfg.adb.usb_debugging : prev.usb_debugging,
         developer_options: typeof cfg.adb.developer_options === 'boolean' ? cfg.adb.developer_options : prev.developer_options,
-        invisible_debugging: typeof cfg.adb.invisible_debugging === 'boolean' ? cfg.adb.invisible_debugging : typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.invisible_debugging,
         adb_root: typeof cfg.adb.adb_root === 'boolean' ? cfg.adb.adb_root : prev.adb_root,
-        hide_usb_debugging: typeof (cfg.adb as any).hide_usb_debugging === 'boolean' ? (cfg.adb as any).hide_usb_debugging : prev.hide_usb_debugging,
+        hide_usb_debugging: typeof cfg.adb.hide_usb_debugging === 'boolean' ? cfg.adb.hide_usb_debugging : prev.hide_usb_debugging,
       }));
     }
     setEmojiConflict(data.emoji_conflict || null);
@@ -860,10 +859,10 @@ function createAppStore() {
       await api.configSet(`adb.${key}`, String(value));
       pushActivity('setting_changed', `adb.${key} → ${value ? 'ON' : 'OFF'}`);
 
-      if (key === 'adb_root' && value && !settings.adb.invisible_debugging) {
-        setSettings('adb', 'invisible_debugging', true);
-        await api.configSet('adb.invisible_debugging', 'true');
-        pushActivity('setting_changed', 'adb.invisible_debugging → ON (auto)');
+      if (key === 'adb_root' && value && !settings.adb.hide_usb_debugging) {
+        setSettings('adb', 'hide_usb_debugging', true);
+        await api.configSet('adb.hide_usb_debugging', 'true');
+        pushActivity('setting_changed', 'adb.hide_usb_debugging → ON (auto)');
       }
     } catch (e) {
       showToast(`Failed to save ${key}`, 'error');
