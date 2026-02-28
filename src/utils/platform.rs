@@ -10,7 +10,7 @@ const ZEROMOUNT_MODULE_DIR: &str = "/data/adb/modules/meta-zeromount";
 
 // -- KernelSU --
 
-pub struct KsuManager;
+struct KsuManager;
 
 impl RootManager for KsuManager {
     fn name(&self) -> &str {
@@ -64,7 +64,7 @@ impl RootManager for KsuManager {
 
 // -- APatch --
 
-pub struct APatchManager;
+struct APatchManager;
 
 impl RootManager for APatchManager {
     fn name(&self) -> &str {
@@ -117,7 +117,7 @@ impl RootManager for APatchManager {
 
 // -- Magisk --
 
-pub struct MagiskManager;
+struct MagiskManager;
 
 impl RootManager for MagiskManager {
     fn name(&self) -> &str {

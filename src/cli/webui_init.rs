@@ -14,7 +14,7 @@ const EXCLUSION_META: &str = "/data/adb/zeromount/.exclusion_meta.json";
 const ACTIVITY_LOG: &str = "/data/adb/zeromount/activity.log";
 
 #[derive(Serialize)]
-pub struct WebUiInitResponse {
+struct WebUiInitResponse {
     pub status: RuntimeState,
     pub config: ZeroMountConfig,
     pub system_info: WebUiSystemInfo,
@@ -28,7 +28,7 @@ pub struct WebUiInitResponse {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebUiSystemInfo {
+struct WebUiSystemInfo {
     pub kernel_version: String,
     pub uptime: String,
     pub device_model: String,
@@ -37,7 +37,7 @@ pub struct WebUiSystemInfo {
 }
 
 #[derive(Serialize)]
-pub struct WebUiRule {
+struct WebUiRule {
     pub id: String,
     pub name: String,
     pub source: String,
@@ -46,7 +46,7 @@ pub struct WebUiRule {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebUiExcludedUid {
+struct WebUiExcludedUid {
     pub uid: u32,
     pub package_name: String,
     pub app_name: String,
@@ -54,7 +54,7 @@ pub struct WebUiExcludedUid {
 }
 
 #[derive(Serialize)]
-pub struct WebUiActivityItem {
+struct WebUiActivityItem {
     pub id: String,
     #[serde(rename = "type")]
     pub item_type: String,
@@ -64,7 +64,7 @@ pub struct WebUiActivityItem {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebUiModule {
+struct WebUiModule {
     pub name: String,
     pub path: String,
     pub has_system: bool,

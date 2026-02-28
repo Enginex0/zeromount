@@ -264,7 +264,6 @@ pub struct ModuleStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-#[allow(dead_code)] // FFI enum matching upstream kernel command codes
 pub enum SusfsCommand {
     AddSusPath = 0x55550,
     SetAndroidDataRootPath = 0x55551,

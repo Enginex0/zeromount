@@ -47,25 +47,6 @@ impl VfsExecutor {
         Ok(results)
     }
 
-    /// Hot-reload: CLEAR_ALL + re-inject all rules.
-    #[allow(dead_code)] // Wired when watcher triggers VFS re-inject
-    pub fn hot_reload(
-        &self,
-        plan: &MountPlan,
-        modules: &[ScannedModule],
-    ) -> Result<Vec<MountResult>> {
-        info!("hot-reload: clearing all rules before re-inject");
-
-        // Disable engine before modifying rules -- bail if this fails to avoid
-        // clearing rules from a still-active engine (detection window)
-        self.driver.disable().context("disable before hot-reload failed")?;
-
-        self.driver.clear_all().context("CLEAR_ALL failed during hot-reload")?;
-
-        // Re-run the full pipeline
-        self.execute(plan, modules)
-    }
-
     /// Inject VFS rules for a single module. Returns per-module result.
     fn inject_module_rules(&self, module: &ScannedModule) -> MountResult {
         let mut applied = 0u32;

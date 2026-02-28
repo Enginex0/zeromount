@@ -167,78 +167,8 @@ build_axon() {
     echo "==> [axon] All targets built"
 }
 
-build_zygisk() {
-    local zygisk_src="$MODULE_DIR/zygisk"
-    if [ ! -f "$zygisk_src/CMakeLists.txt" ]; then
-        echo "WARN: zygisk source not found, skipping" >&2
-        return 0
-    fi
 
-    # LSPlant needs C++23 modules — requires NDK r29+ (Clang 21)
-    local ndk_root=""
-    for candidate in /home/president/Android/Sdk/ndk/29.* /opt/android-ndk-r29*; do
-        if [ -f "$candidate/build/cmake/android.toolchain.cmake" ]; then
-            ndk_root="$candidate"
-            break
-        fi
-    done
-    if [ -z "$ndk_root" ]; then
-        echo "WARN: NDK r29+ not found, skipping zygisk build" >&2
-        return 0
-    fi
 
-    local build_dir="$PROJECT_ROOT/target/zygisk"
-    local build_tools="${BUILD_TOOLS:-/home/president/Android/Sdk/build-tools/34.0.0}"
-    local android_jar="${ANDROID_JAR:-/home/president/Android/Sdk/platforms/android-34/android.jar}"
-    local strip="$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-
-    local dex_builder="$PROJECT_ROOT/external/lsplant/lsplant/src/main/jni/external/dex_builder"
-    if [ ! -f "$dex_builder/CMakeLists.txt" ]; then
-        echo "==> [zygisk] Initializing LSPlant submodules"
-        (cd "$PROJECT_ROOT/external/lsplant" && git submodule update --init --recursive 2>&1)
-    fi
-
-    local zygisk_abis=(arm64-v8a armeabi-v7a)
-    mkdir -p "$MODULE_DIR/zygisk"
-
-    for abi in "${zygisk_abis[@]}"; do
-        local cmake_build="$build_dir/$abi"
-        echo "==> [zygisk] Building $abi (NDK: $(basename "$ndk_root"))"
-
-        rm -rf "$cmake_build"
-        mkdir -p "$cmake_build"
-        cmake -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$ndk_root/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI="$abi" \
-            -DANDROID_PLATFORM=android-26 \
-            -DANDROID_STL=c++_static \
-            -DLSPLANT_BUILD_SHARED=OFF \
-            -S "$zygisk_src" \
-            -B "$cmake_build" 2>&1 | grep -E "^(--|CMake Error)" || true
-
-        ninja -C "$cmake_build" -j"$(nproc)" 2>&1
-        "$strip" "$cmake_build/libzeromount_zygisk.so"
-        cp "$cmake_build/libzeromount_zygisk.so" "$MODULE_DIR/zygisk/$abi.so"
-        echo "==> [zygisk] $abi.so ($(du -h "$MODULE_DIR/zygisk/$abi.so" | cut -f1))"
-    done
-
-    # Build hooker.dex (arch-independent)
-    local dex_out="$build_dir/dex"
-    rm -rf "$dex_out"
-    mkdir -p "$dex_out/classes"
-    javac -source 8 -target 8 \
-        -bootclasspath "$android_jar" \
-        -classpath "$android_jar" \
-        -d "$dex_out/classes" \
-        "$zygisk_src/java/com/zeromount/hook/SettingsHooker.java" 2>&1
-    "$build_tools/d8" \
-        --output "$dex_out" \
-        --min-api 26 \
-        "$dex_out/classes/com/zeromount/hook/SettingsHooker.class" 2>&1
-    mv "$dex_out/classes.dex" "$MODULE_DIR/zygisk/hooker.dex"
-
-    echo "==> [zygisk] hooker.dex built"
-}
 
 # Package one ZIP from a given Rust profile
 package_zip() {
@@ -312,6 +242,7 @@ package_zip() {
                 [ -f "$so" ] && cp "$so" "$staging/lib/$abi/"
             done
         fi
+
     done
 
     if [ "$found_bins" -ne 4 ]; then
@@ -319,6 +250,7 @@ package_zip() {
         rm -rf "$staging"
         exit 1
     fi
+
 
     # WebUI
     local webroot_src=""
@@ -429,7 +361,6 @@ if [ "$BUILD" = true ]; then
     build_rust "release"
 
     build_axon
-    build_zygisk
 
     if [ -f "$WEBUI_DIR/package.json" ]; then
         echo "==> Building WebUI"

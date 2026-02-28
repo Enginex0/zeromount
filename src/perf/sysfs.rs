@@ -72,25 +72,3 @@ pub fn glob_dirs(pattern: &str) -> Vec<String> {
     result.sort();
     result
 }
-
-#[allow(dead_code)]
-pub fn glob_files(pattern: &str) -> Vec<String> {
-    let Some((parent, prefix)) = pattern.rsplit_once('/') else {
-        return Vec::new();
-    };
-
-    let Ok(entries) = fs::read_dir(parent) else {
-        return Vec::new();
-    };
-
-    let mut result = Vec::new();
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        if name_str.starts_with(prefix.trim_end_matches('*')) {
-            result.push(entry.path().to_string_lossy().into_owned());
-        }
-    }
-    result.sort();
-    result
-}

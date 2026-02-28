@@ -7,7 +7,7 @@ const SYSFS_DEBUG: &str = "/sys/kernel/zeromount/debug";
 const VERBOSE_MARKER: &str = "/data/adb/zeromount/.verbose";
 
 /// Read the current kernel debug level from sysfs (0=off, 1=standard, 2=verbose).
-pub fn read_kernel_debug_level() -> Result<u32> {
+pub(super) fn read_kernel_debug_level() -> Result<u32> {
     let content = fs::read_to_string(SYSFS_DEBUG)
         .context("cannot read /sys/kernel/zeromount/debug -- is the kernel module loaded?")?;
     content
@@ -17,7 +17,7 @@ pub fn read_kernel_debug_level() -> Result<u32> {
 }
 
 /// Write a debug level to the kernel sysfs node.
-pub fn write_kernel_debug_level(level: u32) -> Result<()> {
+fn write_kernel_debug_level(level: u32) -> Result<()> {
     fs::write(SYSFS_DEBUG, format!("{level}\n"))
         .context("cannot write /sys/kernel/zeromount/debug -- check permissions / SELinux")
 }

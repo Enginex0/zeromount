@@ -77,7 +77,7 @@ pub fn probe_vfs_driver() -> Result<CapabilityFlags> {
 }
 
 /// Check /sys/kernel/zeromount/ for version info.
-pub fn probe_sysfs() -> Result<Option<u32>> {
+fn probe_sysfs() -> Result<Option<u32>> {
     let version_path = Path::new(SYSFS_DIR).join("version");
     if !version_path.exists() {
         return Ok(None);
@@ -91,21 +91,21 @@ pub fn probe_sysfs() -> Result<Option<u32>> {
 }
 
 /// Check if OverlayFS is supported by probing /proc/filesystems.
-pub fn check_overlay_support() -> Result<bool> {
+fn check_overlay_support() -> Result<bool> {
     let content = std::fs::read_to_string("/proc/filesystems")
         .unwrap_or_default();
     Ok(content.contains("overlay"))
 }
 
 /// Check if EROFS is supported by probing /proc/filesystems.
-pub fn check_erofs_support() -> Result<bool> {
+fn check_erofs_support() -> Result<bool> {
     let content = std::fs::read_to_string("/proc/filesystems")
         .unwrap_or_default();
     Ok(content.contains("erofs"))
 }
 
 /// Check if tmpfs supports xattr by testing setxattr on /dev (always tmpfs on Android).
-pub fn check_tmpfs_xattr() -> Result<bool> {
+fn check_tmpfs_xattr() -> Result<bool> {
     use std::ffi::CString;
 
     let test_path = std::path::Path::new("/dev/.zm_xattr_probe");

@@ -1,23 +1,23 @@
 use crate::core::config::UnameMode;
 
-pub fn bool_to_int(v: bool) -> u8 {
+pub(super) fn bool_to_int(v: bool) -> u8 {
     if v { 1 } else { 0 }
 }
 
-pub fn int_to_bool(v: u8) -> bool {
+pub(super) fn int_to_bool(v: u8) -> bool {
     v >= 1
 }
 
-pub fn string_to_quoted(s: &str) -> String {
+fn string_to_quoted(s: &str) -> String {
     format!("'{s}'")
 }
 
-pub fn quoted_to_string(s: &str) -> String {
+fn quoted_to_string(s: &str) -> String {
     s.trim_matches('\'').to_string()
 }
 
 // susfs4ksu: single int encodes uname mode
-pub fn uname_mode_to_susfs4ksu(mode: &UnameMode) -> u8 {
+pub(super) fn uname_mode_to_susfs4ksu(mode: &UnameMode) -> u8 {
     match mode {
         UnameMode::Disabled => 0,
         UnameMode::Static => 1,
@@ -25,7 +25,7 @@ pub fn uname_mode_to_susfs4ksu(mode: &UnameMode) -> u8 {
     }
 }
 
-pub fn uname_mode_from_susfs4ksu(v: u8) -> UnameMode {
+pub(super) fn uname_mode_from_susfs4ksu(v: u8) -> UnameMode {
     match v {
         0 => UnameMode::Disabled,
         1 | 2 => UnameMode::Static,
@@ -34,7 +34,7 @@ pub fn uname_mode_from_susfs4ksu(v: u8) -> UnameMode {
 }
 
 // BRENE: 3 mutually exclusive booleans encode uname mode + release context
-pub fn uname_mode_to_brene_triple(mode: &UnameMode, release: &str) -> (u8, u8, u8) {
+pub(super) fn uname_mode_to_brene_triple(mode: &UnameMode, release: &str) -> (u8, u8, u8) {
     let has_custom_release = !release.is_empty() && release != "default";
     match mode {
         UnameMode::Disabled => (0, 0, 0),
@@ -44,7 +44,7 @@ pub fn uname_mode_to_brene_triple(mode: &UnameMode, release: &str) -> (u8, u8, u
     }
 }
 
-pub fn uname_mode_from_brene_triple(uname: u8, uname2: u8, custom: u8) -> UnameMode {
+pub(super) fn uname_mode_from_brene_triple(uname: u8, uname2: u8, custom: u8) -> UnameMode {
     if custom >= 1 {
         UnameMode::Dynamic
     } else if uname >= 1 || uname2 >= 1 {
@@ -55,7 +55,7 @@ pub fn uname_mode_from_brene_triple(uname: u8, uname2: u8, custom: u8) -> UnameM
 }
 
 // Normalize external string values on import
-pub fn normalize_string_value(s: &str) -> String {
+pub(super) fn normalize_string_value(s: &str) -> String {
     let stripped = quoted_to_string(s);
     if stripped == "default" {
         String::new()
@@ -64,7 +64,7 @@ pub fn normalize_string_value(s: &str) -> String {
     }
 }
 
-pub fn string_to_external(s: &str) -> String {
+pub(super) fn string_to_external(s: &str) -> String {
     if s.is_empty() {
         string_to_quoted("default")
     } else {

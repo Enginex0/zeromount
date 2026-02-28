@@ -15,7 +15,7 @@ const DETECTION_JSON_PATH: &str = "/data/adb/zeromount/.detection.json";
 /// Run full detection pipeline and return the result.
 /// DET01: Determines one of 4 scenarios based on kernel + SUSFS probes.
 /// DET02+DET03: Kernel probe + three-layer SUSFS probe.
-pub fn detect_scenario() -> Result<DetectionResult> {
+fn detect_scenario() -> Result<DetectionResult> {
     let vfs = kernel::probe_vfs_driver()?;
     let susfs_caps = susfs::probe_susfs()?;
 

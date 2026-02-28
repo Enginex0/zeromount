@@ -64,6 +64,9 @@ pub enum Commands {
     Watch,
     /// Performance tuning + input boost daemon (controlled by perf.enabled)
     Perf,
+    /// Property spoof daemon — event-driven resetprop via __system_property_wait
+    #[command(name = "prop-watch")]
+    PropWatch,
     /// Diagnostic dump
     Diag,
     /// Remove stale overlay mounts from previous runs

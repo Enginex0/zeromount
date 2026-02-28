@@ -109,14 +109,14 @@ for b in /data/adb/modules/meta-zeromount/bin/arm64-v8a/zeromount \
 done
 
 if [ -n "$ZM_BIN" ]; then
-    HIDE=$("$ZM_BIN" config get adb.invisible_debugging 2>/dev/null)
+    HIDE=$("$ZM_BIN" config get adb.hide_usb_debugging 2>/dev/null)
 else
     HIDE=$(cat /data/adb/zeromount/flags/hide_usb_debugging 2>/dev/null | head -1)
     [ "$HIDE" = "1" ] && HIDE="true"
 fi
 
 if [ "$HIDE" = "true" ]; then
-    pass "CONFIG: adb.invisible_debugging=true"
+    pass "CONFIG: adb.hide_usb_debugging=true"
     PERSIST=$(getprop persist.sys.usb.config)
     SYSCFG=$(getprop sys.usb.config)
     ADBD=$(getprop init.svc.adbd)
@@ -134,7 +134,7 @@ if [ "$HIDE" = "true" ]; then
         pass "V6/V9: init.svc.adbd=stopped" || \
         fail "V6/V9: init.svc.adbd=$ADBD (expected stopped)"
 else
-    warn "adb.invisible_debugging not enabled — skipping prop spoof checks"
+    warn "adb.hide_usb_debugging not enabled — skipping prop spoof checks"
 fi
 
 echo ""

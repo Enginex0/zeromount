@@ -3,6 +3,7 @@ package com.test.adbdetect;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.os.Bundle;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.ScrollView;
@@ -36,9 +37,9 @@ public class DetectorCheck extends Activity {
         checkEquals(out, "V2  Settings.dev_settings", v2, "0", "-1");
         checkEquals(out, "V3  Settings.adb_wifi", v3, "0", "-1");
 
-        String v4 = getSystemProperty("persist.sys.usb.config", "");
-        String v5 = getSystemProperty("sys.usb.config", "");
-        String v6 = getSystemProperty("init.svc.adbd", "");
+        String v4 = SystemProperties.get("persist.sys.usb.config", "");
+        String v5 = SystemProperties.get("sys.usb.config", "");
+        String v6 = SystemProperties.get("init.svc.adbd", "");
 
         checkNoAdb(out, "V4  Java persist.sys.usb.config", v4);
         checkNoAdb(out, "V5  Java sys.usb.config", v5);
@@ -89,13 +90,6 @@ public class DetectorCheck extends Activity {
 
     private void checkHidden(StringBuilder sb, String vector, String value) {
         record(sb, vector, value, value.startsWith("NOT_FOUND") || value.startsWith("ERROR:"));
-    }
-
-    private static String getSystemProperty(String key, String def) {
-        try {
-            Class<?> c = Class.forName("android.os.SystemProperties");
-            return (String) c.getMethod("get", String.class, String.class).invoke(null, key, def);
-        } catch (Exception e) { return def; }
     }
 
     private void record(StringBuilder sb, String vector, String value, boolean ok) {

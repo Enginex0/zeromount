@@ -160,11 +160,12 @@ pub enum FontMountStrategy {
 
 /// Result of mounting a font module.
 #[derive(Debug)]
-#[allow(dead_code)] // Status reporting fields
 pub struct FontModuleResult {
+    #[allow(dead_code)]
     pub module_id: String,
     pub strategy: FontMountStrategy,
     pub redirect_count: usize,
+    #[allow(dead_code)]
     pub failed_count: usize,
 }
 

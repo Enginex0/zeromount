@@ -30,7 +30,7 @@ const EVENT_BUF_SIZE: usize = 4096;
 const DEBOUNCE_MS: u64 = 2000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WatchEventKind {
+enum WatchEventKind {
     Created,
     Deleted,
     Modified,
@@ -39,12 +39,12 @@ pub enum WatchEventKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct WatchEvent {
-    pub kind: WatchEventKind,
-    pub name: Option<String>,
+struct WatchEvent {
+    kind: WatchEventKind,
+    name: Option<String>,
 }
 
-pub struct ModuleWatcher {
+struct ModuleWatcher {
     inotify_fd: RawFd,
     _watch_fd: i32,
     modules_dir: PathBuf,
@@ -178,7 +178,7 @@ impl ModuleWatcher {
 
     /// Event loop: poll for changes, invoke callback on each batch.
     /// Runs until the callback returns Err or the process is signaled.
-    pub fn run_loop(&self, mut on_change: impl FnMut(Vec<WatchEvent>) -> Result<()>) -> Result<()> {
+    fn run_loop(&self, mut on_change: impl FnMut(Vec<WatchEvent>) -> Result<()>) -> Result<()> {
         debug!(dir = %self.modules_dir.display(), "module watcher loop started");
 
         loop {
@@ -225,7 +225,7 @@ impl Drop for ModuleWatcher {
 
 /// Fallback watcher using directory mtime polling.
 /// Used when inotify_init1 fails (ENOSYS on some kernels, or EMFILE).
-pub fn start_watcher_fallback(
+fn start_watcher_fallback(
     modules_dir: &Path,
     interval_secs: u64,
     mut on_change: impl FnMut() -> Result<()>,

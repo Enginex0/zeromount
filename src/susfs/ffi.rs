@@ -6,7 +6,6 @@ pub const SUSFS_MAGIC: u64 = 0xFAFAFAFA;
 
 // Size constants matching susfs_def.h
 pub const SUSFS_MAX_LEN_PATHNAME: usize = 256;
-#[allow(dead_code)] // FFI constant matching susfs_def.h
 pub const SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE: usize = 8192;
 pub const SUSFS_ENABLED_FEATURES_SIZE: usize = 8192;
 pub const SUSFS_MAX_VERSION_BUFSIZE: usize = 16;
@@ -42,7 +41,6 @@ pub struct StSusfsSusPath {
 /// C: struct st_external_dir (main.c:91-96)
 #[repr(C)]
 #[derive(Clone)]
-#[allow(dead_code)] // FFI struct matching kernel susfs_def.h
 pub struct StExternalDir {
     pub target_pathname: [u8; SUSFS_MAX_LEN_PATHNAME],
     pub is_inited: u8, // C bool
@@ -124,7 +122,6 @@ pub struct StSusfsLog {
 /// C: struct st_susfs_spoof_cmdline_or_bootconfig (main.c:151-154)
 #[repr(C)]
 #[derive(Clone)]
-#[allow(dead_code)] // FFI struct matching kernel susfs_def.h
 pub struct StSusfsSpoofCmdline {
     pub fake_cmdline_or_bootconfig: [u8; SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE],
     pub err: i32,
@@ -180,7 +177,6 @@ pub struct StSusfsVersion {
 /// hide_sus_mnts_for_non_su_procs (included for completeness, not used by ZeroMount per S05)
 #[repr(C)]
 #[derive(Clone)]
-#[allow(dead_code)] // FFI struct matching kernel susfs_def.h
 pub struct StSusfsHideSusMnts {
     pub enabled: u8,
     pub _pad0: [u8; 3],

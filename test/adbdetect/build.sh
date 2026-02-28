@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-NDK=/opt/android-ndk-r25b
-BUILD_TOOLS=/home/president/Android/Sdk/build-tools/34.0.0
-ANDROID_JAR=/home/president/Android/Sdk/platforms/android-34/android.jar
+NDK=/opt/android-ndk-r29
+BUILD_TOOLS=~/Android/Sdk/build-tools/34.0.0
+ANDROID_JAR=~/Android/Sdk/platforms/android-34/android.jar
 WORK=/tmp/adbdetect_build
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -42,6 +42,7 @@ EOF
 
 echo "==> Adding dex and native lib"
 cd "$WORK/apk"
+cp classes.dex ./
 zip -j adbdetect_base.apk classes.dex
 mkdir -p lib/arm64-v8a
 cp "$WORK/lib/arm64-v8a/libadbdetect.so" lib/arm64-v8a/
@@ -50,7 +51,7 @@ zip -r adbdetect_base.apk lib/
 echo "==> Aligning and signing"
 "$BUILD_TOOLS/zipalign" -f 4 adbdetect_base.apk adbdetect_aligned.apk
 "$BUILD_TOOLS/apksigner" sign \
-    --ks /home/president/.android/debug.keystore --ks-pass pass:android \
+    --ks ~/.android/debug.keystore --ks-pass pass:android \
     --out adbdetect_signed.apk adbdetect_aligned.apk
 
 echo ""

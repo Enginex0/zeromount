@@ -94,9 +94,13 @@ pub fn apply_brene(
 
     // Fonts and emoji use bind mounts / overlayfs — standard Linux ops that
     // work on any kernel. SUSFS kstat/path is layered on top when available.
+    let susfs_cfg = &config.susfs;
+    let has_kstat = client.features().kstat && susfs_cfg.kstat;
+    let has_path = client.features().path && susfs_cfg.path_hide;
+
     if brene.auto_hide_fonts {
         let fonts = if fonts_overlay_mounted {
-            hide_font_modules_overlay(client)
+            hide_font_modules_overlay(client, has_kstat, has_path)
         } else {
             process_font_modules(client, &config.mount.overlay_source)
         };
@@ -122,7 +126,7 @@ pub fn apply_brene(
         debug!("BRENE: emoji toggle OFF, skipping");
     }
 
-    apply_hide_usb_debugging(config.adb.invisible_debugging);
+    apply_hide_usb_debugging(client, config.adb.hide_usb_debugging);
 
     if !client.is_available() {
         debug!("SUSFS unavailable, skipping remaining BRENE protections");
@@ -139,11 +143,7 @@ pub fn apply_brene(
         info!("BRENE: skipping complement ops (susfs4ksu handles cmdline/APK/loops/LSPosed)");
     }
 
-    let susfs_cfg = &config.susfs;
-
-    let has_path = client.features().path && susfs_cfg.path_hide;
     let has_maps = client.features().maps && susfs_cfg.maps_hide;
-    let _has_kstat = client.features().kstat && susfs_cfg.kstat;
 
     if brene.auto_hide_rooted_folders && has_path {
         let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
@@ -236,7 +236,7 @@ pub fn apply_brene(
     }
 
     if run_complement {
-        if brene.hide_ksu_loops && client.features().path {
+        if brene.hide_ksu_loops && has_path {
             let count = hide_ksu_loop_devices(client);
             result.paths_hidden += count;
             if count > 0 {
@@ -502,7 +502,7 @@ fn fix_font_selinux_contexts(font_dir: &Path) {
     }
 }
 
-fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
+fn hide_font_modules_overlay(client: &SusfsClient, has_kstat: bool, has_path: bool) -> Vec<FontModuleInfo> {
     let modules_dir = Path::new(MODULES_DIR);
     if !modules_dir.is_dir() {
         return Vec::new();
@@ -558,7 +558,7 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
                 Path::new(&replacement), "u:object_r:system_file:s0"
             );
 
-            if client.features().kstat {
+            if has_kstat {
                 match kstat::build_kstat_values_from_paths(&target, &replacement) {
                     Ok(mut spoof) => {
                         if let Some(dev) = stock_dev {
@@ -573,7 +573,7 @@ fn hide_font_modules_overlay(client: &SusfsClient) -> Vec<FontModuleInfo> {
                 }
             }
 
-            if client.features().path {
+            if has_path {
                 if let Err(e) = client.add_sus_path(&replacement) {
                     debug!("overlay font path hide failed for {filename}: {e}");
                 }
@@ -661,7 +661,7 @@ fn build_dynamic_uname() -> Result<(String, String)> {
 const HIDE_USB_DEBUGGING_SENTINEL: &str = "/data/adb/zeromount/flags/hide_usb_debugging";
 const HIDE_ADB_SYSFS_KNOB: &str = "/sys/kernel/zeromount/hide_adb";
 
-pub fn apply_hide_usb_debugging(enabled: bool) {
+pub fn apply_hide_usb_debugging(client: &SusfsClient, enabled: bool) {
     let sentinel = Path::new(HIDE_USB_DEBUGGING_SENTINEL);
 
     if enabled {
@@ -673,6 +673,12 @@ pub fn apply_hide_usb_debugging(enabled: bool) {
         }
         if let Err(e) = fs::write(HIDE_ADB_SYSFS_KNOB, "1") {
             debug!("hide_usb_debugging: sysfs knob unavailable: {e}");
+        }
+        // Suppress stat() visibility of authorized keys file (V14)
+        if client.features().path {
+            if let Err(e) = client.add_sus_path("/data/misc/adb/adb_keys") {
+                debug!("hide_usb_debugging: adb_keys path-hide failed: {e}");
+            }
         }
         info!("hide_usb_debugging: enabled");
     } else {

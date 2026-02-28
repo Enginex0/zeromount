@@ -190,8 +190,10 @@ pub fn handle_config(action: ConfigAction) -> Result<()> {
         ConfigAction::Set { key, value } => {
             config.set(&key, &value)?;
             config.save()?;
-            if key == "adb.invisible_debugging" || key == "adb.hide_usb_debugging" {
-                crate::susfs::brene::apply_hide_usb_debugging(config.adb.invisible_debugging);
+            if key == "adb.hide_usb_debugging" {
+                if let Ok(client) = crate::susfs::SusfsClient::probe() {
+                    crate::susfs::brene::apply_hide_usb_debugging(&client, config.adb.hide_usb_debugging);
+                }
             }
             println!("ok");
         }
@@ -316,6 +318,10 @@ pub fn handle_perf() -> Result<()> {
         return Ok(());
     }
     crate::perf::run_perf()
+}
+
+pub fn handle_prop_watch() -> Result<()> {
+    crate::prop::run_prop_watch()
 }
 
 pub fn handle_watch() -> Result<()> {
@@ -447,7 +453,7 @@ pub fn handle_try_umount() -> Result<()> {
 
 const SENTINEL_PATH: &str = "/data/adb/zeromount/flags/external_susfs";
 
-pub fn read_sentinel_module() -> crate::core::types::ExternalSusfsModule {
+fn read_sentinel_module() -> crate::core::types::ExternalSusfsModule {
     use crate::core::types::ExternalSusfsModule;
 
     std::fs::read_to_string(SENTINEL_PATH)

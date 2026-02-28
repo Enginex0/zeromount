@@ -153,7 +153,6 @@ impl SusfsClient {
         check_err(info.err, "add_sus_path_loop")
     }
 
-    #[allow(dead_code)] // FFI supercall wrapper
     pub fn set_android_data_root_path(&self, path: &str) -> Result<()> {
         self.ensure_available()?;
         let mut info = StExternalDir {
@@ -169,7 +168,6 @@ impl SusfsClient {
         check_err(info.err, "set_android_data_root_path")
     }
 
-    #[allow(dead_code)] // FFI supercall wrapper
     pub fn set_sdcard_root_path(&self, path: &str) -> Result<()> {
         self.ensure_available()?;
         let mut info = StExternalDir {

@@ -105,7 +105,7 @@ fn detect_external_module() -> ExternalSusfsModule {
 
 /// Locate the SUSFS binary by searching platform-specific paths.
 /// DET03 layer 2: search order per RootManager::susfs_binary_paths().
-pub fn find_susfs_binary() -> Option<PathBuf> {
+fn find_susfs_binary() -> Option<PathBuf> {
     // Try platform-specific paths first
     if let Ok(manager) = platform::detect_root_manager() {
         for path in manager.susfs_binary_paths() {

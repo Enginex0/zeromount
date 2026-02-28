@@ -19,28 +19,10 @@ pub struct MountInfoEntry {
 }
 
 #[derive(Debug)]
-pub enum HijackAction {
-    VfsReplaced,
-    Skipped,
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct HijackResult {
-    pub mount_point: String,
-    pub source: String,
-    pub action: HijackAction,
-    pub success: bool,
-    pub error: Option<String>,
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
 pub struct SweepSummary {
     pub found: u32,
     pub hijacked: u32,
     pub skipped: u32,
-    pub results: Vec<HijackResult>,
 }
 
 pub fn sweep(
@@ -53,7 +35,7 @@ pub fn sweep(
         Ok(e) => e,
         Err(e) => {
             warn!("sweep: failed to parse mountinfo: {e}");
-            return SweepSummary { found: 0, hijacked: 0, skipped: 0, results: Vec::new() };
+            return SweepSummary { found: 0, hijacked: 0, skipped: 0 };
         }
     };
 
@@ -68,7 +50,7 @@ pub fn sweep(
 
     if found == 0 {
         debug!("sweep: no rogue bind mounts found");
-        return SweepSummary { found: 0, hijacked: 0, skipped: 0, results: Vec::new() };
+        return SweepSummary { found: 0, hijacked: 0, skipped: 0 };
     }
 
     info!("sweep: found {} rogue bind mount(s)", found);
@@ -83,17 +65,7 @@ pub fn sweep(
 
     if matches!(scenario, Scenario::None) {
         debug!("sweep: Scenario::None — no replacement mechanism, skipping all");
-        let results: Vec<HijackResult> = rogues
-            .iter()
-            .map(|e| HijackResult {
-                mount_point: e.mount_point.clone(),
-                source: resolve_source_path(e),
-                action: HijackAction::Skipped,
-                success: false,
-                error: Some("no replacement mechanism available".into()),
-            })
-            .collect();
-        return SweepSummary { found, hijacked: 0, skipped: found, results };
+        return SweepSummary { found, hijacked: 0, skipped: found };
     }
 
     let has_vfs = capabilities.vfs_driver;
@@ -112,31 +84,18 @@ pub fn sweep(
 
     if driver.is_none() {
         debug!("sweep: VFS driver not available for replacement");
-        let results: Vec<HijackResult> = rogues
-            .iter()
-            .map(|e| HijackResult {
-                mount_point: e.mount_point.clone(),
-                source: resolve_source_path(e),
-                action: HijackAction::Skipped,
-                success: false,
-                error: Some("replacement drivers unavailable".into()),
-            })
-            .collect();
-        return SweepSummary { found, hijacked: 0, skipped: found, results };
+        return SweepSummary { found, hijacked: 0, skipped: found };
     }
 
-    let mut results = Vec::with_capacity(rogues.len());
     let mut hijacked = 0u32;
     let mut skipped = 0u32;
 
     for entry in &rogues {
-        let result = hijack_mount(entry, driver.as_ref());
-        if result.success {
+        if hijack_mount(entry, driver.as_ref()) {
             hijacked += 1;
         } else {
             skipped += 1;
         }
-        results.push(result);
     }
 
     // Flush dcache after adding VFS rules
@@ -148,7 +107,7 @@ pub fn sweep(
         }
     }
 
-    SweepSummary { found, hijacked, skipped, results }
+    SweepSummary { found, hijacked, skipped }
 }
 
 fn parse_mountinfo() -> anyhow::Result<Vec<MountInfoEntry>> {
@@ -214,7 +173,7 @@ fn resolve_source_path(entry: &MountInfoEntry) -> String {
 fn hijack_mount(
     entry: &MountInfoEntry,
     driver: Option<&crate::vfs::VfsDriver>,
-) -> HijackResult {
+) -> bool {
     let source = resolve_source_path(entry);
     let target = &entry.mount_point;
     let is_dir = Path::new(&source).is_dir();
@@ -236,51 +195,24 @@ fn hijack_mount(
             source = %source,
             "BRENE-owned path — preserving bind mount, BRENE adds stealth in finalize"
         );
-        return HijackResult {
-            mount_point: target.clone(),
-            source,
-            action: HijackAction::Skipped,
-            success: false,
-            error: None,
-        };
+        return false;
     }
 
-    // Phase 1: Add replacement mechanism BEFORE unmounting
-    let action = if let Some(d) = driver {
-        if is_dir {
-            let (added, _failed) = walk_and_add_vfs_rules(target, &source, d);
-            if added == 0 {
-                return HijackResult {
-                    mount_point: target.clone(),
-                    source,
-                    action: HijackAction::Skipped,
-                    success: false,
-                    error: Some("VFS rule injection failed for directory".into()),
-                };
-            }
-        } else if let Err(e) = d.add_rule(Path::new(&source), Path::new(target), false) {
-            warn!("sweep: VFS add_rule failed for {target}: {e}");
-            return HijackResult {
-                mount_point: target.clone(),
-                source,
-                action: HijackAction::Skipped,
-                success: false,
-                error: Some(format!("VFS add_rule: {e}")),
-            };
-        }
-
-        HijackAction::VfsReplaced
-    } else {
-        return HijackResult {
-            mount_point: target.clone(),
-            source,
-            action: HijackAction::Skipped,
-            success: false,
-            error: Some("no driver available".into()),
-        };
+    let Some(d) = driver else {
+        return false;
     };
 
-    // Phase 2: Unmount the rogue bind mount
+    if is_dir {
+        let (added, _failed) = walk_and_add_vfs_rules(target, &source, d);
+        if added == 0 {
+            return false;
+        }
+    } else if let Err(e) = d.add_rule(Path::new(&source), Path::new(target), false) {
+        warn!("sweep: VFS add_rule failed for {target}: {e}");
+        return false;
+    }
+
+    // Unmount the rogue bind mount after replacement is in place
     let unmounted = lazy_umount(target);
     if !unmounted {
         warn!("sweep: umount failed for {target}, replacement still active");
@@ -289,18 +221,11 @@ fn hijack_mount(
     debug!(
         target,
         source = %source,
-        action = ?action,
         unmounted,
         "rogue mount hijacked"
     );
 
-    HijackResult {
-        mount_point: target.clone(),
-        source,
-        action,
-        success: true,
-        error: None,
-    }
+    true
 }
 
 fn walk_and_add_vfs_rules(

@@ -7,6 +7,7 @@ mod modules;
 mod mount;
 mod susfs;
 mod perf;
+mod prop;
 mod utils;
 mod vfs;
 
@@ -60,6 +61,7 @@ fn main() -> Result<()> {
         Commands::Susfs { feature, state } => cli::handlers::handle_susfs(&feature, &state),
         Commands::Watch => cli::handlers::handle_watch(),
         Commands::Perf => cli::handlers::handle_perf(),
+        Commands::PropWatch => cli::handlers::handle_prop_watch(),
         Commands::Diag => cli::handlers::handle_diag(),
         Commands::CleanupStale => cli::handlers::handle_cleanup_stale(),
         Commands::Emoji { action } => cli::handlers::handle_emoji(action),

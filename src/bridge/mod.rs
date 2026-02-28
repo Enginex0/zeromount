@@ -1,6 +1,6 @@
-pub mod brene;
-pub mod susfs4ksu;
-pub mod translate;
+mod brene;
+mod susfs4ksu;
+mod translate;
 
 use std::collections::HashMap;
 use std::path::Path;
