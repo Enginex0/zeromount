@@ -222,6 +222,8 @@ pub struct RuntimeState {
     pub resolved_storage_mode: Option<String>,
     #[serde(default)]
     pub emoji_applied: bool,
+    #[serde(default)]
+    pub zygisk_hook_active: Option<bool>,
 }
 
 impl Default for RuntimeState {
@@ -246,6 +248,7 @@ impl Default for RuntimeState {
             root_manager: None,
             resolved_storage_mode: None,
             emoji_applied: false,
+            zygisk_hook_active: None,
         }
     }
 }

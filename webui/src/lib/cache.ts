@@ -6,7 +6,7 @@ import type {
 } from './types';
 
 const CACHE_KEY = 'zm-state-cache';
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 export interface HydratableState {
   scenario: Scenario;
@@ -19,6 +19,7 @@ export interface HydratableState {
   degraded: boolean;
   degradationReason: string | null;
   rootManager: string | null;
+  zygiskHookActive: boolean | null;
   runtimeStrategy: MountStrategy | null;
   mountSource: string | null;
   resolvedStorageMode: string | null;
@@ -59,6 +60,7 @@ export function writeCache(state: HydratableState): void {
       degraded: state.degraded,
       degradationReason: state.degradationReason,
       rootManager: state.rootManager,
+      zygiskHookActive: state.zygiskHookActive,
       runtimeStrategy: state.runtimeStrategy,
       mountSource: state.mountSource,
       resolvedStorageMode: state.resolvedStorageMode,
@@ -102,6 +104,7 @@ export function readCache(): HydratableState | null {
       degraded: cached.degraded,
       degradationReason: cached.degradationReason,
       rootManager: cached.rootManager,
+      zygiskHookActive: (cached as any).zygiskHookActive ?? null,
       runtimeStrategy: cached.runtimeStrategy,
       mountSource: cached.mountSource,
       resolvedStorageMode: cached.resolvedStorageMode,

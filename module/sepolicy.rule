@@ -17,8 +17,8 @@ allow untrusted_app su unix_stream_socket { connectto getattr getopt ioctl read 
 # axon: allow various system services to interact with su domain
 allow { surfaceflinger audioserver mediaswcodec mediacodec hwservicemanager netd } su * *
 
-# zygisk: system_server must traverse adb_data_file dirs to reach module zygisk/ for hooker.dex
+# zygisk: system_server traverses adb_data_file for ZygoteLoader DEX and writes hook status sentinel
 allow system_server adb_data_file dir { search getattr open read }
-allow system_server adb_data_file file { read open getattr }
+allow system_server adb_data_file file { read write open getattr }
 allow system_server system_file dir { write add_name create }
 allow system_server system_file file { write create }

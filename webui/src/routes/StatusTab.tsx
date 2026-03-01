@@ -419,6 +419,28 @@ export function StatusTab() {
                 : 'Unavailable'}
             </span>
           </div>
+          <div class="status-mode__row">
+            <div class="status-mode__label">
+              <span
+                class="status-mode__dot"
+                style={{ background: store.zygiskHookActive() === true
+                  ? store.currentTheme().colorSuccess
+                  : store.zygiskHookActive() === false
+                    ? store.currentTheme().colorError
+                    : store.currentTheme().textTertiary }}
+              />
+              <span class="status-mode__text color-text-primary">
+                Zygisk Hook
+              </span>
+            </div>
+            <span class="status-mode__value color-text-accent">
+              {store.zygiskHookActive() === true
+                ? 'Active'
+                : store.zygiskHookActive() === false
+                  ? 'Unavailable (prop fallback)'
+                  : 'Not configured'}
+            </span>
+          </div>
         </div>
 
         <Show when={store.moduleStatuses().length > 0}>

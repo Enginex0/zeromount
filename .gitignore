@@ -48,7 +48,7 @@ target/
 susfs4ksu-new/
 susfs4ksu-module/
 BRENE/
-zeromount/
+/zeromount/
 
 # Release artifacts
 release/

@@ -102,6 +102,10 @@ pub fn build_runtime_status() -> crate::core::types::RuntimeState {
         state.root_manager = Some(mgr.name().to_string());
     }
 
+    state.zygisk_hook_active = std::fs::read_to_string("/data/adb/zeromount/flags/zygisk_status")
+        .ok()
+        .map(|s| s.trim() == "active");
+
     state
 }
 
@@ -194,6 +198,7 @@ pub fn handle_config(action: ConfigAction) -> Result<()> {
                 if let Ok(client) = crate::susfs::SusfsClient::probe() {
                     crate::susfs::brene::apply_hide_usb_debugging(&client, config.adb.hide_usb_debugging);
                 }
+                toggle_zygisk_stash(config.adb.hide_usb_debugging);
             }
             println!("ok");
         }
@@ -504,6 +509,25 @@ pub fn handle_bridge(action: BridgeAction) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn toggle_zygisk_stash(enable: bool) {
+    use std::path::Path;
+    let base = Path::new("/data/adb/modules/meta-zeromount");
+    let stash = base.join(".zygisk_stash");
+    let live = base.join("zygisk");
+
+    if enable && stash.is_dir() && !live.exists() {
+        match std::fs::rename(&stash, &live) {
+            Ok(_) => tracing::info!("zygisk dir activated — reboot to load hook"),
+            Err(e) => tracing::warn!("failed to activate zygisk dir: {e}"),
+        }
+    } else if !enable && live.is_dir() {
+        match std::fs::rename(&live, &stash) {
+            Ok(_) => tracing::info!("zygisk dir stashed — hook removed on next boot"),
+            Err(e) => tracing::warn!("failed to stash zygisk dir: {e}"),
+        }
+    }
 }
 
 pub fn handle_emoji(action: EmojiAction) -> Result<()> {

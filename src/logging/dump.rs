@@ -31,6 +31,10 @@ pub fn execute_dump() -> Result<()> {
     add_log_files(&mut zip, opts, &config.logging.log_dir, &mut manifest_files)?;
     add_entry(&mut zip, opts, "dmesg-zeromount.log", &collect_dmesg("zeromount")?, &mut manifest_files)?;
     add_entry(&mut zip, opts, "dmesg-susfs.log", &collect_dmesg("susfs")?, &mut manifest_files)?;
+    add_entry(&mut zip, opts, "logcat-zeromount.log", &collect_logcat(), &mut manifest_files)?;
+    add_entry(&mut zip, opts, "zygisk-status.txt",
+        &fs::read("/data/adb/zeromount/flags/zygisk_status").unwrap_or_default(),
+        &mut manifest_files)?;
     add_entry(&mut zip, opts, "config.toml", toml::to_string_pretty(&config)?.as_bytes(), &mut manifest_files)?;
     add_entry(&mut zip, opts, "sysfs-level.txt", collect_sysfs_level().as_bytes(), &mut manifest_files)?;
     add_entry(&mut zip, opts, "susfs-probe.txt", collect_susfs_probe().as_bytes(), &mut manifest_files)?;
@@ -106,6 +110,18 @@ fn collect_dmesg(filter: &str) -> Result<Vec<u8>> {
         }
     }
     Ok(buf)
+}
+
+fn collect_logcat() -> Vec<u8> {
+    Command::new("logcat")
+        .args(["-d", "-s", "ZeroMount-Settings:*"])
+        .output()
+        .map(|o| {
+            let mut buf = o.stdout;
+            buf.truncate(DMESG_SIZE_LIMIT);
+            buf
+        })
+        .unwrap_or_default()
 }
 
 fn collect_sysfs_level() -> String {

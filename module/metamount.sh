@@ -23,6 +23,21 @@ fi
 
 . "$MODDIR/common.sh"
 
+mkdir -p /data/adb/zeromount/flags
+echo -n "" > /data/adb/zeromount/flags/zygisk_status
+chmod 666 /data/adb/zeromount/flags/zygisk_status
+
+if [ -n "$BIN" ] && [ -x "$BIN" ]; then
+    HIDE_USB=$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)
+    if [ "$HIDE_USB" = "true" ] && [ -d "$MODDIR/.zygisk_stash" ]; then
+        mv "$MODDIR/.zygisk_stash" "$MODDIR/zygisk"
+        echo "$LOG: zygisk dir activated for USB hiding" > /dev/kmsg 2>/dev/null
+    elif [ "$HIDE_USB" != "true" ] && [ -d "$MODDIR/zygisk" ]; then
+        mv "$MODDIR/zygisk" "$MODDIR/.zygisk_stash"
+        echo "$LOG: zygisk dir stashed (USB hiding disabled)" > /dev/kmsg 2>/dev/null
+    fi
+fi
+
 # Reconcile external SUSFS module config changes made outside zeromount
 EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
 if [ "$EXTERNAL" != "none" ] && [ -n "$ABI" ] && [ -x "$BIN" ]; then

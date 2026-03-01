@@ -1,0 +1,57 @@
+import com.v7878.zygisk.gradle.ZygoteLoader
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.java.zygisk)
+}
+
+android {
+    namespace 'com.zeromount.hook'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 31
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles 'proguard-rules.pro'
+        }
+        debug {
+            debuggable true
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+zygisk {
+    packages(ZygoteLoader.PACKAGE_SYSTEM_SERVER)
+
+    id = "com_zeromount_adb_hide"
+    name = "ZeroMount ADB Hide"
+    author = "zeromount"
+    description = "Spoofs ADB settings for untrusted apps"
+    entrypoint = "com.zeromount.hook.Main"
+    archiveName = "ZeroMountHook"
+}
+
+dependencies {
+    implementation libs.androidvmtools
+    implementation libs.r8.annotations
+}

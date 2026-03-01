@@ -1,0 +1,13 @@
+[versions]
+agp = "8.9.1"
+zygisk = "88a3d83d52"
+r8_annotations = "v0.0.2"
+androidvmtools = "95571c7efd"
+
+[libraries]
+androidvmtools = { module = "com.github.vova7878:AndroidVMTools", version.ref = "androidvmtools" }
+r8-annotations = { module = "com.github.vova7878:R8Annotations", version.ref = "r8_annotations" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+java-zygisk = { id = "com.github.vova7878.ZygoteLoader", version.ref = "zygisk" }

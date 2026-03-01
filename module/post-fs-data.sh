@@ -7,6 +7,17 @@ MODDIR="${0%/*}"
 
 "$BIN" detect
 
+mkdir -p /data/adb/zeromount/flags
+echo -n "" > /data/adb/zeromount/flags/zygisk_status
+chmod 666 /data/adb/zeromount/flags/zygisk_status
+HIDE_USB=$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)
+if [ "$HIDE_USB" = "true" ] && [ -d "$MODDIR/.zygisk_stash" ]; then
+    mv "$MODDIR/.zygisk_stash" "$MODDIR/zygisk"
+    echo "zeromount: zygisk dir activated" > /dev/kmsg 2>/dev/null
+elif [ "$HIDE_USB" != "true" ] && [ -d "$MODDIR/zygisk" ]; then
+    mv "$MODDIR/zygisk" "$MODDIR/.zygisk_stash"
+fi
+
 spoof_cosmetic_props() {
     [ "$("$BIN" config get adb.invisible_debugging 2>/dev/null)" = "true" ] || return 0
     command -v resetprop >/dev/null 2>&1 || return 1

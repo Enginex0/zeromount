@@ -21,6 +21,12 @@ zm_print() {
 
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
 
+rm -f "$MODPATH/disable"
+
+if [ -d "$MODPATH/zygisk" ] && [ ! -d "$MODPATH/.zygisk_stash" ]; then
+    mv "$MODPATH/zygisk" "$MODPATH/.zygisk_stash"
+fi
+
 for _mgr_bin in /data/adb/ksu/bin /data/adb/ap/bin /data/adb/magisk; do
     [ -d "$_mgr_bin" ] && export PATH="$_mgr_bin:$PATH"
 done
