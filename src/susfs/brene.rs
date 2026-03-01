@@ -126,8 +126,6 @@ pub fn apply_brene(
         debug!("BRENE: emoji toggle OFF, skipping");
     }
 
-    apply_hide_usb_debugging(client, config.adb.hide_usb_debugging);
-
     if !client.is_available() {
         debug!("SUSFS unavailable, skipping remaining BRENE protections");
         return Ok(result);
@@ -656,42 +654,6 @@ fn build_dynamic_uname() -> Result<(String, String)> {
     let version = truncate_uname(&version);
 
     Ok((release, version))
-}
-
-const HIDE_USB_DEBUGGING_SENTINEL: &str = "/data/adb/zeromount/flags/hide_usb_debugging";
-const HIDE_ADB_SYSFS_KNOB: &str = "/sys/kernel/zeromount/hide_adb";
-
-pub fn apply_hide_usb_debugging(client: &SusfsClient, enabled: bool) {
-    let sentinel = Path::new(HIDE_USB_DEBUGGING_SENTINEL);
-
-    if enabled {
-        if let Some(parent) = sentinel.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        if let Err(e) = fs::write(sentinel, "1") {
-            warn!("hide_usb_debugging: sentinel write failed: {e}");
-        }
-        if let Err(e) = fs::write(HIDE_ADB_SYSFS_KNOB, "1") {
-            debug!("hide_usb_debugging: sysfs knob unavailable: {e}");
-        }
-        // Suppress stat() visibility of authorized keys file (V14)
-        if client.features().path {
-            if let Err(e) = client.add_sus_path("/data/misc/adb/adb_keys") {
-                debug!("hide_usb_debugging: adb_keys path-hide failed: {e}");
-            }
-        }
-        info!("hide_usb_debugging: enabled");
-    } else {
-        if sentinel.exists() {
-            if let Err(e) = fs::remove_file(sentinel) {
-                warn!("hide_usb_debugging: sentinel removal failed: {e}");
-            }
-        }
-        if let Err(e) = fs::write(HIDE_ADB_SYSFS_KNOB, "0") {
-            debug!("hide_usb_debugging: sysfs knob unavailable: {e}");
-        }
-        info!("hide_usb_debugging: disabled");
-    }
 }
 
 const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";

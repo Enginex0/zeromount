@@ -20,11 +20,9 @@ fi
 # Track background PIDs for cleanup
 _bg_pids=""
 
-# Prop spoofing + USB debug hiding — Rust daemon with event-driven enforcement
 PROP_SPOOF=$("$BIN" config get brene.prop_spoofing 2>/dev/null)
-HIDE_USB=$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)
 
-if [ "$PROP_SPOOF" = "true" ] || [ "$HIDE_USB" = "true" ]; then
+if [ "$PROP_SPOOF" = "true" ]; then
     if command -v resetprop >/dev/null 2>&1; then
         {
             while true; do

@@ -64,7 +64,7 @@ pub enum Commands {
     Watch,
     /// Performance tuning + input boost daemon (controlled by perf.enabled)
     Perf,
-    /// Property spoof daemon — event-driven resetprop via __system_property_wait
+    /// One-shot property spoofing via resetprop
     #[command(name = "prop-watch")]
     PropWatch,
     /// Diagnostic dump

@@ -10,29 +10,6 @@ MODDIR="${0%/*}"
 mkdir -p /data/adb/zeromount/flags
 echo -n "" > /data/adb/zeromount/flags/zygisk_status
 chmod 666 /data/adb/zeromount/flags/zygisk_status
-HIDE_USB=$("$BIN" config get adb.hide_usb_debugging 2>/dev/null)
-if [ "$HIDE_USB" = "true" ] && [ -d "$MODDIR/.zygisk_stash" ]; then
-    mv "$MODDIR/.zygisk_stash" "$MODDIR/zygisk"
-    echo "zeromount: zygisk dir activated" > /dev/kmsg 2>/dev/null
-elif [ "$HIDE_USB" != "true" ] && [ -d "$MODDIR/zygisk" ]; then
-    mv "$MODDIR/zygisk" "$MODDIR/.zygisk_stash"
-fi
-
-spoof_cosmetic_props() {
-    [ "$("$BIN" config get adb.invisible_debugging 2>/dev/null)" = "true" ] || return 0
-    command -v resetprop >/dev/null 2>&1 || return 1
-
-    # Cosmetic only — doesn't affect USB/ADB functionality
-    resetprop -n ro.debuggable 0
-    resetprop -n ro.boot.vbmeta.device_state locked
-    resetprop -n ro.boot.verifiedbootstate green
-    resetprop -n ro.boot.flash.locked 1
-    resetprop -n ro.boot.warranty_bit 0
-    resetprop -n ro.warranty_bit 0
-
-    echo "zeromount: cosmetic debug props applied (pre-Zygote)" > /dev/kmsg 2>/dev/null
-}
-spoof_cosmetic_props
 
 # Magisk has no metamount.sh — run mount pipeline here
 if [ -z "$KSU" ] && [ -z "$APATCH" ]; then

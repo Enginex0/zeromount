@@ -95,7 +95,7 @@ export function SettingsTab() {
         </div>
         <CollapsibleSubgroup
           label="Android Settings"
-          hiddenCount={4}
+          hiddenCount={3}
           defaultItems={<></>}
           expandedItems={<>
             <div class="settings__item">
@@ -132,16 +132,6 @@ export function SettingsTab() {
               <Toggle
                 checked={store.settings.adb.adb_root}
                 onChange={(v) => store.setAdbToggle('adb_root', v)}
-              />
-            </div>
-            <div class="settings__item">
-              <div class="settings__item-content">
-                <div class="settings__item-label">Hide USB Debugging</div>
-                <div class="settings__item-desc">Full ADB concealment — kernel sysfs, prop enforcement - use with HMA-OSS</div>
-              </div>
-              <Toggle
-                checked={store.settings.adb.hide_usb_debugging}
-                onChange={(v) => store.setAdbToggle('hide_usb_debugging', v)}
               />
             </div>
           </>}

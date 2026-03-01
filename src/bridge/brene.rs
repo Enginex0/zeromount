@@ -52,8 +52,7 @@ pub(super) fn write_config(dir: &Path, config: &ZeroMountConfig) -> Result<()> {
             lines.push(format!("{CONFIG_PREFIX}{key}={val}"));
         }
     }
-    let hide = config.adb.hide_usb_debugging;
-    lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(!hide && config.adb.developer_options)));
+    lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(config.adb.developer_options)));
 
     lines.push(String::new());
     fs::write(&path, lines.join("\n"))
@@ -129,8 +128,7 @@ pub(super) fn merge_config(
             lines.push(format!("{CONFIG_PREFIX}{key}={val}"));
         }
     }
-    let hide = config.adb.hide_usb_debugging;
-    lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(!hide && config.adb.developer_options)));
+    lines.push(format!("{CONFIG_PREFIX}developer_options={}", translate::bool_to_int(config.adb.developer_options)));
     lines.push(String::new());
     fs::write(&path, lines.join("\n"))
         .with_context(|| format!("writing merged {}", path.display()))?;
@@ -174,9 +172,8 @@ fn config_to_keys(config: &ZeroMountConfig) -> HashMap<String, String> {
 
     m.insert("hide_zygisk_modules".into(), translate::bool_to_int(config.brene.auto_hide_zygisk).to_string());
     m.insert("hide_injections".into(), translate::bool_to_int(config.brene.auto_hide_injections).to_string());
-    let hide = config.adb.hide_usb_debugging;
-    m.insert("usb_debugging".into(), translate::bool_to_int(!hide && config.adb.usb_debugging).to_string());
-    m.insert("developer_options".into(), translate::bool_to_int(!hide && config.adb.developer_options).to_string());
+    m.insert("usb_debugging".into(), translate::bool_to_int(config.adb.usb_debugging).to_string());
+    m.insert("developer_options".into(), translate::bool_to_int(config.adb.developer_options).to_string());
     m.insert("enable_log".into(), translate::bool_to_int(config.brene.susfs_log).to_string());
     m.insert("hide_modules_img".into(), translate::bool_to_int(config.brene.hide_ksu_loops).to_string());
     m.insert("verified_boot_hash".into(), translate::string_to_external(&config.brene.verified_boot_hash));
