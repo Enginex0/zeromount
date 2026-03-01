@@ -283,12 +283,11 @@ package_zip() {
         cp -r "$MODULE_DIR/emoji" "$staging/emoji"
     fi
 
-    # Zygisk: .so stashed to avoid KSU disable; DEX + packages at root (inert without .so)
     local _has_zygisk=false
     for _za in arm64-v8a armeabi-v7a x86 x86_64; do
         if [ -f "$MODULE_DIR/zygisk/$_za.so" ]; then
-            mkdir -p "$staging/.zygisk_stash"
-            cp "$MODULE_DIR/zygisk/$_za.so" "$staging/.zygisk_stash/"
+            mkdir -p "$staging/zygisk"
+            cp "$MODULE_DIR/zygisk/$_za.so" "$staging/zygisk/"
             _has_zygisk=true
         fi
     done
@@ -341,7 +340,7 @@ UPDATER
     for _za in arm64-v8a armeabi-v7a x86 x86_64; do
         [ -f "$MODULE_DIR/zygisk/$_za.so" ] && _zs+=("$_za")
     done
-    [ ${#_zs[@]} -gt 0 ] && zygisk_status="${_zs[*]} (stashed)"
+    [ ${#_zs[@]} -gt 0 ] && zygisk_status="${_zs[*]}"
 
     echo "    Output:  $out_path"
     echo "    Size:    $(du -h "$out_path" | cut -f1)"
