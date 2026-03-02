@@ -1,4 +1,4 @@
-import { For, onMount, onCleanup } from 'solid-js';
+import { For } from 'solid-js';
 import { store } from '../../lib/store';
 import type { Tab } from '../../lib/types';
 import "./NavBar.css";
@@ -16,34 +16,11 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 ];
 
 export function NavBar(props: NavBarProps) {
-  let scrollDebounce: ReturnType<typeof setTimeout> | undefined;
-  let navRef: HTMLElement | undefined;
-
-  onMount(() => {
-    let isScrolling = false;
-    const handleScroll = () => {
-      if (!isScrolling) {
-        isScrolling = true;
-        navRef?.classList.add('navbar--scrolling');
-      }
-      clearTimeout(scrollDebounce);
-      scrollDebounce = setTimeout(() => {
-        isScrolling = false;
-        navRef?.classList.remove('navbar--scrolling');
-      }, 150);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    onCleanup(() => {
-      window.removeEventListener('scroll', handleScroll);
-      clearTimeout(scrollDebounce);
-    });
-  });
-
   const tabIndex = () => tabs.findIndex(t => t.id === props.activeTab);
   const extraPadding = () => store.settings.fixedNav;
 
   return (
-    <nav ref={navRef} class={`navbar ${extraPadding() ? 'navbar--fixed-nav' : ''}`}>
+    <nav class={`navbar ${extraPadding() ? 'navbar--fixed-nav' : ''}`}>
       <div class="navbar__tabs">
         <div
           class="navbar__indicator"

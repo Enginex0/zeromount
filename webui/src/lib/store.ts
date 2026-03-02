@@ -1,4 +1,4 @@
-import { createSignal, createRoot, createMemo, createEffect } from 'solid-js';
+import { createSignal, createRoot, createMemo, createEffect, batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
 import { api, shouldUseMock } from './api';
@@ -264,31 +264,33 @@ function createAppStore() {
     const cached = readCache();
     if (!cached) return false;
 
-    setScenario(cached.scenario);
-    setEngineActive(cached.engineActive);
-    setCapabilities(cached.capabilities);
-    setStats(cached.stats);
-    setSystemInfo(cached.systemInfo);
-    setModuleStatuses(cached.moduleStatuses);
-    setFontModules(cached.fontModules);
-    setDegraded(cached.degraded);
-    setDegradationReason(cached.degradationReason);
-    setRootManager(cached.rootManager);
-    setRuntimeStrategy(cached.runtimeStrategy);
-    _setMountSource(cached.mountSource);
-    setResolvedStorageMode(cached.resolvedStorageMode);
-    setRules(cached.rules);
-    setExcludedUids(cached.excludedUids);
-    setActivity(cached.activity);
-    setKsuModules(cached.ksuModules);
-    setSettings('brene', prev => ({ ...prev, ...cached.brene }));
-    setSettings('susfs', prev => ({ ...prev, ...cached.susfs }));
-    setSettings('uname', prev => ({ ...prev, ...cached.uname }));
-    setSettings('mount', prev => ({ ...prev, ...cached.mount }));
-    setSettings('adb', prev => ({ ...prev, ...cached.adb }));
-    setSettings({ verboseLogging: cached.verboseLogging });
-    if (cached.externalSusfsModule !== undefined) setExternalSusfsModule(cached.externalSusfsModule);
-    if (cached.bridgeValues !== undefined) setBridgeValues(cached.bridgeValues);
+    batch(() => {
+      setScenario(cached.scenario);
+      setEngineActive(cached.engineActive);
+      setCapabilities(cached.capabilities);
+      setStats(cached.stats);
+      setSystemInfo(cached.systemInfo);
+      setModuleStatuses(cached.moduleStatuses);
+      setFontModules(cached.fontModules);
+      setDegraded(cached.degraded);
+      setDegradationReason(cached.degradationReason);
+      setRootManager(cached.rootManager);
+      setRuntimeStrategy(cached.runtimeStrategy);
+      _setMountSource(cached.mountSource);
+      setResolvedStorageMode(cached.resolvedStorageMode);
+      setRules(cached.rules);
+      setExcludedUids(cached.excludedUids);
+      setActivity(cached.activity);
+      setKsuModules(cached.ksuModules);
+      setSettings('brene', prev => ({ ...prev, ...cached.brene }));
+      setSettings('susfs', prev => ({ ...prev, ...cached.susfs }));
+      setSettings('uname', prev => ({ ...prev, ...cached.uname }));
+      setSettings('mount', prev => ({ ...prev, ...cached.mount }));
+      setSettings('adb', prev => ({ ...prev, ...cached.adb }));
+      setSettings({ verboseLogging: cached.verboseLogging });
+      if (cached.externalSusfsModule !== undefined) setExternalSusfsModule(cached.externalSusfsModule);
+      if (cached.bridgeValues !== undefined) setBridgeValues(cached.bridgeValues);
+    });
     return true;
   };
 
@@ -321,6 +323,7 @@ function createAppStore() {
   });
 
   const applyBatchedResponse = (data: WebUiInitResponse) => {
+    batch(() => {
     const s = data.status;
     setScenario(s.scenario as Scenario);
     setCapabilities(s.capabilities);
@@ -456,6 +459,7 @@ function createAppStore() {
     });
 
     setKsuModules(data.modules);
+    });
   };
 
   const loadInitialDataLegacy = async () => {
@@ -472,39 +476,40 @@ function createAppStore() {
     const dump = criticalResults[2].status === 'fulfilled' ? criticalResults[2].value : null;
     const systemColor = criticalResults[3].status === 'fulfilled' ? criticalResults[3].value : null;
 
-    if (status) {
-      setScenario(status.scenario as Scenario);
-      setCapabilities(status.capabilities);
-      setModuleStatuses(status.modules);
-      setFontModules(status.font_modules || []);
-      setDegraded(status.degraded);
-      setDegradationReason(status.degradation_reason);
-      setEngineActive(status.engine_active ?? false);
-      if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
-      setSystemInfo('susfsVersion', status.susfs_version || '');
-      setRootManager(status.root_manager);
-
-      setRuntimeStrategy(status.active_strategy ?? null);
-      _setMountSource(status.mount_source ?? null);
-      setResolvedStorageMode(status.resolved_storage_mode ?? null);
-      setStats({
-        activeRules: status.rule_count,
-        excludedUids: status.excluded_uid_count,
-        hiddenPaths: status.hidden_path_count,
-        hiddenMaps: status.hidden_maps_count ?? 0,
-      });
-    }
-    setSystemInfo('kernelVersion', sysInfo.kernelVersion);
-    setSystemInfo('uptime', sysInfo.uptime);
-    setSystemInfo('deviceModel', sysInfo.deviceModel);
-    setSystemInfo('androidVersion', sysInfo.androidVersion);
-    setSystemInfo('selinuxStatus', sysInfo.selinuxStatus);
-    if (!status) {
-      setSystemInfo('driverVersion', sysInfo.driverVersion);
-      setSystemInfo('susfsVersion', sysInfo.susfsVersion);
-    }
-    if (systemColor) setSettings({ accentColor: systemColor });
-    setLoading('status', false);
+    batch(() => {
+      if (status) {
+        setScenario(status.scenario as Scenario);
+        setCapabilities(status.capabilities);
+        setModuleStatuses(status.modules);
+        setFontModules(status.font_modules || []);
+        setDegraded(status.degraded);
+        setDegradationReason(status.degradation_reason);
+        setEngineActive(status.engine_active ?? false);
+        if (status.driver_version !== null) setSystemInfo('driverVersion', `v${status.driver_version}`);
+        setSystemInfo('susfsVersion', status.susfs_version || '');
+        setRootManager(status.root_manager);
+        setRuntimeStrategy(status.active_strategy ?? null);
+        _setMountSource(status.mount_source ?? null);
+        setResolvedStorageMode(status.resolved_storage_mode ?? null);
+        setStats({
+          activeRules: status.rule_count,
+          excludedUids: status.excluded_uid_count,
+          hiddenPaths: status.hidden_path_count,
+          hiddenMaps: status.hidden_maps_count ?? 0,
+        });
+      }
+      setSystemInfo('kernelVersion', sysInfo.kernelVersion);
+      setSystemInfo('uptime', sysInfo.uptime);
+      setSystemInfo('deviceModel', sysInfo.deviceModel);
+      setSystemInfo('androidVersion', sysInfo.androidVersion);
+      setSystemInfo('selinuxStatus', sysInfo.selinuxStatus);
+      if (!status) {
+        setSystemInfo('driverVersion', sysInfo.driverVersion);
+        setSystemInfo('susfsVersion', sysInfo.susfsVersion);
+      }
+      if (systemColor) setSettings({ accentColor: systemColor });
+      setLoading('status', false);
+    });
 
     const configLoads = Promise.allSettled([
       loadBreneSettings(dump),
@@ -527,23 +532,25 @@ function createAppStore() {
     const activityData = deferredResults[2].status === 'fulfilled' ? deferredResults[2].value : [];
     const ksuModulesData = deferredResults[3].status === 'fulfilled' ? deferredResults[3].value : [];
 
-    setRules(rulesData);
-    setExcludedUids(uidsData);
-    setActivity(prev => {
-      const runtimeItems = prev.filter(item => item.id.startsWith('rt-'));
-      const rtMessages = new Set(runtimeItems.map(item => item.message));
-      const deduped = activityData.filter(item => !rtMessages.has(item.message));
-      const merged = [...runtimeItems, ...deduped];
-      merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      return merged.slice(0, 10);
-    });
-    if (!status) {
-      setStats({
-        activeRules: rulesData.length,
-        excludedUids: uidsData.length,
+    batch(() => {
+      setRules(rulesData);
+      setExcludedUids(uidsData);
+      setActivity(prev => {
+        const runtimeItems = prev.filter(item => item.id.startsWith('rt-'));
+        const rtMessages = new Set(runtimeItems.map(item => item.message));
+        const deduped = activityData.filter(item => !rtMessages.has(item.message));
+        const merged = [...runtimeItems, ...deduped];
+        merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        return merged.slice(0, 10);
       });
-    }
-    setKsuModules(ksuModulesData);
+      if (!status) {
+        setStats({
+          activeRules: rulesData.length,
+          excludedUids: uidsData.length,
+        });
+      }
+      setKsuModules(ksuModulesData);
+    });
 
     await configLoads;
   };
@@ -1168,28 +1175,29 @@ function createAppStore() {
       const status = await api.getRuntimeStatus();
       if (!status) return;
 
-      setScenario(status.scenario as Scenario);
-      setCapabilities(status.capabilities);
-      setModuleStatuses(status.modules);
-      setFontModules(status.font_modules || []);
-      setDegraded(status.degraded);
-      setDegradationReason(status.degradation_reason);
-      setRootManager(status.root_manager);
+      batch(() => {
+        setScenario(status.scenario as Scenario);
+        setCapabilities(status.capabilities);
+        setModuleStatuses(status.modules);
+        setFontModules(status.font_modules || []);
+        setDegraded(status.degraded);
+        setDegradationReason(status.degradation_reason);
+        setRootManager(status.root_manager);
+        setRuntimeStrategy(status.active_strategy ?? null);
+        _setMountSource(status.mount_source ?? null);
+        setResolvedStorageMode(status.resolved_storage_mode ?? null);
 
-      setRuntimeStrategy(status.active_strategy ?? null);
-      _setMountSource(status.mount_source ?? null);
-      setResolvedStorageMode(status.resolved_storage_mode ?? null);
-
-      setEngineActive(status.engine_active ?? false);
-      if (status.driver_version !== null) {
-        setSystemInfo('driverVersion', `v${status.driver_version}`);
-      }
-      setSystemInfo('susfsVersion', status.susfs_version || '');
-      setStats({
-        activeRules: status.rule_count,
-        excludedUids: status.excluded_uid_count,
-        hiddenPaths: status.hidden_path_count,
-        hiddenMaps: status.hidden_maps_count ?? 0,
+        setEngineActive(status.engine_active ?? false);
+        if (status.driver_version !== null) {
+          setSystemInfo('driverVersion', `v${status.driver_version}`);
+        }
+        setSystemInfo('susfsVersion', status.susfs_version || '');
+        setStats({
+          activeRules: status.rule_count,
+          excludedUids: status.excluded_uid_count,
+          hiddenPaths: status.hidden_path_count,
+          hiddenMaps: status.hidden_maps_count ?? 0,
+        });
       });
     } catch (e) {
       setLastApiError({ operation: 'loadRuntimeStatus', error: e, timestamp: new Date() });

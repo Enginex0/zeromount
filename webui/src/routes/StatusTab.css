@@ -15,8 +15,9 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.5);
+  background: radial-gradient(ellipse at center, rgba(var(--accent-rgb), 0.25) 0%, transparent 70%);
   animation: glowBreathe 3s ease-in-out infinite;
+  will-change: opacity;
   pointer-events: none;
 }
 @keyframes glowBreathe {
@@ -59,7 +60,7 @@
 }
 
 .status-hero__shield--active {
-  animation: shieldFloat 3s ease-in-out infinite;
+  animation: shieldFloat 3s ease-in-out 1 forwards;
 }
 
 @keyframes shieldFloat {
@@ -119,6 +120,7 @@
   min-height: 80px;
   border-radius: var(--radius-medium, 12px);
   border: 1px solid var(--glass-border);
+  contain: content;
 }
 
 .status-stats__value {
@@ -398,6 +400,7 @@
   gap: 12px;
   padding: 12px;
   border-radius: var(--radius-medium, 12px);
+  contain: content;
 }
 
 .status-activity__icon {

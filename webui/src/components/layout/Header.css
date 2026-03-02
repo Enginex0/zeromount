@@ -35,17 +35,11 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: subtitleShimmer 2s ease-in-out 1 forwards;
-  filter: drop-shadow(0 0 6px rgba(245, 217, 142, 0.4));
 }
 
 @keyframes headerPulse {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
-}
-
-@keyframes subtitleGlow {
-  0% { opacity: 0.7; filter: drop-shadow(0 0 4px rgba(245, 217, 142, 0.3)) brightness(0.95); }
-  100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(245, 217, 142, 0.6)) brightness(1.15); }
 }
 
 @keyframes subtitleShimmer {
