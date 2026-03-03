@@ -411,6 +411,10 @@ export const api = {
     }
   },
 
+  async reboot(): Promise<void> {
+    await ksuExec('svc power reboot');
+  },
+
   async getVerboseLogging(): Promise<boolean> {
     if (shouldUseMock()) {
       return false;

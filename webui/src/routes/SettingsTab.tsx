@@ -43,7 +43,7 @@ export function SettingsTab() {
           <div class="settings__item">
             <div class="settings__item-content">
               <div class="settings__item-label">Verbose logging</div>
-              <div class="settings__item-desc">Log detailed operation info</div>
+              <div class="settings__item-desc">Capture all ZeroMount logs from boot — requires reboot</div>
             </div>
             <Toggle
               checked={store.settings.verboseLogging}
@@ -56,7 +56,7 @@ export function SettingsTab() {
             <div class="settings__item-desc color-text-tertiary">
               {store.verboseDumpPath()
                 ? `Logs at: ${store.verboseDumpPath()}/`
-                : 'Verbose mode active'}
+                : 'Verbose mode active — logs captured since last boot'}
             </div>
           )}
 

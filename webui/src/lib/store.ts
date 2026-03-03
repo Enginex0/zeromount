@@ -692,13 +692,20 @@ function createAppStore() {
       await api.setVerboseLogging(enabled);
       pushActivity('setting_changed', `Verbose logging → ${enabled ? 'ON' : 'OFF'}`);
       if (enabled) {
-        showToast('Verbose logging enabled. Reboot for full coverage.', 'info');
+        showToast('Rebooting in 3 seconds for verbose logging...', 'warning', 3000);
+        const timerId = setTimeout(async () => {
+          try { await api.reboot(); }
+          catch { showToast('Reboot failed — please reboot manually', 'error'); }
+        }, 3000);
+        (window as any).__zmRebootTimer = timerId;
       } else {
+        if ((window as any).__zmRebootTimer) {
+          clearTimeout((window as any).__zmRebootTimer);
+          (window as any).__zmRebootTimer = null;
+        }
         showToast('Verbose logging disabled.', 'info');
         setVerboseDumpPath(null);
       }
-      const dumpPath = await api.getVerboseDumpPath();
-      setVerboseDumpPath(dumpPath);
     } catch (e) {
       setSettings({ verboseLogging: !enabled });
       showToast('Failed to set verbose logging', 'error');
