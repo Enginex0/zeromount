@@ -19,11 +19,11 @@ if [ "$EXTERNAL_SUSFS" = "none" ] || [ -z "$EXTERNAL_SUSFS" ]; then
         if [ -n "$KSUD" ]; then
             "$KSUD" feature set kernel_umount 1 2>/dev/null && \
                 "$KSUD" feature save 2>/dev/null
-            echo "$LOG: kernel_umount enabled via ksud" > /dev/kmsg 2>/dev/null
+            echo "zeromount: kernel_umount enabled via ksud" > /dev/kmsg 2>/dev/null
         fi
     fi
 else
-    echo "$LOG: kernel_umount deferred to external module ($EXTERNAL_SUSFS)" > /dev/kmsg 2>/dev/null
+    echo "zeromount: kernel_umount deferred to external module ($EXTERNAL_SUSFS)" > /dev/kmsg 2>/dev/null
 fi
 
 # Emoji needs pm (package manager), only available post-boot

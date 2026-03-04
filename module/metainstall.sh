@@ -6,6 +6,7 @@ KSU_HAS_METAMODULE=true
 KSU_METAMODULE=meta-zeromount
 export KSU_HAS_METAMODULE KSU_METAMODULE
 
+# KSU install_module calls this callback — stub to suppress default partition handling
 handle_partition() { : ; }
 
 install_module

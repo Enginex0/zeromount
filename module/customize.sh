@@ -61,7 +61,7 @@ for d in "$MODPATH"/bin/*/; do
     rm -rf "$d"
 done
 
-cp "$BIN" "$MODPATH/bin/zm"
+cp "$BIN" "$MODPATH/bin/zm" || abort "  ❌ Failed to copy binary"
 chmod 755 "$MODPATH/bin/zm"
 zm_print "  ✅ Binary ready"
 
