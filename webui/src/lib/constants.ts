@@ -18,6 +18,6 @@ export const PATHS = {
   VERBOSE_FLAG: '/data/adb/zeromount/.verbose',
 };
 
-export const GITHUB_URL = 'https://github.com/backslashxx/zeromount';
+export const GITHUB_URL = 'https://github.com/Enginex0/zeromount';
 
 export const APP_VERSION = '2.0.0-dev';
