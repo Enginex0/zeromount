@@ -96,6 +96,30 @@ The result: **module files appear at their stock system paths with absolutely ze
 
 ---
 
+## ⚙️ Kernel Interface
+
+ZeroMount communicates with the kernel through two interfaces: a custom miscdevice for VFS control and SUSFS supercalls for hiding features.
+
+### ZeroMount VFS — `/dev/zeromount`
+
+Ioctl commands issued to the ZeroMount miscdevice (magic `0x5A`):
+
+| Ioctl | Code | Description |
+|---|---|---|
+| `ADD_RULE` | `0x5A01` | Register a VFS path redirection rule |
+| `DEL_RULE` | `0x5A02` | Remove a VFS redirection rule |
+| `CLEAR_ALL` | `0x5A03` | Clear all active redirection rules |
+| `GET_VERSION` | `0x5A04` | Query the driver version |
+| `ADD_UID` | `0x5A05` | Exclude a UID from VFS redirection |
+| `DEL_UID` | `0x5A06` | Re-include a UID in VFS redirection |
+| `GET_LIST` | `0x5A07` | List all active redirection rules |
+| `ENABLE` | `0x5A08` | Enable the VFS engine |
+| `DISABLE` | `0x5A09` | Disable the VFS engine |
+| `REFRESH` | `0x5A0A` | Flush dcache to apply rule changes |
+| `GET_STATUS` | `0x5A0B` | Query whether the engine is active |
+
+---
+
 ## 📋 Requirements
 
 > [!IMPORTANT]
