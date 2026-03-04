@@ -725,6 +725,10 @@ pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<Runti
     if ZeroMountConfig::check_bootloop()? {
         warn!("bootloop detected — safe mode (zero rules, no mounts)");
 
+        let _ = crate::utils::platform::write_description_to_module_prop(
+            "🛡\u{fe0f} Safe mode — mounts skipped due to repeated boot failures"
+        );
+
         if let Ok(mgr) = crate::utils::platform::detect_root_manager() {
             if let Err(e) = mgr.notify_module_mounted() {
                 warn!("notify-module-mounted failed in safe mode: {e}");

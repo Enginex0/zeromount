@@ -42,6 +42,8 @@ pub struct ZeroMountConfig {
     #[serde(default)]
     pub adb: AdbConfig,
     #[serde(default)]
+    pub guard: GuardConfig,
+    #[serde(default)]
     pub per_module: HashMap<String, ModuleOverrides>,
 }
 
@@ -329,6 +331,68 @@ impl Default for AdbConfig {
     }
 }
 
+// -- Bootloop guard --
+
+fn default_guard_threshold() -> u32 { 2 }
+fn default_boot_timeout() -> u32 { 100 }
+fn default_watch_secs() -> u32 { 30 }
+fn default_zygote_poll() -> u32 { 4 }
+fn default_zygote_restarts() -> u32 { 4 }
+fn default_systemui_poll() -> u32 { 4 }
+fn default_systemui_restarts() -> u32 { 3 }
+fn default_systemui_absent() -> u32 { 25 }
+fn default_allowed_modules() -> Vec<String> { vec!["meta-zeromount".to_string()] }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuardConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_guard_threshold")]
+    pub marker_threshold: u32,
+    #[serde(default = "default_boot_timeout")]
+    pub boot_timeout_secs: u32,
+    #[serde(default = "default_watch_secs")]
+    pub zygote_watch_secs: u32,
+    #[serde(default = "default_zygote_poll")]
+    pub zygote_poll_secs: u32,
+    #[serde(default = "default_zygote_restarts")]
+    pub zygote_max_restarts: u32,
+    #[serde(default = "default_watch_secs")]
+    pub systemui_watch_secs: u32,
+    #[serde(default = "default_systemui_poll")]
+    pub systemui_poll_secs: u32,
+    #[serde(default = "default_systemui_restarts")]
+    pub systemui_max_restarts: u32,
+    #[serde(default = "default_systemui_absent")]
+    pub systemui_absent_timeout_secs: u32,
+    #[serde(default = "default_true")]
+    pub systemui_monitor_enabled: bool,
+    #[serde(default = "default_allowed_modules")]
+    pub allowed_modules: Vec<String>,
+    #[serde(default)]
+    pub allowed_scripts: Vec<String>,
+}
+
+impl Default for GuardConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            marker_threshold: 2,
+            boot_timeout_secs: 100,
+            zygote_watch_secs: 30,
+            zygote_poll_secs: 4,
+            zygote_max_restarts: 4,
+            systemui_watch_secs: 30,
+            systemui_poll_secs: 4,
+            systemui_max_restarts: 3,
+            systemui_absent_timeout_secs: 25,
+            systemui_monitor_enabled: true,
+            allowed_modules: vec!["meta-zeromount".to_string()],
+            allowed_scripts: Vec::new(),
+        }
+    }
+}
+
 // -- Per-module overrides --
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -362,6 +426,7 @@ impl Default for ZeroMountConfig {
             perf: PerfConfig::default(),
             emoji: EmojiConfig::default(),
             adb: AdbConfig::default(),
+            guard: GuardConfig::default(),
             per_module: HashMap::new(),
         }
     }
@@ -556,6 +621,25 @@ impl ZeroMountConfig {
             "adb.developer_options" => Some(self.adb.developer_options.to_string()),
             "adb.adb_root" => Some(self.adb.adb_root.to_string()),
 
+            // guard.*
+            "guard.enabled" => Some(self.guard.enabled.to_string()),
+            "guard.marker_threshold" => Some(self.guard.marker_threshold.to_string()),
+            "guard.boot_timeout_secs" => Some(self.guard.boot_timeout_secs.to_string()),
+            "guard.zygote_watch_secs" => Some(self.guard.zygote_watch_secs.to_string()),
+            "guard.zygote_poll_secs" => Some(self.guard.zygote_poll_secs.to_string()),
+            "guard.zygote_max_restarts" => Some(self.guard.zygote_max_restarts.to_string()),
+            "guard.systemui_watch_secs" => Some(self.guard.systemui_watch_secs.to_string()),
+            "guard.systemui_poll_secs" => Some(self.guard.systemui_poll_secs.to_string()),
+            "guard.systemui_max_restarts" => Some(self.guard.systemui_max_restarts.to_string()),
+            "guard.systemui_absent_timeout_secs" => {
+                Some(self.guard.systemui_absent_timeout_secs.to_string())
+            }
+            "guard.systemui_monitor_enabled" => {
+                Some(self.guard.systemui_monitor_enabled.to_string())
+            }
+            "guard.allowed_modules" => Some(self.guard.allowed_modules.join(",")),
+            "guard.allowed_scripts" => Some(self.guard.allowed_scripts.join(",")),
+
             // per_module.<id>.<field>
             k if k.starts_with("per_module.") => self.get_module_key(k),
 
@@ -627,6 +711,25 @@ impl ZeroMountConfig {
             "adb.usb_debugging" => self.adb.usb_debugging = value.parse()?,
             "adb.developer_options" => self.adb.developer_options = value.parse()?,
             "adb.adb_root" => self.adb.adb_root = value.parse()?,
+
+            // guard.*
+            "guard.enabled" => self.guard.enabled = value.parse()?,
+            "guard.marker_threshold" => self.guard.marker_threshold = value.parse()?,
+            "guard.boot_timeout_secs" => self.guard.boot_timeout_secs = value.parse()?,
+            "guard.zygote_watch_secs" => self.guard.zygote_watch_secs = value.parse()?,
+            "guard.zygote_poll_secs" => self.guard.zygote_poll_secs = value.parse()?,
+            "guard.zygote_max_restarts" => self.guard.zygote_max_restarts = value.parse()?,
+            "guard.systemui_watch_secs" => self.guard.systemui_watch_secs = value.parse()?,
+            "guard.systemui_poll_secs" => self.guard.systemui_poll_secs = value.parse()?,
+            "guard.systemui_max_restarts" => self.guard.systemui_max_restarts = value.parse()?,
+            "guard.systemui_absent_timeout_secs" => {
+                self.guard.systemui_absent_timeout_secs = value.parse()?
+            }
+            "guard.systemui_monitor_enabled" => {
+                self.guard.systemui_monitor_enabled = value.parse()?
+            }
+            "guard.allowed_modules" => self.guard.allowed_modules = parse_csv(value),
+            "guard.allowed_scripts" => self.guard.allowed_scripts = parse_csv(value),
 
             // per_module.<id>.<field>
             k if k.starts_with("per_module.") => self.set_module_key(k, value)?,

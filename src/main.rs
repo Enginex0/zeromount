@@ -2,6 +2,7 @@ mod bridge;
 mod cli;
 mod core;
 mod detect;
+mod guard;
 mod logging;
 mod modules;
 mod mount;
@@ -68,6 +69,7 @@ fn main() -> Result<()> {
         Commands::VoldAppData => cli::handlers::handle_vold_app_data(),
         Commands::TryUmount => cli::handlers::handle_try_umount(),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),
+        Commands::Guard { action } => guard::handle_guard(action),
         Commands::Version => {
             println!("zeromount v{}", read_version_from_prop());
             Ok(())

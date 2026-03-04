@@ -151,7 +151,7 @@ impl RootManager for MagiskManager {
 
 // -- Shared --
 
-fn write_description_to_module_prop(text: &str) -> Result<()> {
+pub(crate) fn write_description_to_module_prop(text: &str) -> Result<()> {
     let prop_path = Path::new(ZEROMOUNT_MODULE_DIR).join("module.prop");
     let content = std::fs::read_to_string(&prop_path)
         .context("failed to read module.prop for description update")?;

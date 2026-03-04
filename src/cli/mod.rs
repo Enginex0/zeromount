@@ -85,6 +85,11 @@ pub enum Commands {
     /// Auto-discover KSU mounts and register kernel umount paths (post-boot)
     #[command(name = "try-umount")]
     TryUmount,
+    /// Device-wide bootloop guard
+    Guard {
+        #[command(subcommand)]
+        action: GuardAction,
+    },
     /// Print version
     Version,
 }
@@ -183,4 +188,35 @@ pub enum UidAction {
     Block { uid: u32 },
     /// Include UID in redirection
     Unblock { uid: u32 },
+}
+
+#[derive(Subcommand)]
+pub enum GuardAction {
+    /// Record post-fs-data marker
+    #[command(name = "record-pfd")]
+    RecordPfd,
+    /// Record service marker
+    #[command(name = "record-svc")]
+    RecordSvc,
+    /// Check if guard has tripped (exit 1 if so)
+    Check,
+    /// Clear all guard markers
+    Clear,
+    /// Boot completion watchdog (blocks until done or timeout)
+    #[command(name = "watch-boot")]
+    WatchBoot,
+    /// Zygote stability monitor (blocks for watch window)
+    #[command(name = "watch-zygote")]
+    WatchZygote,
+    /// SystemUI stability monitor (runs continuously)
+    #[command(name = "watch-systemui")]
+    WatchSystemui,
+    /// Print guard status
+    Status,
+    /// Force recovery (disable modules + reboot)
+    Recover,
+    /// Add module to guard whitelist
+    Allow { name: String },
+    /// Remove module from guard whitelist
+    Disallow { name: String },
 }
