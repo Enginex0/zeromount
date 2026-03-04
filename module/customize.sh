@@ -101,7 +101,7 @@ if [ "$FRESH_INSTALL" = true ]; then
         "$BIN" config set adb.developer_options true 2>/dev/null
     [ "$(settings get global adb_enabled 2>/dev/null)" = "1" ] && \
         "$BIN" config set adb.usb_debugging true 2>/dev/null
-    VBS=$(( 4096 + (RANDOM % 8) * 1024 ))
+    VBS=$(( 4096 + ($(od -An -tu1 -N1 /dev/urandom) % 8) * 1024 ))
     "$BIN" config set brene.vbmeta_size "$VBS" 2>/dev/null
     zm_print "  ✅ vbmeta_size randomized: $VBS"
 else

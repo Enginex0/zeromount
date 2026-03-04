@@ -2,7 +2,7 @@ import { Card } from '../core/Card';
 import { Button } from '../core/Button';
 import { store } from '../../lib/store';
 import { GITHUB_URL, PATHS } from '../../lib/constants';
-import { ksuExec } from '../../lib/ksuApi';
+import { ksuExec, ksuWriteFile } from '../../lib/ksuApi';
 import type { Settings } from '../../lib/types';
 
 export function AboutSection() {
@@ -38,8 +38,7 @@ export function AboutSection() {
           bgOpacity: localStorage.getItem('zeromount-bgOpacity'),
         },
       }, null, 2);
-      const escaped = backup.replace(/'/g, "'\\''");
-      const { errno: writeErr } = await ksuExec(`printf '%s' '${escaped}' > /sdcard/Download/zeromount-backup.json`);
+      const { errno: writeErr } = await ksuWriteFile(backup, '/sdcard/Download/zeromount-backup.json');
       if (writeErr === 0) {
         store.showToast('Config exported to Downloads', 'success');
       } else {
@@ -77,8 +76,7 @@ export function AboutSection() {
           // Not JSON — treat as raw TOML config
         }
 
-        const escaped = backendConfig.replace(/'/g, "'\\''");
-        const { errno } = await ksuExec(`printf '%s' '${escaped}' > /data/adb/zeromount/config.toml`);
+        const { errno } = await ksuWriteFile(backendConfig, '/data/adb/zeromount/config.toml');
         if (errno !== 0) {
           store.showToast('Failed to write config', 'error');
           return;

@@ -109,7 +109,11 @@ export async function getPackagesInfo(packageNames: string[]): Promise<PackagesI
   return results;
 }
 
-// Fetch label for a single app via aapt (used for newly installed apps)
+export async function ksuWriteFile(content: string, path: string): Promise<KsuExecResult> {
+  const escaped = content.replace(/'/g, "'\\''");
+  return ksuExec(`printf '%s' '${escaped}' > '${path}'`);
+}
+
 export async function getAppLabelViaAapt(packageName: string): Promise<string | null> {
   if (!isValidPackageName(packageName)) return null;
   const { stdout, errno } = await ksuExec(
