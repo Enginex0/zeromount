@@ -5,6 +5,15 @@ MODDIR="${0%/*}"
 [ -z "$ABI" ] && exit 0
 [ -x "$BIN" ] || exit 0
 
+"$BIN" guard record-pfd 2>/dev/null
+
+if command -v getevent >/dev/null 2>&1; then
+    if timeout 3 getevent -lqn 2>/dev/null | grep -q 'KEY_VOLUMEDOWN.*DOWN'; then
+        echo "zeromount: vol-down safe mode triggered, running guard recovery" > /dev/kmsg 2>/dev/null
+        "$BIN" guard recover 2>/dev/null
+    fi
+fi
+
 "$BIN" detect
 
 mkdir -p /data/adb/zeromount/flags
