@@ -603,7 +603,7 @@ echo "]"
       return (await getMock()).getRuntimeStatus();
     }
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} status --json`, 5000);
+      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} status --json`, { timeout: 5000 });
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as RuntimeStatus;
       }
@@ -728,7 +728,7 @@ echo "]"
   async webuiInit(): Promise<WebUiInitResponse | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} webui-init`, 10000);
+      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} webui-init`, { timeout: 10000 });
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as WebUiInitResponse;
       }
