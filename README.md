@@ -205,6 +205,9 @@ $ zeromount --connect
 
 - **[NoMount](https://github.com/maxsteeel/nomount)** — the project that inspired ZeroMount's approach to mountless module loading
 - **[BRENE](https://github.com/rrr333nnn333/BRENE)** — SUSFS automation
+- **[Hybrid Mount](https://github.com/Hybrid-Mount/meta-hybrid_mount)** by Hybrid Mount Org — metamodule architecture and frontend/backend structural design
+- **[HymoFS](https://github.com/Anatdx/HymoFS)** by Anatdx — hybrid mounting and kernel-level path manipulation
+- **[Mountify](https://github.com/backslashxx/mountify)** by backslashxx — mount solution and module management
 - **[Magisk](https://github.com/topjohnwu/Magisk)** by topjohnwu — the root solution that started it all
 - **[KernelSU](https://github.com/tiann/KernelSU)** by tiann — next-gen kernel root and module framework
 
