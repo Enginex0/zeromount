@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.146-dev
+
+- Detect and uninstall conflicting metamodules during installation
+
 ## v2.0.144-dev
 
 - Change safe mode trigger from volume-down to volume-up + volume-down combo (fixes fastboot key conflict)

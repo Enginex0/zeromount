@@ -73,6 +73,37 @@ else
     zm_print "  ℹ️ Flash a ZeroMount-patched kernel for VFS mode"
 fi
 
+zm_print "🔍 Checking Metamodule Conflicts" 0.3 "h"
+
+_found_conflict=false
+for _mod_dir in /data/adb/modules/*/; do
+    [ -d "$_mod_dir" ] || continue
+    _mod_id=$(basename "$_mod_dir")
+    [ "$_mod_id" = "meta-zeromount" ] && continue
+    _prop="$_mod_dir/module.prop"
+    [ -f "$_prop" ] || continue
+    _meta=$(grep -E '^metamodule[[:space:]]*=' "$_prop" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d '[:space:]')
+    case "$_meta" in
+        1|true)
+            _conflict_name=$(grep -E '^name[[:space:]]*=' "$_prop" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//')
+            zm_print "  ⚠️ Removing metamodule: ${_conflict_name:-$_mod_id}"
+            # Run its uninstall hook if present
+            [ -f "$_mod_dir/uninstall.sh" ] && sh "$_mod_dir/uninstall.sh" 2>/dev/null
+            touch "$_mod_dir/remove"
+            touch "$_mod_dir/disable"
+            _found_conflict=true
+            ;;
+    esac
+done
+unset _mod_dir _mod_id _prop _meta _conflict_name
+
+if [ "$_found_conflict" = true ]; then
+    zm_print "  ✅ Conflicting metamodules marked for removal"
+else
+    zm_print "  ✅ No conflicts found"
+fi
+unset _found_conflict
+
 ZM_DATA="/data/adb/zeromount"
 zm_print "📁 Preparing Data" 0.3 "h"
 
