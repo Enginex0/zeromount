@@ -192,7 +192,23 @@ impl MountController<Planned> {
                             &self.state.modules,
                             self.state.root_mgr.mount_mode(),
                         );
-                        self.execute_overlay_or_magic(&self.state.modules, &self.state.plan, config)
+                        let mut results = self.execute_overlay_or_magic(
+                            &self.state.modules, &self.state.plan, config,
+                        )?;
+
+                        // VFS fallback for novel directories that overlay can't mount
+                        if results.iter().any(|r| !r.success) {
+                            if let Ok(driver) = crate::vfs::VfsDriver::open() {
+                                let fail = results.iter().filter(|r| !r.success).count();
+                                info!(fail, "VFS fallback for failed overlay mounts");
+                                let executor = crate::vfs::VfsExecutor::new(driver);
+                                if let Ok(mut vfs) = executor.execute(&self.state.plan, &self.state.modules) {
+                                    results.append(&mut vfs);
+                                }
+                            }
+                        }
+
+                        Ok(results)
                     }
                     Some(MountStrategy::MagicMount) => {
                         info!("user override: magic mount on VFS-capable kernel");
@@ -599,7 +615,7 @@ fn cleanup_previous_mounts() {
     info!(modules = prev_state.modules.len(), "previous mounts cleaned up");
 }
 
-fn try_detach_mount(path: &str) -> bool {
+pub(crate) fn try_detach_mount(path: &str) -> bool {
     let c_path = match std::ffi::CString::new(path.as_bytes()) {
         Ok(p) => p,
         Err(_) => return false,
