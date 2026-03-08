@@ -1472,6 +1472,11 @@ function createAppStore() {
       setKsuModules(prev => prev.map(m =>
         m.path === modulePath ? { ...m, isLoaded: false } : m
       ));
+      const status = await api.getRuntimeStatus();
+      if (status) {
+        setModuleStatuses(status.modules);
+        setFontModules(status.font_modules || []);
+      }
       setStats('activeRules', s => Math.max(0, s - count));
       showToast(t('toast.moduleUnloaded', { moduleName, count }), 'success');
       return count;

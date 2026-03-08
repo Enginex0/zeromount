@@ -130,6 +130,11 @@ async function logActivity(type: string, message: string): Promise<void> {
   }
 }
 
+function syncDescription(): void {
+  if (shouldUseMock()) return;
+  ksuExec(`${PATHS.BINARY} sync-description`).catch(() => {});
+}
+
 export const api = {
   async getVersion(): Promise<string> {
     if (shouldUseMock()) {
@@ -280,6 +285,7 @@ export const api = {
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to clear rules');
     }
+    syncDescription();
   },
 
   async getExcludedUids(): Promise<ExcludedUid[]> {
@@ -552,6 +558,7 @@ echo "]"
       }
 
       await logActivity('MODULE_LOADED', `${moduleName}: ${addedCount} rules added`);
+      syncDescription();
       return addedCount;
     } catch (e) {
       throw e;
@@ -563,22 +570,28 @@ echo "]"
       return (await getMock()).unloadKsuModule(moduleName, modulePath);
     }
 
+    const moduleId = modulePath.split('/').pop() || '';
+    const { errno, stdout } = await ksuExec(
+      `${PATHS.BINARY} module unload ${escapeShellArg(moduleId)}`
+    );
+
+    if (errno !== 0) {
+      throw new Error(stdout || 'Failed to unload module');
+    }
+
+    let removed = 0;
     try {
-      const rules = await this.getRules();
-      const moduleRules = rules.filter(r => r.source.startsWith(modulePath));
-      const cmds = moduleRules.map(r => `${PATHS.BINARY} vfs del ${escapeShellArg(r.target)} && echo OK || echo FAIL`);
-
-      let removedCount = 0;
-      if (cmds.length > 0) {
-        const { stdout: batchOut } = await ksuExec(cmds.join('\n'));
-        removedCount = (batchOut.match(/\bOK\b/g) ?? []).length;
-      }
-
-      await logActivity('MODULE_UNLOADED', `${moduleName}: ${removedCount} rules removed`);
-      return removedCount;
+      const result = JSON.parse(stdout.trim());
+      if (result.error) throw new Error(result.error);
+      removed = result.removed || 0;
     } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(stdout || 'Unexpected response');
       throw e;
     }
+
+    await logActivity('MODULE_UNLOADED', `${moduleName}: ${removed} mounts removed`);
+    syncDescription();
+    return removed;
   },
 
   async fetchSystemColor(): Promise<string | null> {

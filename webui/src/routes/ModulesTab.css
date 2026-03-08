@@ -71,6 +71,22 @@
   text-overflow: ellipsis;
 }
 
+.modules__item-name--scrolling {
+  text-overflow: clip;
+}
+
+.modules__item-name--scrolling > span {
+  display: inline-block;
+  animation: scroll-name 6s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+@keyframes scroll-name {
+  0%, 15% { transform: translateX(0); }
+  40%, 60% { transform: translateX(var(--scroll-distance)); }
+  85%, 100% { transform: translateX(0); }
+}
+
 .modules__item-meta {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;

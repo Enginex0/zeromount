@@ -161,8 +161,18 @@ export function ModulesTab() {
                   </div>
 
                   <div class="modules__item-content">
-                    <div class="modules__item-name">
-                      {mod.name}
+                    <div
+                      class="modules__item-name"
+                      ref={(el) => {
+                        requestAnimationFrame(() => {
+                          if (el.scrollWidth > el.clientWidth) {
+                            el.style.setProperty('--scroll-distance', `-${el.scrollWidth - el.clientWidth + 12}px`);
+                            el.classList.add('modules__item-name--scrolling');
+                          }
+                        });
+                      }}
+                    >
+                      <span>{mod.name}</span>
                     </div>
                     <div class="modules__item-meta">
                       {t('modules.filesCount', { count: mod.fileCount })}
