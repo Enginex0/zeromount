@@ -26,7 +26,7 @@ if [ -z "$KSU" ] && [ -z "$APATCH" ]; then
     if [ ! -f "/dev/zeromount_metamount_lock" ]; then
         touch "/dev/zeromount_metamount_lock"
         COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
-        if [ "$COUNT" -eq 0 ] && [ ! -f /data/adb/zeromount/.recovery_lockout ]; then
+        if [ "$COUNT" -eq 0 ]; then
             EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
             [ "$EXTERNAL" != "none" ] && "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
             timeout 60 "$BIN" mount

@@ -60,9 +60,7 @@ pub fn execute(config: &ZeroMountConfig) -> ! {
     let _ = crate::utils::platform::write_description_to_module_prop(&desc);
 
     super::markers::clear_all().ok();
-
-    // Persistent lockout — survives boot-completed cleanup so the pipeline
-    // stays in safe mode until the user explicitly clears it via CLI/WebUI.
+    let _ = fs::remove_file("/data/adb/zeromount/.bootcount");
     let _ = fs::write(RECOVERY_LOCKOUT, timestamp.as_bytes());
 
     let _ = Command::new("/system/bin/svc").args(["power", "reboot"]).status();

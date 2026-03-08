@@ -723,7 +723,7 @@ pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
 /// Bootloop-aware pipeline entry point (ME15).
 /// Checks bootcount before running; enters safe mode if threshold exceeded.
 pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<RuntimeState> {
-    if crate::guard::recovery::is_locked_out() || ZeroMountConfig::check_bootloop()? {
+    if ZeroMountConfig::check_bootloop()? {
         warn!("bootloop detected — safe mode (zero rules, no mounts)");
 
         let _ = crate::utils::platform::write_description_to_module_prop(

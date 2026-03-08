@@ -19,7 +19,7 @@
 >
 > Features are being added, tested, and refined continuously. The core functionality has been tested end-to-end on personal devices, but edge cases are expected — different devices, ROMs, and kernel configurations behave differently across brands and models.
 >
-> If something breaks, [report it on Telegram](https://t.me/superpowers9) or [open an issue](https://github.com/Enginex0/zeromount/issues). Response times may vary as development is the priority.
+> If something breaks, [open an issue](https://github.com/Enginex0/zeromount/issues). Response times may vary as development is the priority.
 
 ---
 
@@ -52,17 +52,15 @@ The result: **module files appear at their stock system paths with absolutely ze
 
 ## 🔥 Why ZeroMount?
 
-🛡️ **Bootloop Protection Built In** — Hold both volume keys during boot to trigger safe mode instantly. Three failed boots and your config auto-rolls back to the last working state. Problematic modules get disabled automatically. We've all been there — ZeroMount makes sure you can always recover.
+🛡️ **Bootloop Protection** — Volume keys trigger safe mode. Three failed boots auto-rollback your config. You can always recover.
 
-👻 **Truly Invisible Module Loading** — Zero entries in `/proc/mounts`. Zero entries in `/proc/self/mountinfo`. File metadata, SELinux contexts, and filesystem types all match stock. Detection apps see nothing because there's nothing to see.
+👻 **Truly Invisible** — No mount table entries, no metadata leaks. Detection apps see a stock device.
 
-🎛️ **Full WebUI — No Terminal Needed** — Dashboard with live stats, module manager with hot-load/unload, app exclusion panel, SUSFS controls, theme customization (dark, light, AMOLED). Configure everything from your KSU manager.
+🎛️ **Full WebUI** — Configure everything from your KSU manager. No terminal needed.
 
-🔄 **Strategy Fallback** — VFS redirection is the primary engine, but if your kernel doesn't support it, ZeroMount gracefully falls back to OverlayFS, then MagicMount. Your modules load regardless.
+🔄 **Works Without a Custom Kernel** — VFS is the primary engine, but ZeroMount falls back to OverlayFS or MagicMount if needed.
 
-📦 **Metamodule — Manages All Your Modules** — ZeroMount takes over module mounting from your root manager. Install and uninstall KSU modules normally — ZeroMount intercepts, applies VFS rules, and loads everything mountlessly. New module installs, uninstalls, and updates are handled automatically.
-
-🔒 **Deep SUSFS Integration** — Path hiding, kstat spoofing, maps hiding, mount hiding, uname spoofing, cmdline spoofing, and more — all configurable from the WebUI. If you know SUSFS, you know what this means.
+📦 **Manages All Your Modules** — Install and uninstall modules normally. ZeroMount intercepts and loads everything mountlessly.
 
 ---
 
@@ -152,7 +150,7 @@ Ioctl commands issued to the ZeroMount miscdevice (magic `0x5A`):
 | APatch | ⚠️ Untested | Should work — metamodule hooks present but not verified |
 | Magisk | ⚠️ Untested | Fallback mount pipeline exists but not verified on device |
 
-> More kernels and devices will be tested as development continues. If you test on a device/kernel combo not listed here, let us know in the [Telegram group](https://t.me/superpowers9)!
+> More kernels and devices will be tested as development continues. If you test on an unlisted combo, let us know!
 
 ---
 
@@ -164,15 +162,7 @@ Ioctl commands issued to the ZeroMount miscdevice (magic `0x5A`):
 4. **Reboot** your device
 5. **Open the WebUI** from KSU Manager → ZeroMount → ⚙️
 
-The WebUI will show your engine status, detected kernel capabilities, and loaded modules. Configure SUSFS toggles, app exclusions, and mount strategies from there.
-
----
-
-## 🔨 Build Your Own Kernel
-
-ZeroMount kernels are built via the **[Super-Builders](https://github.com/Enginex0/Super-Builders)** CI pipeline. It handles patching, compilation, and packaging for supported kernel versions.
-
-If you want to build for a device or kernel version not yet supported, check the repo for the build matrix and open an issue or reach out on Telegram.
+The WebUI will show your engine status, detected kernel capabilities, and loaded modules.
 
 ---
 

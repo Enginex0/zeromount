@@ -6,7 +6,7 @@ MODDIR="${0%/*}"
 [ -x "$BIN" ] || exit 0
 
 rm -f /data/adb/zeromount/.bootcount
-"$BIN" guard clear 2>/dev/null
+"$BIN" guard clear-lockout 2>/dev/null
 
 EXTERNAL_SUSFS=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null)
 

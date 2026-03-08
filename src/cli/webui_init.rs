@@ -411,10 +411,10 @@ fn count_files_recursive(dir: &Path) -> usize {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                count += 1;
-            } else if path.is_dir() {
+            if path.is_dir() {
                 count += count_files_recursive(&path);
+            } else {
+                count += 1;
             }
         }
     }

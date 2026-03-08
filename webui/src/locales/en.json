@@ -124,7 +124,7 @@
   "settings.developerOptionsDesc": "Default system settings toggle",
   "settings.usbDebugging": "USB Debugging",
   "settings.adbRoot": "ADB Root",
-  "settings.adbRootDesc": "Run ADB as root without enabling the above two options (stealth) - requires reboot",
+  "settings.adbRootDesc": "Silently grant ADB root access — Developer Options and USB Debugging stay off — requires reboot",
   "settings.performance": "Performance",
   "settings.perfTweak": "Performance Tweak",
   "settings.perfTweakDesc": "Optimize scheduler, memory, I/O and CPU frequency at boot",

@@ -15,8 +15,8 @@ echo "$LOG: metamount.sh entered (post-fs-data)" > /dev/kmsg 2>/dev/null
 # Shell-level bootloop guard — metamount.sh is blocking, so a broken
 # pipeline would hang boot indefinitely without this check.
 COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
-if [ "$COUNT" -gt 0 ] || [ -f /data/adb/zeromount/.recovery_lockout ]; then
-    echo "$LOG: bootloop guard (count=$COUNT, lockout=$([ -f /data/adb/zeromount/.recovery_lockout ] && echo yes || echo no)), skipping pipeline" > /dev/kmsg 2>/dev/null
+if [ "$COUNT" -gt 0 ]; then
+    echo "$LOG: bootloop guard (count=$COUNT), skipping pipeline" > /dev/kmsg 2>/dev/null
     ksud kernel notify-module-mounted 2>/dev/null
     exit 0
 fi

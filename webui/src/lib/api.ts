@@ -486,7 +486,7 @@ for dir in /data/adb/modules/*/; do
 
   [ $has_sys -eq 0 ] && [ $has_ven -eq 0 ] && [ $has_prod -eq 0 ] && continue
 
-  count=$(find "$path" -type f \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null | wc -l)
+  count=$(find "$path" \\( -type f -o -type c \\) \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null | wc -l)
 
   display_name="$name"
   if [ -f "$path/module.prop" ]; then
@@ -536,7 +536,7 @@ echo "]"
 
     try {
       const { stdout } = await ksuExec(
-        `find ${escapeShellArg(modulePath)} -type f \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null`
+        `find ${escapeShellArg(modulePath)} \\( -type f -o -type c \\) \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null`
       );
       const files = stdout.trim().split('\n').filter(Boolean);
       const cmds = files.flatMap(filePath => {

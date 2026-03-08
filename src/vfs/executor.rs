@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::core::types::{
     ModuleFileType, MountPlan, MountResult, MountStrategy, ScannedModule,
 };
+use crate::susfs::SusfsClient;
 use super::VfsDriver;
 
 pub struct VfsExecutor {
@@ -25,10 +26,18 @@ impl VfsExecutor {
     ) -> Result<Vec<MountResult>> {
         let mut results = Vec::with_capacity(modules.len());
 
+        let susfs = SusfsClient::probe()
+            .ok()
+            .filter(|c| c.is_available() && c.features().path);
+
+        if susfs.is_some() {
+            info!("SUSFS path hiding available for whiteout processing");
+        }
+
         // Phase 1: Inject all rules for all modules
         info!(modules = modules.len(), "phase 1: injecting VFS rules");
         for module in modules {
-            let result = self.inject_module_rules(module);
+            let result = self.inject_module_rules(module, susfs.as_ref());
             results.push(result);
         }
 
@@ -47,37 +56,79 @@ impl VfsExecutor {
         Ok(results)
     }
 
-    /// Inject VFS rules for a single module. Returns per-module result.
-    fn inject_module_rules(&self, module: &ScannedModule) -> MountResult {
+    fn inject_module_rules(
+        &self,
+        module: &ScannedModule,
+        susfs: Option<&SusfsClient>,
+    ) -> MountResult {
         let mut applied = 0u32;
         let mut failed = 0u32;
         let mut mount_paths = Vec::new();
         let mut error = None;
 
         for file in &module.files {
-            // Skip whiteouts, opaque dirs, and other non-regular types for VFS rules.
-            // VFS redirection only applies to regular files, directories, and symlinks.
-            match file.file_type {
-                ModuleFileType::Regular
-                | ModuleFileType::Directory
-                | ModuleFileType::Symlink
-                | ModuleFileType::RedirectXattr => {}
-                _ => continue,
-            }
+            // Whiteouts → hide the original path via SUSFS
+            if matches!(
+                file.file_type,
+                ModuleFileType::WhiteoutCharDev
+                    | ModuleFileType::WhiteoutXattr
+                    | ModuleFileType::WhiteoutAufs
+            ) {
+                let Some(client) = susfs else {
+                    // No SUSFS: whiteouts can't be processed in VFS mode
+                    if failed == 0 {
+                        warn!(
+                            module = %module.id,
+                            "SUSFS unavailable, whiteouts will not be hidden in VFS mode"
+                        );
+                    }
+                    failed += 1;
+                    continue;
+                };
 
-            let is_dir = file.file_type == ModuleFileType::Directory;
-
-            // Directory rules redirect opendir() to the module's directory, hiding
-            // stock content (GPU drivers, linker libs). The kernel's auto_inject_parent()
-            // handles directory visibility in readdir via dirs_ht — no rule needed.
-            if is_dir {
+                let relative = whiteout_target_relative(&file.relative_path, &file.file_type);
+                let target = match resolve_target_path(&relative) {
+                    Some(t) => t,
+                    None => {
+                        failed += 1;
+                        continue;
+                    }
+                };
+                let target_str = target.display().to_string();
+                match client.add_sus_path(&target_str) {
+                    Ok(()) => {
+                        applied += 1;
+                        mount_paths.push(target_str);
+                    }
+                    Err(e) => {
+                        debug!(
+                            module = %module.id,
+                            target = %target_str,
+                            error = %e,
+                            "SUSFS hide failed for whiteout"
+                        );
+                        failed += 1;
+                        if error.is_none() {
+                            error = Some(format!("SUSFS hide failed: {e}"));
+                        }
+                    }
+                }
                 continue;
             }
 
-            // source: the module's file on disk
-            let source = module.path.join(&file.relative_path);
+            // VFS redirect: regular files, symlinks, redirect xattrs
+            match file.file_type {
+                ModuleFileType::Regular
+                | ModuleFileType::Symlink
+                | ModuleFileType::RedirectXattr => {}
+                // auto_inject_parent handles directory visibility in readdir
+                ModuleFileType::Directory => continue,
+                // OpaqueDir needs both SUSFS hide + VFS redirect — not yet supported
+                ModuleFileType::OpaqueDir => continue,
+                _ => continue,
+            }
 
-            // target: where it should appear in the real filesystem (strip the partition prefix)
+            let source = module.path.join(&file.relative_path);
             let target = match resolve_target_path(&file.relative_path) {
                 Some(t) => t,
                 None => {
@@ -91,7 +142,7 @@ impl VfsExecutor {
                 }
             };
 
-            match self.driver.add_rule(&target, &source, is_dir) {
+            match self.driver.add_rule(&target, &source, false) {
                 Ok(()) => {
                     applied += 1;
                     mount_paths.push(target.display().to_string());
@@ -112,9 +163,6 @@ impl VfsExecutor {
             }
         }
 
-        let (strategy, success, rules) =
-            (MountStrategy::Vfs, failed == 0 && applied > 0, applied);
-
         debug!(
             module = %module.id,
             applied,
@@ -124,15 +172,31 @@ impl VfsExecutor {
 
         MountResult {
             module_id: module.id.clone(),
-            strategy_used: strategy,
-            success,
-            rules_applied: rules,
+            strategy_used: MountStrategy::Vfs,
+            success: failed == 0 && applied > 0,
+            rules_applied: applied,
             rules_failed: failed,
             error,
             mount_paths,
         }
     }
 
+}
+
+// AUFS whiteouts encode the target name as `.wh.<name>`. Strip the prefix
+// to recover the real path to hide. CharDev/Xattr whiteouts use the target
+// name directly.
+fn whiteout_target_relative(relative: &Path, file_type: &ModuleFileType) -> PathBuf {
+    if *file_type == ModuleFileType::WhiteoutAufs {
+        if let Some(name) = relative.file_name().and_then(|n| n.to_str()) {
+            if let Some(real_name) = name.strip_prefix(".wh.") {
+                if let Some(parent) = relative.parent() {
+                    return parent.join(real_name);
+                }
+            }
+        }
+    }
+    relative.to_path_buf()
 }
 
 const BRENE_OWNED_TARGET_PREFIXES: &[&str] = &["/system/fonts/"];
@@ -261,5 +325,52 @@ mod tests {
         assert!(!is_brene_owned_target(Path::new("/vendor/fonts/custom.ttf")));
         assert!(!is_brene_owned_target(Path::new("/system/app/SomeApp.apk")));
         assert!(!is_brene_owned_target(Path::new("")));
+    }
+
+    #[test]
+    fn whiteout_target_chardev_unchanged() {
+        let rel = PathBuf::from("product/app/YouTube");
+        assert_eq!(
+            whiteout_target_relative(&rel, &ModuleFileType::WhiteoutCharDev),
+            PathBuf::from("product/app/YouTube")
+        );
+    }
+
+    #[test]
+    fn whiteout_target_xattr_unchanged() {
+        let rel = PathBuf::from("system/app/Gmail");
+        assert_eq!(
+            whiteout_target_relative(&rel, &ModuleFileType::WhiteoutXattr),
+            PathBuf::from("system/app/Gmail")
+        );
+    }
+
+    #[test]
+    fn whiteout_target_aufs_strips_prefix() {
+        let rel = PathBuf::from("system/app/.wh.Gmail");
+        assert_eq!(
+            whiteout_target_relative(&rel, &ModuleFileType::WhiteoutAufs),
+            PathBuf::from("system/app/Gmail")
+        );
+    }
+
+    #[test]
+    fn whiteout_target_aufs_sar_path() {
+        let rel = PathBuf::from("system/product/app/.wh.YouTube");
+        let target_rel = whiteout_target_relative(&rel, &ModuleFileType::WhiteoutAufs);
+        assert_eq!(target_rel, PathBuf::from("system/product/app/YouTube"));
+        assert_eq!(
+            resolve_target_path(&target_rel),
+            Some(PathBuf::from("/product/app/YouTube"))
+        );
+    }
+
+    #[test]
+    fn whiteout_target_aufs_no_prefix_noop() {
+        let rel = PathBuf::from("system/app/NormalFile");
+        assert_eq!(
+            whiteout_target_relative(&rel, &ModuleFileType::WhiteoutAufs),
+            PathBuf::from("system/app/NormalFile")
+        );
     }
 }
