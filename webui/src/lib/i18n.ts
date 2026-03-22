@@ -18,6 +18,12 @@ export function t(key: string, params?: Record<string, string | number>): string
   return str;
 }
 
+function getInlinedLocale(code: string): Strings | null {
+  const locales = (window as any).__ZM_LOCALES__;
+  if (locales && typeof locales === 'object' && locales[code]) return locales[code];
+  return null;
+}
+
 export async function loadLocale(code: string) {
   if (code === 'en') {
     setStrings(en);
@@ -25,12 +31,18 @@ export async function loadLocale(code: string) {
     return;
   }
   if (!cache[code]) {
-    try {
-      cache[code] = (await import(`../locales/${code}.json`)).default;
-    } catch {
-      setStrings(en);
-      setLocaleSignal('en');
-      return;
+    // Check boot-time inlined locales first (zero I/O)
+    const inlined = getInlinedLocale(code);
+    if (inlined) {
+      cache[code] = inlined;
+    } else {
+      try {
+        cache[code] = (await import(`../locales/${code}.json`)).default;
+      } catch {
+        setStrings(en);
+        setLocaleSignal('en');
+        return;
+      }
     }
   }
   setStrings({ ...(en as Strings), ...cache[code] });

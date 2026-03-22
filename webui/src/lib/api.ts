@@ -17,6 +17,54 @@ export function shouldUseMock(): boolean {
   return import.meta.env.DEV && typeof globalThis.ksu === 'undefined';
 }
 
+// --- In-memory TTL cache for webui-init data (Layer 1) ---
+const CACHE_PATH = PATHS.BINARY.replace(/\/bin\/zm$/, '/webroot/cache.json');
+
+let _cacheData: WebUiInitResponse | null = null;
+let _cacheTs = 0;
+const CACHE_TTL = 5000;
+
+export async function readFromCache(): Promise<WebUiInitResponse | null> {
+  if (shouldUseMock()) return null;
+
+  // Hot path: in-memory TTL cache
+  if (_cacheData && Date.now() - _cacheTs < CACHE_TTL) return _cacheData;
+
+  // Layer 2: boot-time inlined data (zero I/O)
+  const inlined = (window as any).__ZM_CACHE__;
+  if (inlined && typeof inlined === 'object') {
+    _cacheData = inlined as WebUiInitResponse;
+    _cacheTs = Date.now();
+    return _cacheData;
+  }
+
+  // Fallback: fetch from file (first install before reboot)
+  try {
+    const res = await fetch(`./cache.json?t=${Date.now()}`);
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (!text.trim()) return null;
+    _cacheData = JSON.parse(text) as WebUiInitResponse;
+    _cacheTs = Date.now();
+    return _cacheData;
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshCache(): Promise<void> {
+  if (shouldUseMock()) return;
+  try {
+    await ksuExec(`${PATHS.BINARY} webui-init > ${CACHE_PATH} 2>/dev/null`);
+  } catch {}
+  invalidateCache();
+}
+
+export function invalidateCache(): void {
+  _cacheData = null;
+  _cacheTs = 0;
+  (window as any).__ZM_CACHE__ = null;
+}
 
 function parseRulesOutput(stdout: string): VfsRule[] {
   const lines = stdout.trim().split('\n').filter(line => line.trim());
@@ -598,6 +646,11 @@ echo "]"
     if (shouldUseMock()) {
       return (await getMock()).fetchSystemColor();
     }
+
+    // Check boot-time inlined accent color first (zero exec)
+    const inlined = (window as any).__ZM_ACCENT__;
+    if (typeof inlined === 'string' && inlined) return inlined;
+
     try {
       const { errno, stdout } = await ksuExec(
         'settings get secure theme_customization_overlay_packages'

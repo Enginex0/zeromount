@@ -1,7 +1,7 @@
 import { createSignal, createRoot, createMemo, createEffect, batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, GuardSettings, GuardStatus, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
-import { api, shouldUseMock } from './api';
+import { api, shouldUseMock, invalidateCache, readFromCache } from './api';
 import { PATHS } from './constants';
 import { listPackages, getPackagesInfo, getAppLabelViaAapt, ksuExec } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
@@ -599,17 +599,29 @@ function createAppStore() {
     hydrateFromCache();
 
     try {
-      const [batchedData, systemColor] = await Promise.all([
-        api.webuiInit(),
-        settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
-      ]);
-
-      if (systemColor) setSettings({ accentColor: systemColor });
-
-      if (batchedData) {
-        applyBatchedResponse(batchedData);
+      // Layer 1+2: check inlined/cached data first (zero ksu.exec)
+      const cached = await readFromCache();
+      if (cached) {
+        applyBatchedResponse(cached);
+        // Check boot-time inlined accent color
+        const inlinedAccent = (window as any).__ZM_ACCENT__;
+        if (settings.autoAccentColor && typeof inlinedAccent === 'string' && inlinedAccent) {
+          setSettings({ accentColor: inlinedAccent });
+        }
       } else {
-        await loadInitialDataLegacy();
+        // Fallback: live ksu.exec (first install before reboot, or cache invalidated)
+        const [batchedData, systemColor] = await Promise.all([
+          api.webuiInit(),
+          settings.autoAccentColor ? api.fetchSystemColor() : Promise.resolve(null),
+        ]);
+
+        if (systemColor) setSettings({ accentColor: systemColor });
+
+        if (batchedData) {
+          applyBatchedResponse(batchedData);
+        } else {
+          await loadInitialDataLegacy();
+        }
       }
 
       writeCache(buildCacheState());

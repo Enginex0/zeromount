@@ -3,6 +3,7 @@ import { Button } from '../core/Button';
 import { store } from '../../lib/store';
 import { GITHUB_URL, PATHS } from '../../lib/constants';
 import { ksuExec, ksuWriteFile } from '../../lib/ksuApi';
+import { invalidateCache } from '../../lib/api';
 import { t } from '../../lib/i18n';
 import type { Settings } from '../../lib/types';
 
@@ -105,6 +106,7 @@ export function AboutSection() {
           if (webuiSettings.bgOpacity != null) store.setBgOpacity(parseFloat(webuiSettings.bgOpacity));
         }
 
+        invalidateCache();
         await store.loadInitialData();
         store.showToast(t('toast.importedConfig', { filename: file.name }), 'success');
       } catch {
