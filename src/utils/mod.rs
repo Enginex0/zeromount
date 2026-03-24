@@ -1,4 +1,5 @@
 pub mod command;
+pub mod fs;
 pub mod hash;
 pub mod lock;
 pub mod platform;

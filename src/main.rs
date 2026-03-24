@@ -41,6 +41,24 @@ fn main() -> Result<()> {
     // the process before any visible work (R08: fixes BUG-L3).
     let cli = Cli::parse();
 
+    std::panic::set_hook(Box::new(|info| {
+        let msg = info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.as_str()))
+            .unwrap_or("unknown panic");
+
+        let loc = info
+            .location()
+            .map(|l| format!(" ({}:{})", l.file(), l.line()))
+            .unwrap_or_default();
+
+        let desc = format!("❌ Crashed: {msg}{loc}");
+        eprintln!("zeromount panic: {msg}{loc}");
+        let _ = utils::platform::write_description_to_module_prop(&desc);
+    }));
+
     if let Err(e) = utils::process::camouflage() {
         eprintln!("camouflage failed (non-fatal): {e}");
     }
@@ -49,7 +67,9 @@ fn main() -> Result<()> {
     logging::init(cli.verbose, &config.logging)?;
     utils::signal::register_shutdown_handler();
 
-    match cli.command {
+    let is_mount = matches!(cli.command, Commands::Mount);
+
+    let result = match cli.command {
         Commands::Mount => cli::handlers::handle_mount(),
         Commands::Detect => cli::handlers::handle_detect(),
         Commands::Status { json } => cli::handlers::handle_status(json),
@@ -75,5 +95,14 @@ fn main() -> Result<()> {
             println!("zeromount v{}", read_version_from_prop());
             Ok(())
         }
+    };
+
+    if let Err(ref e) = result {
+        if is_mount {
+            let desc = format!("❌ Mount failed: {e:#}");
+            let _ = utils::platform::write_description_to_module_prop(&desc);
+        }
     }
+
+    result
 }

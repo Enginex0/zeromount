@@ -50,7 +50,14 @@ pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
                 Some(n) => n,
                 None => return false,
             };
-            !BLACKLISTED_NAMES.contains(&name)
+            if BLACKLISTED_NAMES.contains(&name) {
+                return false;
+            }
+            if name.contains("..") || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-') {
+                warn!(id = name, "rejected module with invalid ID");
+                return false;
+            }
+            true
         })
         .filter(|p| is_module_enabled(p) && !has_skip_mount(p) && !has_manual_mounts(p))
         .collect();

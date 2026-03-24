@@ -87,11 +87,13 @@ fn execute_overlay(
         staged.push((pm, lower_dirs));
     }
 
-    // Phase 2: All staging succeeded — mount overlays.
+    // Phase 2: All staging succeeded -- mount overlays.
     // Lower dirs are partition-level (e.g., .../viperfxmod/system/) but mount points
     // may be subdirectories (e.g., /system/etc). Append the relative suffix so overlay
     // only exposes files belonging to that mount point.
     let mut results = Vec::new();
+    let mut failed_module_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut succeeded_module_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for (pm, lower_dirs) in &staged {
         let adjusted: Vec<PathBuf> = lower_dirs
@@ -119,9 +121,22 @@ fn execute_overlay(
         let decoy_ref = decoy_subdir.as_deref();
 
         let result = match mount_overlay(&lower_refs, target, &mount_id, &storage.overlay_source, decoy_ref) {
-            Ok(r) => r,
+            Ok(r) => {
+                for mid in &pm.contributing_modules {
+                    succeeded_module_ids.insert(mid.clone());
+                }
+                r
+            }
             Err(e) => {
-                warn!(target = %target.display(), error = %e, "overlay mount failed");
+                warn!(
+                    target = %target.display(),
+                    modules = ?pm.contributing_modules,
+                    error = %e,
+                    "overlay mount failed, modules queued for magic mount fallback"
+                );
+                for mid in &pm.contributing_modules {
+                    failed_module_ids.insert(mid.clone());
+                }
                 MountResult {
                     module_id: mount_id.clone(),
                     strategy_used: MountStrategy::Overlay,
@@ -143,8 +158,50 @@ fn execute_overlay(
         decoy::teardown_decoy(d);
     }
 
+    // Phase 3: Fallback to magic mount for modules that failed overlay on every
+    // partition they contributed to. Modules with at least one successful overlay
+    // are excluded to prevent double-mounting.
+    let fallback_ids: Vec<&str> = failed_module_ids
+        .iter()
+        .filter(|id| !succeeded_module_ids.contains(id.as_str()))
+        .map(|id| id.as_str())
+        .collect();
+
+    if !fallback_ids.is_empty() {
+        let fallback_modules: Vec<&ScannedModule> = fallback_ids
+            .iter()
+            .filter_map(|id| module_map.get(id).copied())
+            .collect();
+
+        warn!(
+            count = fallback_modules.len(),
+            modules = ?fallback_ids,
+            "falling back to magic mount for overlay-failed modules"
+        );
+
+        match execute_magic_mount_for(
+            &fallback_modules,
+            capabilities,
+            mount_config,
+        ) {
+            Ok(mut fallback_results) => results.append(&mut fallback_results),
+            Err(e) => {
+                warn!(error = %e, "magic mount fallback failed");
+            }
+        }
+    }
+
     info!(mounts = results.len(), "overlay execution complete");
     Ok(results)
+}
+
+fn execute_magic_mount_for(
+    modules: &[&ScannedModule],
+    capabilities: &CapabilityFlags,
+    mount_config: &MountConfig,
+) -> Result<Vec<MountResult>> {
+    let owned: Vec<ScannedModule> = modules.iter().map(|m| (*m).clone()).collect();
+    execute_magic_mount(&owned, capabilities, mount_config)
 }
 
 fn execute_magic_mount(
@@ -216,7 +273,7 @@ fn prepare_lower_dir(
                 ensure_parent_dirs_with_context(lower_dir, parent, partition)?;
             }
             if src.exists() {
-                fs::copy(&src, &dst).with_context(|| {
+                crate::utils::fs::copy_file(&src, &dst).with_context(|| {
                     format!("copy {} -> {}", src.display(), dst.display())
                 })?;
                 crate::utils::selinux::copy_selinux_context(&src, &dst);

@@ -167,8 +167,15 @@ pub(crate) fn write_description_to_module_prop(text: &str) -> Result<()> {
         updated.push('\n');
     }
 
-    std::fs::write(&prop_path, &updated)
-        .context("failed to write module.prop for description update")?;
+    let tmp_path = prop_path.with_extension("prop.tmp");
+    std::fs::write(&tmp_path, &updated)
+        .context("failed to write module.prop.tmp for description update")?;
+
+    if let Err(e) = std::fs::rename(&tmp_path, &prop_path) {
+        tracing::warn!("atomic rename failed, trying direct write: {e}");
+        std::fs::write(&prop_path, &updated)
+            .context("failed to write module.prop for description update")?;
+    }
     Ok(())
 }
 

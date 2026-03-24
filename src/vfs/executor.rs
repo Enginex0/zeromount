@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -56,6 +57,56 @@ impl VfsExecutor {
         Ok(results)
     }
 
+    fn ensure_ancestor_dirs(
+        &self,
+        relative: &Path,
+        module: &ScannedModule,
+        injected_dirs: &mut HashSet<PathBuf>,
+        mount_paths: &mut Vec<String>,
+    ) -> (u32, u32) {
+        let mut applied = 0u32;
+        let mut failed = 0u32;
+        let mut missing = Vec::new();
+
+        let mut ancestor = relative.parent();
+        while let Some(rel) = ancestor {
+            if rel.as_os_str().is_empty() {
+                break;
+            }
+            let target = match resolve_target_path(rel) {
+                Some(t) => t,
+                None => break,
+            };
+            if injected_dirs.contains(&target) || target.exists() {
+                break;
+            }
+            missing.push((rel.to_path_buf(), target));
+            ancestor = rel.parent();
+        }
+
+        for (rel, target) in missing.into_iter().rev() {
+            let source = module.path.join(&rel);
+            if !source.exists() {
+                continue;
+            }
+            if let Err(e) = self.driver.add_rule(&target, &source, true) {
+                debug!(
+                    module = %module.id,
+                    target = %target.display(),
+                    error = %e,
+                    "ancestor dir rule failed"
+                );
+                failed += 1;
+                continue;
+            }
+            injected_dirs.insert(target.clone());
+            mount_paths.push(target.display().to_string());
+            applied += 1;
+        }
+
+        (applied, failed)
+    }
+
     fn inject_module_rules(
         &self,
         module: &ScannedModule,
@@ -65,6 +116,7 @@ impl VfsExecutor {
         let mut failed = 0u32;
         let mut mount_paths = Vec::new();
         let mut error = None;
+        let mut injected_dirs = HashSet::new();
 
         for file in &module.files {
             // Whiteouts → hide the original path via SUSFS
@@ -128,10 +180,17 @@ impl VfsExecutor {
                         None => continue,
                     };
                     if target.exists() {
+                        injected_dirs.insert(target);
                         continue;
                     }
+                    let (a, f) = self.ensure_ancestor_dirs(
+                        &file.relative_path, module, &mut injected_dirs, &mut mount_paths,
+                    );
+                    applied += a;
+                    failed += f;
                     match self.driver.add_rule(&target, &source, true) {
                         Ok(()) => {
+                            injected_dirs.insert(target.clone());
                             applied += 1;
                             mount_paths.push(target.display().to_string());
                         }
@@ -153,6 +212,11 @@ impl VfsExecutor {
                 ModuleFileType::OpaqueDir => {
                     let source = module.path.join(&file.relative_path);
                     if let Some(target) = resolve_target_path(&file.relative_path) {
+                        let (a, f) = self.ensure_ancestor_dirs(
+                            &file.relative_path, module, &mut injected_dirs, &mut mount_paths,
+                        );
+                        applied += a;
+                        failed += f;
                         match self.driver.add_rule(&target, &source, true) {
                             Ok(()) => {
                                 applied += 1;
@@ -187,6 +251,12 @@ impl VfsExecutor {
                     continue;
                 }
             };
+
+            let (a, f) = self.ensure_ancestor_dirs(
+                &file.relative_path, module, &mut injected_dirs, &mut mount_paths,
+            );
+            applied += a;
+            failed += f;
 
             match self.driver.add_rule(&target, &source, false) {
                 Ok(()) => {
