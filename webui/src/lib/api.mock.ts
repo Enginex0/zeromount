@@ -327,4 +327,8 @@ const mockBreneConfig: Record<string, string> = {
   'mount.random_mount_paths': 'true',
   'mount.mount_source': 'auto',
   'mount.overlay_source': 'auto',
+  'mount.exclude_hosts_modules': 'true',
+  'mount.module_blacklist': '',
+  'mount.ext4_image_size_mb': '0',
+  'mount.restart_framework': 'false',
 };

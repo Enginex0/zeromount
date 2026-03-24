@@ -150,6 +150,10 @@ function createAppStore() {
     random_mount_paths: true,
     mount_source: 'auto',
     overlay_source: 'auto',
+    exclude_hosts_modules: true,
+    module_blacklist: '',
+    ext4_image_size_mb: 0,
+    restart_framework: false,
   };
 
   const defaultPerf: PerfSettings = {
@@ -422,6 +426,10 @@ function createAppStore() {
         random_mount_paths: cfg.mount.random_mount_paths ?? prev.random_mount_paths,
         mount_source: cfg.mount.mount_source ?? prev.mount_source,
         overlay_source: cfg.mount.overlay_source ?? prev.overlay_source,
+        exclude_hosts_modules: cfg.mount.exclude_hosts_modules ?? prev.exclude_hosts_modules,
+        module_blacklist: cfg.mount.module_blacklist ?? prev.module_blacklist,
+        ext4_image_size_mb: cfg.mount.ext4_image_size_mb ?? prev.ext4_image_size_mb,
+        restart_framework: cfg.mount.restart_framework ?? prev.restart_framework,
       }));
     }
     if (cfg.perf) {
@@ -1110,6 +1118,10 @@ function createAppStore() {
       if (m.random_mount_paths != null) mount.random_mount_paths = typeof m.random_mount_paths === 'boolean' ? m.random_mount_paths : String(m.random_mount_paths) === 'true';
       if (m.mount_source != null) mount.mount_source = String(m.mount_source);
       if (m.overlay_source != null) mount.overlay_source = String(m.overlay_source);
+      if (m.exclude_hosts_modules != null) mount.exclude_hosts_modules = typeof m.exclude_hosts_modules === 'boolean' ? m.exclude_hosts_modules : String(m.exclude_hosts_modules) === 'true';
+      if (m.module_blacklist != null) mount.module_blacklist = String(m.module_blacklist);
+      if (m.ext4_image_size_mb != null) mount.ext4_image_size_mb = typeof m.ext4_image_size_mb === 'number' ? m.ext4_image_size_mb : parseInt(String(m.ext4_image_size_mb), 10) || 0;
+      if (m.restart_framework != null) mount.restart_framework = typeof m.restart_framework === 'boolean' ? m.restart_framework : String(m.restart_framework) === 'true';
       setSettings('mount', prev => ({ ...prev, ...mount }));
       return;
     }
@@ -1117,12 +1129,15 @@ function createAppStore() {
     // Fallback: individual configGet calls — all in a single Promise.allSettled
     const boolKeys: (keyof MountSettings)[] = [
       'overlay_preferred', 'magic_mount_fallback', 'random_mount_paths',
+      'exclude_hosts_modules', 'restart_framework',
     ];
     const results = await Promise.allSettled([
       api.configGet('mount.storage_mode'),
       ...boolKeys.map(k => api.configGet(`mount.${k}`)),
       api.configGet('mount.mount_source'),
       api.configGet('mount.overlay_source'),
+      api.configGet('mount.module_blacklist'),
+      api.configGet('mount.ext4_image_size_mb'),
     ]);
     const mount: Partial<MountSettings> = {};
     if (results[0].status === 'fulfilled' && results[0].value !== null) {
@@ -1136,11 +1151,19 @@ function createAppStore() {
     });
     const mountSourceResult = results[boolKeys.length + 1];
     const overlaySourceResult = results[boolKeys.length + 2];
+    const blacklistResult = results[boolKeys.length + 3];
+    const ext4SizeResult = results[boolKeys.length + 4];
     if (mountSourceResult.status === 'fulfilled' && mountSourceResult.value !== null) {
       mount.mount_source = mountSourceResult.value;
     }
     if (overlaySourceResult.status === 'fulfilled' && overlaySourceResult.value !== null) {
       mount.overlay_source = overlaySourceResult.value;
+    }
+    if (blacklistResult.status === 'fulfilled' && blacklistResult.value !== null) {
+      mount.module_blacklist = blacklistResult.value;
+    }
+    if (ext4SizeResult.status === 'fulfilled' && ext4SizeResult.value !== null) {
+      mount.ext4_image_size_mb = parseInt(ext4SizeResult.value, 10) || 0;
     }
     setSettings('mount', prev => ({ ...prev, ...mount }));
   };
@@ -1198,7 +1221,7 @@ function createAppStore() {
     }
   };
 
-  const setMountToggle = async (key: 'overlay_preferred' | 'magic_mount_fallback' | 'random_mount_paths', value: boolean) => {
+  const setMountToggle = async (key: 'overlay_preferred' | 'magic_mount_fallback' | 'random_mount_paths' | 'exclude_hosts_modules' | 'restart_framework', value: boolean) => {
     const prev = settings.mount[key];
     setSettings('mount', key, value);
     try {
@@ -1231,6 +1254,18 @@ function createAppStore() {
     } catch (e) {
       showToast(t('toast.failedSaveOverlaySource'), 'error');
       setSettings('mount', 'overlay_source', prev);
+    }
+  };
+
+  const setMountField = async (key: 'module_blacklist' | 'ext4_image_size_mb', value: string | number) => {
+    const prev = settings.mount[key];
+    (setSettings as any)('mount', key, value);
+    try {
+      await api.configSet(`mount.${key}`, String(value));
+      pushActivity('setting_changed', `${key} → ${value || '(empty)'}`);
+    } catch (e) {
+      showToast(t('toast.failedSaveKey', { key }), 'error');
+      (setSettings as any)('mount', key, prev);
     }
   };
 
@@ -1564,6 +1599,7 @@ function createAppStore() {
     setMountStrategy,
     setMountStorageMode,
     setMountToggle,
+    setMountField,
     setMountSource,
     setOverlaySource,
     activeStrategy,

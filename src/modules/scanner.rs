@@ -9,6 +9,11 @@ use tracing::{debug, info, warn};
 use crate::core::types::{ModuleFile, ModuleFileType, ModuleProp, ScannedModule};
 use super::rules::detect_conflicts;
 
+pub struct ScanOptions<'a> {
+    pub exclude_hosts: bool,
+    pub blacklist: &'a [String],
+}
+
 pub const SUPPORTED_PARTITIONS: &[&str] = &[
     "system",
     "vendor",
@@ -39,7 +44,7 @@ const BLACKLISTED_NAMES: &[&str] = &["meta-zeromount", ".", "..", "lost+found"];
 
 /// Scan /data/adb/modules/ for active modules, classify files, detect conflicts.
 /// Returns modules sorted reverse-alphabetically (last-installed wins on conflict).
-pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
+pub fn scan_modules(modules_dir: &Path, opts: &ScanOptions) -> Result<Vec<ScannedModule>> {
     let entries: Vec<PathBuf> = fs::read_dir(modules_dir)
         .with_context(|| format!("cannot read modules directory: {}", modules_dir.display()))?
         .filter_map(|e| e.ok())
@@ -55,6 +60,10 @@ pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
             }
             if name.contains("..") || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-') {
                 warn!(id = name, "rejected module with invalid ID");
+                return false;
+            }
+            if opts.blacklist.iter().any(|b| b == name) {
+                debug!(id = name, "skipping blacklisted module");
                 return false;
             }
             true
@@ -78,7 +87,7 @@ pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
 
     let mut modules: Vec<ScannedModule> = entries
         .par_iter()
-        .filter_map(|path| match scan_single_module(path) {
+        .filter_map(|path| match scan_single_module(path, opts.exclude_hosts) {
             Ok(Some(m)) => Some(m),
             Ok(None) => None,
             Err(e) => {
@@ -101,12 +110,17 @@ pub fn scan_modules(modules_dir: &Path) -> Result<Vec<ScannedModule>> {
     Ok(modules)
 }
 
-fn scan_single_module(module_dir: &Path) -> Result<Option<ScannedModule>> {
+fn scan_single_module(module_dir: &Path, exclude_hosts: bool) -> Result<Option<ScannedModule>> {
     let id = module_dir
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
+
+    if exclude_hosts && module_dir.join("system/etc/hosts").exists() {
+        debug!(module = %id, "skipping module with system/etc/hosts");
+        return Ok(None);
+    }
 
     let prop = parse_module_prop(&module_dir.join("module.prop")).unwrap_or_default();
 

@@ -1,8 +1,10 @@
 import { createSignal, Show } from 'solid-js';
 import { Card } from '../core/Card';
 import { Toggle } from '../core/Toggle';
+import { Input } from '../core/Input';
 import { BottomSheet } from '../ui/BottomSheet';
 import { ChipSelect } from '../ui/ChipSelect';
+import { CollapsibleSubgroup } from '../ui/CollapsibleSubgroup';
 import { store } from '../../lib/store';
 import { t } from '../../lib/i18n';
 import type { StorageMode } from '../../lib/types';
@@ -208,7 +210,63 @@ export function MountEngineSection() {
             onConfirm: (v) => store.setMountSource(v),
           }}
         />
+
+        <CollapsibleSubgroup
+          label={t('engine.advancedMounting')}
+          hiddenCount={1 + (store.settings.mount.storage_mode === 'ext4' ? 1 : 0)}
+          defaultItems={
+            <div class="settings__item">
+              <div class="settings__item-content">
+                <div class="settings__item-label">{t('engine.restartFramework')}</div>
+                <div class="settings__item-desc">{t('engine.restartFrameworkDesc')}</div>
+              </div>
+              <Toggle
+                checked={store.settings.mount.restart_framework}
+                onChange={(v) => store.setMountToggle('restart_framework', v)}
+              />
+            </div>
+          }
+          expandedItems={<>
+            <div class="settings__item" style={{ "flex-direction": "column", "align-items": "stretch" }}>
+              <div class="settings__item-content">
+                <div class="settings__item-label">{t('engine.moduleBlacklist')}</div>
+                <div class="settings__item-desc">{t('engine.moduleBlacklistDesc')}</div>
+              </div>
+              <Input
+                fullWidth
+                value={store.settings.mount.module_blacklist}
+                placeholder={t('engine.moduleBlacklistPlaceholder')}
+                onBlur={(e) => store.setMountField('module_blacklist', e.currentTarget.value)}
+              />
+            </div>
+            <Show when={store.settings.mount.storage_mode === 'ext4'}>
+              <div class="settings__item" style={{ "flex-direction": "column", "align-items": "stretch" }}>
+                <div class="settings__item-content">
+                  <div class="settings__item-label">{t('engine.ext4ImageSize')}</div>
+                  <div class="settings__item-desc">{t('engine.ext4ImageSizeDesc')}</div>
+                </div>
+                <Input
+                  fullWidth
+                  type="number"
+                  value={String(store.settings.mount.ext4_image_size_mb)}
+                  onBlur={(e) => store.setMountField('ext4_image_size_mb', parseInt(e.currentTarget.value, 10) || 0)}
+                />
+              </div>
+            </Show>
+          </>}
+        />
       </Show>
+
+      <div class="settings__item">
+        <div class="settings__item-content">
+          <div class="settings__item-label">{t('engine.excludeHosts')}</div>
+          <div class="settings__item-desc">{t('engine.excludeHostsDesc')}</div>
+        </div>
+        <Toggle
+          checked={store.settings.mount.exclude_hosts_modules}
+          onChange={(v) => store.setMountToggle('exclude_hosts_modules', v)}
+        />
+      </div>
     </Card>
   );
 }

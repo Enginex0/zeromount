@@ -104,6 +104,16 @@ else
 fi
 unset _found_conflict
 
+# Older KSU/APatch use sparse-backed overlayfs that conflicts with zeromount's overlay mode
+if [ -n "$KSU" ] && [ "${KSU_VER_CODE:-0}" -lt 22098 ] && [ "$KSU_MAGIC_MOUNT" != "true" ]; then
+    zm_print "  ⚠️ KSU $KSU_VER_CODE uses sparse overlayfs; overlay mode may conflict"
+    zm_print "  ℹ️ Update KSU to 22098+ or enable magic mount"
+fi
+if [ -n "$APATCH" ] && [ "${APATCH_VER_CODE:-0}" -lt 11170 ] && [ "$APATCH_BIND_MOUNT" != "true" ]; then
+    zm_print "  ⚠️ APatch $APATCH_VER_CODE uses sparse overlayfs; overlay mode may conflict"
+    zm_print "  ℹ️ Update APatch to 11170+ or enable bind mount"
+fi
+
 ZM_DATA="/data/adb/zeromount"
 zm_print "📁 Preparing Data" 0.3 "h"
 
@@ -198,15 +208,25 @@ if [ -f "$VBH_FILE" ]; then
     fi
 fi
 
-if "$BIN" detect 2>/dev/null | grep -q 'susfs: true'; then
+_detect_out=$("$BIN" detect 2>/dev/null)
+if echo "$_detect_out" | grep -q 'susfs: true'; then
     if [ "$KSU_SUKISU" = "true" ]; then
         zm_print "  ✅ SUSFS +enhanced (manager-integrated)"
     else
         zm_print "  ✅ SUSFS detected in kernel"
     fi
+    _susfs_ver=$(echo "$_detect_out" | grep '  version:' | sed 's/.*version: //')
+    case "$_susfs_ver" in
+        1.5.10|1.5.11)
+            zm_print "  ⚠️ SUSFS $_susfs_ver has known overlay mount conflicts"
+            zm_print "  ℹ️ VFS mode is primary; overlay fallback may be unreliable"
+            ;;
+    esac
+    unset _susfs_ver
 else
     zm_print "  ⚠️ SUSFS not detected in kernel"
 fi
+unset _detect_out
 
 zm_print "  🔄 Syncing SUSFS bidirectional"
 "$BIN" bridge init 2>/dev/null && zm_print "  ✅ External configs synced" || zm_print "  ⚠️ Bridge init skipped (binary error)"

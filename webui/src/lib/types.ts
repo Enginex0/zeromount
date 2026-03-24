@@ -199,6 +199,10 @@ export interface MountSettings {
   random_mount_paths: boolean;
   mount_source: string;
   overlay_source: string;
+  exclude_hosts_modules: boolean;
+  module_blacklist: string;
+  ext4_image_size_mb: number;
+  restart_framework: boolean;
 }
 
 export interface Settings {

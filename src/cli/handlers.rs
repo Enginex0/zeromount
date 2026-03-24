@@ -155,7 +155,13 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
                 }
             }
 
-            let modules = crate::modules::scanner::scan_modules(modules_dir)?;
+            let config = crate::core::config::ZeroMountConfig::load(None)
+                .unwrap_or_default();
+            let scan_opts = crate::modules::scanner::ScanOptions {
+                exclude_hosts: config.mount.exclude_hosts_modules,
+                blacklist: &config.mount.module_blacklist,
+            };
+            let modules = crate::modules::scanner::scan_modules(modules_dir, &scan_opts)?;
             println!("scan complete: {} modules", modules.len());
             for m in &modules {
                 println!("  {} ({} files)", m.id, m.files.len());

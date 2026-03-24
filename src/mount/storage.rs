@@ -123,7 +123,7 @@ pub fn init_storage(capabilities: &CapabilityFlags, mount_config: &MountConfig) 
             warn!("forced tmpfs failed, falling back to cascade");
         }
         ConfigStorageMode::Ext4 => {
-            if let Some(handle) = try_mode_ext4(&base_path, &overlay_source) {
+            if let Some(handle) = try_mode_ext4(&base_path, &overlay_source, mount_config.ext4_image_size_mb) {
                 return Ok(record_resolved(handle, &requested));
             }
             warn!("forced ext4 failed, falling back to cascade");
@@ -140,7 +140,7 @@ pub fn init_storage(capabilities: &CapabilityFlags, mount_config: &MountConfig) 
         handle.overlay_source = overlay_source;
         return Ok(record_resolved(handle, &requested));
     }
-    if let Some(handle) = try_mode_ext4(&base_path, &overlay_source) {
+    if let Some(handle) = try_mode_ext4(&base_path, &overlay_source, mount_config.ext4_image_size_mb) {
         return Ok(record_resolved(handle, &requested));
     }
 
@@ -212,8 +212,8 @@ fn try_mode_tmpfs(base_path: &Path, capabilities: &CapabilityFlags, source_name:
     }
 }
 
-fn try_mode_ext4(base_path: &Path, overlay_source: &str) -> Option<StorageHandle> {
-    match try_ext4_storage(base_path) {
+fn try_mode_ext4(base_path: &Path, overlay_source: &str, ext4_override_mb: u32) -> Option<StorageHandle> {
+    match try_ext4_storage(base_path, ext4_override_mb) {
         Ok(()) => {
             info!(mode = "ext4", path = %base_path.display(), "storage initialized");
 
@@ -445,7 +445,10 @@ fn try_tmpfs_with_xattr(base_path: &Path, source_name: &str) -> Result<()> {
     Ok(())
 }
 
-fn calculate_ext4_image_size_mb() -> u64 {
+fn calculate_ext4_image_size_mb(override_mb: u32) -> u64 {
+    if override_mb as u64 >= MIN_EXT4_SIZE_MB {
+        return override_mb as u64;
+    }
     let modules_dir = Path::new(MODULES_DIR_PATH);
     if !modules_dir.is_dir() {
         return MIN_EXT4_SIZE_MB;
@@ -483,10 +486,10 @@ fn dir_size_recursive(path: &Path) -> u64 {
 }
 
 /// Create a sparse ext4 image and loop-mount it.
-fn try_ext4_storage(base_path: &Path) -> Result<()> {
+fn try_ext4_storage(base_path: &Path, ext4_override_mb: u32) -> Result<()> {
     let image_path = base_path.with_extension("ext4.img");
 
-    let image_size_mb = calculate_ext4_image_size_mb();
+    let image_size_mb = calculate_ext4_image_size_mb(ext4_override_mb);
     debug!(size_mb = image_size_mb, "ext4 image size calculated");
 
     // Sparse allocation via ftruncate -- no dd, no external process

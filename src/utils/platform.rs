@@ -55,9 +55,10 @@ impl RootManager for KsuManager {
         Ok(())
     }
 
-    // KSU uses metamodules — only one active at a time. If ZeroMount is the
-    // metamodule, we own all mounting. No other mounter can conflict.
     fn mount_mode(&self) -> RootMountMode {
+        if Path::new("/data/adb/ksu/.nomount").exists() {
+            return RootMountMode::BindMount;
+        }
         RootMountMode::Metamodule
     }
 }
@@ -109,8 +110,10 @@ impl RootManager for APatchManager {
         Ok(())
     }
 
-    // APatch adopted KSU's metamodule system — same single-metamodule constraint.
     fn mount_mode(&self) -> RootMountMode {
+        if Path::new("/data/adb/.litemode_enable").exists() {
+            return RootMountMode::BindMount;
+        }
         RootMountMode::Metamodule
     }
 }

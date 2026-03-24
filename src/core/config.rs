@@ -102,6 +102,14 @@ pub struct MountConfig {
     pub mount_source: String,
     #[serde(default = "default_auto")]
     pub overlay_source: String,
+    #[serde(default = "default_true")]
+    pub exclude_hosts_modules: bool,
+    #[serde(default)]
+    pub module_blacklist: Vec<String>,
+    #[serde(default)]
+    pub ext4_image_size_mb: u32,
+    #[serde(default)]
+    pub restart_framework: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +136,10 @@ impl Default for MountConfig {
             random_mount_paths: true,
             mount_source: default_auto(),
             overlay_source: default_auto(),
+            exclude_hosts_modules: true,
+            module_blacklist: Vec::new(),
+            ext4_image_size_mb: 0,
+            restart_framework: false,
         }
     }
 }
@@ -590,6 +602,10 @@ impl ZeroMountConfig {
             "mount.random_mount_paths" => Some(self.mount.random_mount_paths.to_string()),
             "mount.mount_source" => Some(self.mount.mount_source.clone()),
             "mount.overlay_source" => Some(self.mount.overlay_source.clone()),
+            "mount.exclude_hosts_modules" => Some(self.mount.exclude_hosts_modules.to_string()),
+            "mount.module_blacklist" => Some(self.mount.module_blacklist.join(",")),
+            "mount.ext4_image_size_mb" => Some(self.mount.ext4_image_size_mb.to_string()),
+            "mount.restart_framework" => Some(self.mount.restart_framework.to_string()),
 
             // susfs.*
             "susfs.enabled" => Some(self.susfs.enabled.to_string()),
@@ -684,6 +700,10 @@ impl ZeroMountConfig {
             "mount.random_mount_paths" => self.mount.random_mount_paths = value.parse()?,
             "mount.mount_source" => self.mount.mount_source = value.to_string(),
             "mount.overlay_source" => self.mount.overlay_source = value.to_string(),
+            "mount.exclude_hosts_modules" => self.mount.exclude_hosts_modules = value.parse()?,
+            "mount.module_blacklist" => self.mount.module_blacklist = parse_csv(value),
+            "mount.ext4_image_size_mb" => self.mount.ext4_image_size_mb = value.parse()?,
+            "mount.restart_framework" => self.mount.restart_framework = value.parse()?,
 
             // susfs.*
             "susfs.enabled" => self.susfs.enabled = value.parse()?,

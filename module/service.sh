@@ -88,6 +88,14 @@ if command -v getevent >/dev/null 2>&1; then
     _bg_pids="$_bg_pids $!"
 fi
 
+# Late-loaded modules miss the mount window before zygote; restart framework
+# so apps see the mounts. Also honor explicit user toggle.
+RESTART_FW=$("$BIN" config get mount.restart_framework 2>/dev/null)
+if [ "$RESTART_FW" = "true" ] || [ "$KSU_LATE_LOAD" = "1" ]; then
+    echo "zeromount: restarting framework (restart_fw=$RESTART_FW late_load=${KSU_LATE_LOAD:-0})" > /dev/kmsg 2>/dev/null
+    stop; start
+fi
+
 PROP_SPOOF=$("$BIN" config get brene.prop_spoofing 2>/dev/null)
 
 if [ "$PROP_SPOOF" = "true" ]; then

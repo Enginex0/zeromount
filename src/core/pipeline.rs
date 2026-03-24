@@ -105,8 +105,12 @@ impl MountController<Detected> {
 
         // Scan
         let modules_dir = Path::new(MODULES_DIR);
+        let scan_opts = crate::modules::scanner::ScanOptions {
+            exclude_hosts: self.state.config.mount.exclude_hosts_modules,
+            blacklist: &self.state.config.mount.module_blacklist,
+        };
         let modules = if modules_dir.exists() {
-            crate::modules::scanner::scan_modules(modules_dir)
+            crate::modules::scanner::scan_modules(modules_dir, &scan_opts)
                 .context("module scan failed")?
         } else {
             warn!("modules directory missing: {MODULES_DIR}");
