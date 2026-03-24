@@ -16,7 +16,7 @@ thiserror = "= 2.0.18"
 libc = "= 0.2.180"
 rand = "= 0.8.5"
 zip = { version = "= 8.1.0", default-features = false, features = ["deflate"] }
-resetprop = { path = "external/resetprop-rs/crates/resetprop" }
+resetprop = { git = "https://github.com/Enginex0/resetprop-rs" }
 
 [dev-dependencies]
 tempfile = "3"
