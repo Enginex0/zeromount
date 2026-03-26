@@ -276,7 +276,11 @@ fn prepare_lower_dir(
                 crate::utils::fs::copy_file(&src, &dst).with_context(|| {
                     format!("copy {} -> {}", src.display(), dst.display())
                 })?;
-                crate::utils::selinux::copy_selinux_context(&src, &dst);
+                // Copy SELinux context from the real system path, not the
+                // module source on /data. Falls back to system_data_file
+                // for novel files that don't exist on the stock system.
+                let real_path = PathBuf::from(format!("/{partition}")).join(sub);
+                crate::utils::selinux::copy_selinux_context(&real_path, &dst);
             }
         }
     }
@@ -327,8 +331,14 @@ fn ensure_parent_dirs_with_context(
     Ok(())
 }
 
-// KSU/APatch metamodules own all mounting — skip_mount flags are irrelevant.
+// KSU/APatch metamodules own all mounting -- skip_mount flags are irrelevant.
 // BindMount (Magisk) needs flags so the root manager doesn't double-mount.
+//
+// Exception: modules with post-fs-data.sh may create files at runtime that
+// ZeroMount cannot see during its scan pass (e.g., MSD generates
+// system/etc/selinux/plat_seapp_contexts). Leaving skip_mount unset for
+// these modules lets the root manager mount those late-created files in its
+// own pass (which runs after all post-fs-data scripts have completed).
 pub fn manage_skip_mount_flags(modules: &[ScannedModule], mode: RootMountMode) {
     if mode == RootMountMode::Metamodule {
         return;
@@ -338,6 +348,13 @@ pub fn manage_skip_mount_flags(modules: &[ScannedModule], mode: RootMountMode) {
     let mut flagged = Vec::new();
 
     for module in modules {
+        if module.has_post_fs_data_sh {
+            info!(
+                module = %module.id,
+                "not setting skip_mount (module has post-fs-data.sh that may create files)"
+            );
+            continue;
+        }
         let flag = modules_base.join(&module.id).join("skip_mount");
         let _ = std::fs::write(&flag, "");
         flagged.push(module.id.as_str());

@@ -103,6 +103,11 @@ impl MountController<Detected> {
     pub fn scan_and_plan(self) -> Result<MountController<Planned>> {
         info!("pipeline: scan + plan phase");
 
+        // Remove stale skip_mount flags from the previous boot so the scanner
+        // picks these modules up again.  manage_skip_mount_flags() will
+        // recreate the flags for whichever modules are still managed.
+        cleanup_skip_mount_flags();
+
         // Scan
         let modules_dir = Path::new(MODULES_DIR);
         let scan_opts = crate::modules::scanner::ScanOptions {
@@ -586,6 +591,37 @@ impl MountController<Mounted> {
             root_manager: Some(self.state.root_mgr.name().to_string()),
             resolved_storage_mode: crate::mount::storage::get_resolved_storage_mode(),
             emoji_applied: false,
+        }
+    }
+}
+
+/// Remove skip_mount flags left over from the previous boot cycle.
+///
+/// During each boot, `manage_skip_mount_flags()` writes a skip_mount sentinel
+/// into every managed module's directory so Magisk won't double-mount them.
+/// Those flags persist across reboots, which causes the scanner to skip the
+/// modules entirely on the next boot (nobody mounts them).
+///
+/// This function reads the tracking file written alongside the flags and
+/// removes each one.  `manage_skip_mount_flags()` recreates whichever flags
+/// are still needed after the current mount phase completes.
+fn cleanup_skip_mount_flags() {
+    let tracking = Path::new("/data/adb/zeromount/.skipped_modules");
+    let content = match std::fs::read_to_string(tracking) {
+        Ok(c) => c,
+        Err(_) => {
+            debug!("no .skipped_modules tracking file, nothing to clean up");
+            return;
+        }
+    };
+
+    let modules_base = Path::new(MODULES_DIR);
+    for id in content.lines().filter(|l| !l.is_empty()) {
+        let flag = modules_base.join(id).join("skip_mount");
+        if let Err(e) = std::fs::remove_file(&flag) {
+            debug!(module = id, error = %e, "skip_mount flag already absent or removal failed");
+        } else {
+            debug!(module = id, "removed stale skip_mount flag");
         }
     }
 }

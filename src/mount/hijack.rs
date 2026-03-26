@@ -156,6 +156,7 @@ fn find_rogue_mounts<'a>(
                 && e.fs_type != "overlay"
                 && is_system_partition(&e.mount_point)
                 && !managed_paths.contains(&e.mount_point)
+                && !is_child_of_managed(&e.mount_point, managed_paths)
         })
         .collect()
 }
@@ -164,6 +165,10 @@ fn is_system_partition(mount_point: &str) -> bool {
     SUPPORTED_PARTITIONS
         .iter()
         .any(|p| mount_point.starts_with(&format!("/{p}/")))
+}
+
+fn is_child_of_managed(mount_point: &str, managed: &HashSet<String>) -> bool {
+    managed.iter().any(|mp| mount_point.starts_with(&format!("{mp}/")))
 }
 
 fn resolve_source_path(entry: &MountInfoEntry) -> String {
@@ -371,6 +376,24 @@ mod tests {
         let rogues = find_rogue_mounts(&entries, &managed);
         assert_eq!(rogues.len(), 1);
         assert_eq!(rogues[0].mount_point, "/system/fonts/Emoji.ttf");
+    }
+
+    #[test]
+    fn child_of_managed_not_rogue() {
+        let entries = vec![
+            MountInfoEntry {
+                mount_point: "/system/priv-app/com.chiller3.msd/app-release.apk".into(),
+                root: "/adb/modules/com.chiller3.msd/system/priv-app/com.chiller3.msd/app-release.apk".into(),
+                fs_type: "f2fs".into(),
+                mount_source: "/dev/block/dm-47".into(),
+            },
+        ];
+
+        let mut managed = HashSet::new();
+        managed.insert("/system/priv-app".to_string());
+
+        let rogues = find_rogue_mounts(&entries, &managed);
+        assert_eq!(rogues.len(), 0);
     }
 
     #[test]

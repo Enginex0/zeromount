@@ -484,7 +484,8 @@ checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
 
 [[package]]
 name = "resetprop"
-version = "0.2.0"
+version = "0.3.1"
+source = "git+https://github.com/Enginex0/resetprop-rs#a840be470962301e79476be9fe3b26d99a9912e0"
 dependencies = [
  "libc",
 ]
@@ -964,7 +965,7 @@ dependencies = [
 
 [[package]]
 name = "zeromount"
-version = "2.0.160-dev"
+version = "2.0.174-dev"
 dependencies = [
  "anyhow",
  "clap",

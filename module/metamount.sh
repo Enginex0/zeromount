@@ -39,11 +39,36 @@ if [ "$EXTERNAL" != "none" ] && [ -n "$ABI" ] && [ -x "$BIN" ]; then
 fi
 
 if [ -n "$ABI" ] && [ -x "$BIN" ]; then
+    # Run other modules' post-fs-data scripts BEFORE the mount pipeline.
+    # Modules like MSD create files at runtime (e.g., seapp_contexts) that
+    # must exist before ZeroMount scans and mounts. In stock KSU, scripts
+    # run before mounts; the metamodule model inverts this, so we restore
+    # the expected ordering by executing scripts here.
+    #
+    # KSU will re-execute these scripts after notify-module-mounted; well-
+    # behaved scripts (including MSD) produce idempotent output, so double
+    # execution is safe.
+    echo "$LOG: running other modules' post-fs-data scripts (pre-mount)" > /dev/kmsg 2>/dev/null
+    for _pfd in /data/adb/modules/*/post-fs-data.sh; do
+        [ ! -f "$_pfd" ] && continue
+        _pfd_dir="${_pfd%/post-fs-data.sh}"
+        _pfd_mod="${_pfd_dir##*/}"
+        # Skip ourselves, disabled, and removed modules
+        case "$_pfd_mod" in
+            zeromount|meta-zeromount) continue ;;
+        esac
+        [ -f "${_pfd_dir}/disable" ] && continue
+        [ -f "${_pfd_dir}/remove" ] && continue
+        echo "$LOG: pre-mount: executing $_pfd_mod/post-fs-data.sh" > /dev/kmsg 2>/dev/null
+        (cd "$_pfd_dir" && timeout 30 sh post-fs-data.sh) 2>/dev/null
+        echo "$LOG: pre-mount: $_pfd_mod exited (rc=$?)" > /dev/kmsg 2>/dev/null
+    done
+
     echo "$LOG: starting mount pipeline (pre-zygote)" > /dev/kmsg 2>/dev/null
     timeout 60 "$BIN" mount
     RET=$?
     if [ "$RET" -eq 124 ]; then
-        echo "$LOG: mount pipeline hung after 60s — forced termination" > /dev/kmsg 2>/dev/null
+        echo "$LOG: mount pipeline hung after 60s, forced termination" > /dev/kmsg 2>/dev/null
     fi
     echo "$LOG: mount pipeline exited (rc=$RET)" > /dev/kmsg 2>/dev/null
 
