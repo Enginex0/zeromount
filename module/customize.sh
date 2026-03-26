@@ -42,6 +42,8 @@ sleep 0.5
 zm_print "📱 Detecting Architecture" 0.3 "h"
 
 . "$MODPATH/common.sh"
+. "$MODPATH/install_i18n.sh"
+. "$MODPATH/install_func.sh"
 if [ -z "$ABI" ]; then
     abort "  ❌ Unsupported architecture: $(uname -m)"
 fi
@@ -118,26 +120,41 @@ ZM_DATA="/data/adb/zeromount"
 zm_print "📁 Preparing Data" 0.3 "h"
 
 FRESH_INSTALL=false
+USER_RESET=false
+mkdir -p "$ZM_DATA"
+mkdir -p "$ZM_DATA/logs"
+
+if [ ! -f "$ZM_DATA/config.toml" ] && [ -f "$ZM_DATA/.stash/config.toml" ]; then
+    restore_stash && zm_print "  ✅ $(_msg config_stash_restored)"
+fi
+
 if [ ! -f "$ZM_DATA/config.toml" ]; then
     FRESH_INSTALL=true
 fi
 
-# Upgrade detection (PIF-style): old module dir exists → preserve settings,
-# clean stale state, and restore SELinux contexts on peer modules.
 IS_UPGRADE=false
 OLD_MODULE="/data/adb/modules/meta-zeromount"
 if [ -d "$OLD_MODULE" ] && [ "$FRESH_INSTALL" = false ]; then
     IS_UPGRADE=true
 fi
 
-mkdir -p "$ZM_DATA"
-mkdir -p "$ZM_DATA/logs"
-zm_print "  ✅ Data directory ready"
+zm_print "  ✅ $(_msg data_ready)"
 
-if [ "$FRESH_INSTALL" = true ]; then
-    zm_print "  🔧 Writing default config"
+if [ "$FRESH_INSTALL" = false ]; then
+    ui_print ""
+    zm_print "⚙️ $(_msg config_prompt)" 0.3 "h"
+    zm_print "  🔊 $(_msg vol_up_preserve)"
+    zm_print "  🔉 $(_msg vol_down_reset)"
+    ui_print ""
+    choose_config 0
+    if [ $? -eq 1 ]; then
+        USER_RESET=true
+    fi
+fi
+
+if [ "$FRESH_INSTALL" = true ] || [ "$USER_RESET" = true ]; then
+    zm_print "  🔧 $(_msg config_default)"
     "$BIN" config defaults > "$ZM_DATA/config.toml" 2>/dev/null || true
-    # Snapshot current Android settings so boot-completed doesn't override them
     [ "$(settings get global development_settings_enabled 2>/dev/null)" = "1" ] && \
         "$BIN" config set adb.developer_options true 2>/dev/null
     [ "$(settings get global adb_enabled 2>/dev/null)" = "1" ] && \
@@ -145,7 +162,6 @@ if [ "$FRESH_INSTALL" = true ]; then
     VBS=$(( 4096 + ($(od -An -tu1 -N1 /dev/urandom) % 8) * 1024 ))
     "$BIN" config set brene.vbmeta_size "$VBS" 2>/dev/null
     zm_print "  ✅ vbmeta_size randomized: $VBS"
-    # Detect device language for WebUI + description strings
     DEVICE_LANG=$(getprop ro.system.locale 2>/dev/null)
     [ -z "$DEVICE_LANG" ] && DEVICE_LANG=$(getprop persist.sys.locale 2>/dev/null)
     [ -z "$DEVICE_LANG" ] && DEVICE_LANG=$(getprop ro.product.locale 2>/dev/null)
@@ -163,9 +179,7 @@ if [ "$FRESH_INSTALL" = true ]; then
     esac
     "$BIN" config set ui.language "$LANG_CODE" 2>/dev/null
 else
-    zm_print "  ✅ Existing config preserved"
-    # Merge new keys: load fills defaults for missing fields, dump writes them back
-    "$BIN" config dump > "$ZM_DATA/config.toml.tmp" 2>/dev/null && mv "$ZM_DATA/config.toml.tmp" "$ZM_DATA/config.toml"
+    zm_print "  ✅ $(_msg config_preserved)"
 fi
 
 if [ "$IS_UPGRADE" = true ]; then
@@ -203,8 +217,18 @@ VBH_FILE="/data/adb/VerifiedBootHash/VerifiedBootHash.txt"
 if [ -f "$VBH_FILE" ]; then
     VBH=$(cat "$VBH_FILE" 2>/dev/null | head -1 | tr -d '[:space:]')
     if [ -n "$VBH" ]; then
-        "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
-        zm_print "  ✅ VerifiedBootHash imported"
+        if [ "$FRESH_INSTALL" = true ] || [ "$USER_RESET" = true ]; then
+            "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
+            zm_print "  ✅ $(_msg vbh_imported)"
+        else
+            EXISTING_VBH=$("$BIN" config get brene.verified_boot_hash 2>/dev/null)
+            if [ -z "$EXISTING_VBH" ]; then
+                "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
+                zm_print "  ✅ $(_msg vbh_imported)"
+            else
+                zm_print "  ✅ $(_msg vbh_kept)"
+            fi
+        fi
     fi
 fi
 

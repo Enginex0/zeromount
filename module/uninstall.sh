@@ -7,4 +7,12 @@ if [ -f /data/adb/zeromount/.skipped_modules ]; then
     done < /data/adb/zeromount/.skipped_modules
 fi
 
-rm -rf /data/adb/zeromount
+ZM_DATA="/data/adb/zeromount"
+STASH="$ZM_DATA/.stash"
+
+mkdir -p "$STASH"
+cp "$ZM_DATA/config.toml" "$STASH/config.toml" 2>/dev/null
+cp "$ZM_DATA/config.toml.bak" "$STASH/config.toml.bak" 2>/dev/null
+
+# Remove everything except the stash
+find "$ZM_DATA" -mindepth 1 -not -path "$STASH" -not -path "$STASH/*" -exec rm -rf {} + 2>/dev/null
