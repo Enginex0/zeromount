@@ -58,6 +58,8 @@ SCRIPTS=(
     action.sh
     boot-completed.sh
     common.sh
+    install_func.sh
+    install_i18n.sh
     post-fs-data.sh
     metamount.sh
     service.sh
