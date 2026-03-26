@@ -5,9 +5,6 @@ MODDIR="${0%/*}"
 [ -z "$ABI" ] && exit 0
 [ -x "$BIN" ] || exit 0
 
-"$BIN" guard record-pfd 2>/dev/null || \
-    echo "zeromount: guard record-pfd failed (rc=$?)" > /dev/kmsg 2>/dev/null
-
 if command -v getevent >/dev/null 2>&1; then
     _keys=$(timeout 3 getevent -lq 2>/dev/null || true)
     if echo "$_keys" | grep -q 'KEY_VOLUMEDOWN.*DOWN' && \
@@ -25,15 +22,10 @@ mkdir -p /data/adb/zeromount/flags
 if [ -z "$KSU" ] && [ -z "$APATCH" ]; then
     if [ ! -f "/dev/zeromount_metamount_lock" ]; then
         touch "/dev/zeromount_metamount_lock"
-        COUNT=$(cat /data/adb/zeromount/.bootcount 2>/dev/null || echo 0)
-        if [ "$COUNT" -eq 0 ]; then
-            EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
-            [ "$EXTERNAL" != "none" ] && "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
-            timeout 60 "$BIN" mount
-            echo "zeromount: magisk mount pipeline exited (rc=$?)" > /dev/kmsg 2>/dev/null
-        else
-            echo "zeromount: bootloop guard (count=$COUNT), skipping" > /dev/kmsg 2>/dev/null
-        fi
+        EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
+        [ "$EXTERNAL" != "none" ] && "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
+        timeout 60 "$BIN" mount
+        echo "zeromount: magisk mount pipeline exited (rc=$?)" > /dev/kmsg 2>/dev/null
     fi
 fi
 

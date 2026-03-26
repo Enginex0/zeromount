@@ -17,8 +17,6 @@ if [ -f /data/adb/zeromount/.verbose ]; then
     $BIN log level 3
 fi
 
-"$BIN" guard record-svc 2>/dev/null
-
 # --- WebUI zero-latency init: inline all data at boot ---
 WEBROOT="$MODDIR/webroot"
 if [ -d "$WEBROOT" ]; then

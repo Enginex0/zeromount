@@ -32,11 +32,9 @@ struct WebUiInitResponse {
 struct WebUiGuardStatus {
     pub enabled: bool,
     pub recovery_lockout: bool,
-    pub pfd_markers: u32,
-    pub svc_markers: u32,
-    pub threshold: u32,
+    pub bootcount: u32,
+    pub disabled: bool,
     pub last_recovery: Option<String>,
-    pub allowed_modules: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -108,16 +106,13 @@ pub fn handle_webui_init() -> Result<()> {
             }),
     };
 
-    let (pfd_markers, svc_markers) = crate::guard::markers::status();
     let last_recovery = find_last_recovery(&activity);
     let guard = WebUiGuardStatus {
         enabled: config.guard.enabled,
         recovery_lockout: crate::guard::recovery::is_locked_out(),
-        pfd_markers,
-        svc_markers,
-        threshold: config.guard.marker_threshold,
+        bootcount: ZeroMountConfig::read_bootcount(),
+        disabled: std::path::Path::new("/data/adb/modules/meta-zeromount/disable").exists(),
         last_recovery,
-        allowed_modules: config.guard.allowed_modules.clone(),
     };
 
     let response = WebUiInitResponse {

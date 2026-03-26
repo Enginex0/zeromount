@@ -1,59 +1,15 @@
-import { createSignal, createMemo, onMount, Show, For } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 import { Card } from '../core/Card';
 import { Toggle } from '../core/Toggle';
 import { CollapsibleSubgroup } from '../ui/CollapsibleSubgroup';
 import { store } from '../../lib/store';
 import { api } from '../../lib/api';
-import { ksuExec } from '../../lib/ksuApi';
 import { t } from '../../lib/i18n';
 import './GuardSection.css';
 
-interface ModuleEntry {
-  name: string;
-  disabled: boolean;
-  locked: boolean;
-}
-
 export function GuardSection() {
   const [expanded, setExpanded] = createSignal(false);
-  const [modules, setModules] = createSignal<ModuleEntry[]>([]);
-
   const gs = () => store.guardStatus();
-  const allowed = createMemo(() => new Set(gs().allowedModules));
-
-  const fetchModules = async () => {
-    const { errno, stdout } = await ksuExec(
-      'for d in /data/adb/modules/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ -f "$d/disable" ] && echo "1:$n" || echo "0:$n"; done'
-    );
-    if (errno !== 0) return;
-    const entries: ModuleEntry[] = stdout.trim().split('\n').filter(Boolean).map(line => {
-      const disabled = line.startsWith('1:');
-      const name = line.substring(2);
-      return { name, disabled, locked: name === 'meta-zeromount' };
-    });
-    if (!entries.some(e => e.name === 'meta-zeromount')) {
-      entries.unshift({ name: 'meta-zeromount', disabled: false, locked: true });
-    }
-    entries.sort((a, b) => {
-      if (a.locked !== b.locked) return a.locked ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    setModules(entries);
-  };
-
-  onMount(fetchModules);
-
-  const protectedCount = createMemo(() =>
-    modules().filter(m => allowed().has(m.name)).length
-  );
-
-  const handleCheck = (name: string, checked: boolean) => {
-    if (checked) store.guardAllowModule(name);
-    else store.guardDisallowModule(name);
-  };
-
-  const markerChipClass = (count: number) =>
-    count > 0 ? 'guard__chip guard__chip--warn' : 'guard__chip guard__chip--ok';
 
   return (
     <Card>
@@ -104,11 +60,11 @@ export function GuardSection() {
           </Show>
 
           <div class="guard__status-row">
-            <span class={markerChipClass(gs().pfdMarkers)}>
-              {t('guard.pfd', { current: gs().pfdMarkers, threshold: gs().threshold })}
+            <span class={`guard__chip ${gs().disabled ? 'guard__chip--warn' : 'guard__chip--ok'}`}>
+              {gs().disabled ? t('guard.moduleDisabled') : t('guard.moduleActive')}
             </span>
-            <span class={markerChipClass(gs().svcMarkers)}>
-              {t('guard.svc', { current: gs().svcMarkers, threshold: gs().threshold })}
+            <span class="guard__chip guard__chip--ok">
+              {t('guard.bootcount', { count: gs().bootcount })}
             </span>
           </div>
 
@@ -132,51 +88,12 @@ export function GuardSection() {
           </div>
 
           <CollapsibleSubgroup
-            label={t('guard.protectedModules', { protected: protectedCount(), total: modules().length })}
-            hiddenCount={modules().length}
-            defaultItems={<></>}
-            expandedItems={
-              <div class="guard__module-list">
-                <For each={modules()}>
-                  {(mod) => {
-                    const checked = () => allowed().has(mod.name);
-                    return (
-                      <div
-                        class={`guard__check-row${mod.locked ? ' guard__check-row--locked' : ''}`}
-                        onClick={() => !mod.locked && handleCheck(mod.name, !checked())}
-                      >
-                        <div class={`guard__checkbox${checked() ? ' guard__checkbox--on' : ''}`}>
-                          <Show when={checked()}>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                            </svg>
-                          </Show>
-                        </div>
-                        <div class="guard__check-label">
-                          <span>{mod.name}</span>
-                          <Show when={mod.disabled}>
-                            <span class="guard__tag guard__tag--disabled">{t('guard.tagDisabled')}</span>
-                          </Show>
-                          <Show when={mod.locked}>
-                            <span class="guard__tag guard__tag--locked">{t('guard.tagAlways')}</span>
-                          </Show>
-                        </div>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
-            }
-          />
-
-          <CollapsibleSubgroup
             label={t('guard.thresholds')}
-            hiddenCount={5}
+            hiddenCount={4}
             defaultItems={<></>}
             expandedItems={
               <div class="guard__threshold-list">
                 <ThresholdRow label={t('guard.bootTimeout')} configKey="guard.boot_timeout_secs" value={store.settings.guard.boot_timeout_secs} />
-                <ThresholdRow label={t('guard.markerThreshold')} configKey="guard.marker_threshold" value={store.settings.guard.marker_threshold} />
                 <ThresholdRow label={t('guard.zygoteMaxRestarts')} configKey="guard.zygote_max_restarts" value={store.settings.guard.zygote_max_restarts} />
                 <ThresholdRow label={t('guard.systemuiMaxRestarts')} configKey="guard.systemui_max_restarts" value={store.settings.guard.systemui_max_restarts} />
                 <ThresholdRow label={t('guard.systemuiAbsentTimeout')} configKey="guard.systemui_absent_timeout_secs" value={store.settings.guard.systemui_absent_timeout_secs} />

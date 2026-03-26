@@ -1,6 +1,7 @@
-pub mod markers;
 pub mod monitors;
 pub mod recovery;
+
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -11,7 +12,7 @@ pub fn handle_guard(action: GuardAction) -> Result<()> {
     let config = ZeroMountConfig::load(None)?;
 
     if let GuardAction::Status = action {
-        return print_status(&config);
+        return print_status();
     }
 
     if !config.guard.enabled {
@@ -20,22 +21,14 @@ pub fn handle_guard(action: GuardAction) -> Result<()> {
     }
 
     match action {
-        GuardAction::RecordPfd => {
-            markers::record_marker("pfd", config.guard.marker_threshold, &config)?;
-        }
-        GuardAction::RecordSvc => {
-            markers::record_marker("svc", config.guard.marker_threshold, &config)?;
-        }
         GuardAction::Check => {
-            if markers::any_triggered(config.guard.marker_threshold) {
+            if recovery::is_locked_out()
+                || Path::new("/data/adb/modules/meta-zeromount/disable").exists()
+            {
                 std::process::exit(1);
             }
         }
-        GuardAction::Clear => {
-            markers::clear_all()?;
-        }
         GuardAction::ClearLockout => {
-            markers::clear_all()?;
             recovery::clear_lockout();
         }
         GuardAction::WatchBoot => {
@@ -50,33 +43,18 @@ pub fn handle_guard(action: GuardAction) -> Result<()> {
         GuardAction::Recover => {
             recovery::execute(&config);
         }
-        GuardAction::Allow { name } => {
-            let mut cfg = config;
-            if !cfg.guard.allowed_modules.contains(&name) {
-                cfg.guard.allowed_modules.push(name);
-                cfg.save()?;
-            }
-        }
-        GuardAction::Disallow { name } => {
-            let mut cfg = config;
-            cfg.guard.allowed_modules.retain(|m| m != &name);
-            cfg.save()?;
-        }
         GuardAction::Status => unreachable!(),
     }
 
     Ok(())
 }
 
-fn print_status(config: &ZeroMountConfig) -> Result<()> {
-    let (pfd, svc) = markers::status();
-    let threshold = config.guard.marker_threshold;
-    println!("enabled: {}", config.guard.enabled);
-    println!("recovery_lockout: {}", recovery::is_locked_out());
-    println!("markers: pfd={pfd}/{threshold} svc={svc}/{threshold}");
-    println!("allowed_modules: {}", config.guard.allowed_modules.join(", "));
-    if !config.guard.allowed_scripts.is_empty() {
-        println!("allowed_scripts: {}", config.guard.allowed_scripts.join(", "));
-    }
+fn print_status() -> Result<()> {
+    let bootcount = ZeroMountConfig::read_bootcount();
+    let disabled = Path::new("/data/adb/modules/meta-zeromount/disable").exists();
+    let lockout = recovery::is_locked_out();
+    println!("bootcount: {bootcount}");
+    println!("disabled: {disabled}");
+    println!("recovery_lockout: {lockout}");
     Ok(())
 }

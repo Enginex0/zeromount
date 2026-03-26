@@ -200,16 +200,8 @@ pub enum UidAction {
 
 #[derive(Subcommand)]
 pub enum GuardAction {
-    /// Record post-fs-data marker
-    #[command(name = "record-pfd")]
-    RecordPfd,
-    /// Record service marker
-    #[command(name = "record-svc")]
-    RecordSvc,
     /// Check if guard has tripped (exit 1 if so)
     Check,
-    /// Clear all guard markers
-    Clear,
     /// Boot completion watchdog (blocks until done or timeout)
     #[command(name = "watch-boot")]
     WatchBoot,
@@ -219,15 +211,11 @@ pub enum GuardAction {
     /// SystemUI stability monitor (runs continuously)
     #[command(name = "watch-systemui")]
     WatchSystemui,
-    /// Clear recovery lockout (re-enables pipeline after guard recovery)
+    /// Clear recovery lockout
     #[command(name = "clear-lockout")]
     ClearLockout,
     /// Print guard status
     Status,
-    /// Force recovery (disable modules + reboot)
+    /// Force self-disable + reboot
     Recover,
-    /// Add module to guard whitelist
-    Allow { name: String },
-    /// Remove module from guard whitelist
-    Disallow { name: String },
 }

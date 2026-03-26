@@ -158,7 +158,6 @@ export interface AdbSettings {
 
 export interface GuardSettings {
   enabled: boolean;
-  marker_threshold: number;
   boot_timeout_secs: number;
   zygote_watch_secs: number;
   zygote_poll_secs: number;
@@ -168,18 +167,14 @@ export interface GuardSettings {
   systemui_max_restarts: number;
   systemui_absent_timeout_secs: number;
   systemui_monitor_enabled: boolean;
-  allowed_modules: string[];
-  allowed_scripts: string[];
 }
 
 export interface GuardStatus {
   enabled: boolean;
   recoveryLockout: boolean;
-  pfdMarkers: number;
-  svcMarkers: number;
-  threshold: number;
+  bootcount: number;
+  disabled: boolean;
   lastRecovery: string | null;
-  allowedModules: string[];
 }
 
 export type UnameMode = 'disabled' | 'static' | 'dynamic';

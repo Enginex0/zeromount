@@ -766,27 +766,23 @@ pub fn run_full_pipeline(config: ZeroMountConfig) -> Result<RuntimeState> {
     Ok(state)
 }
 
-/// Bootloop-aware pipeline entry point (ME15).
-/// Checks bootcount before running; enters safe mode if threshold exceeded.
 pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<RuntimeState> {
+    if !config.guard.enabled {
+        return run_full_pipeline(config);
+    }
+
     if ZeroMountConfig::check_bootloop()? {
-        warn!("bootloop detected — safe mode (zero rules, no mounts)");
+        warn!("previous boot failed, disabling zeromount");
 
+        let _ = std::fs::File::create("/data/adb/modules/meta-zeromount/disable");
         let _ = crate::utils::platform::write_description_to_module_prop(
-            "🛡\u{fe0f} Safe mode — mounts skipped due to repeated boot failures"
+            "\u{26a0}\u{fe0f} Disabled — previous boot failed. Re-enable manually.",
         );
-
-        if let Ok(mgr) = crate::utils::platform::detect_root_manager() {
-            if let Err(e) = mgr.notify_module_mounted() {
-                warn!("notify-module-mounted failed in safe mode: {e}");
-            }
-        } else {
-            debug!("root manager not detected in safe mode, skipping notification");
-        }
+        ZeroMountConfig::reset_bootcount().ok();
 
         return Ok(RuntimeState {
             degraded: true,
-            degradation_reason: Some("bootloop detected — safe mode active".into()),
+            degradation_reason: Some("boot failure detected, module disabled".into()),
             ..RuntimeState::default()
         });
     }
@@ -794,13 +790,7 @@ pub fn run_pipeline_with_bootloop_guard(config: ZeroMountConfig) -> Result<Runti
     ZeroMountConfig::increment_bootcount()?;
 
     let state = run_full_pipeline(config)?;
-
-    // Pipeline succeeded — clear bootcount so a normal reboot won't
-    // false-trigger the shell guard (which bails at count > 0).
-    ZeroMountConfig::reset_bootcount().unwrap_or_else(|e| {
-        warn!("bootcount reset failed (non-fatal): {e}");
-    });
-
+    // Bootcount stays at 1 until boot-completed.sh clears it
     Ok(state)
 }
 

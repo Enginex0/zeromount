@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 const DEFAULT_CONFIG_PATH: &str = "/data/adb/zeromount/config.toml";
 const BACKUP_CONFIG_PATH: &str = "/data/adb/zeromount/config.toml.bak";
 const BOOTCOUNT_PATH: &str = "/data/adb/zeromount/.bootcount";
-const BOOTLOOP_THRESHOLD: u32 = 3;
+const BOOTLOOP_THRESHOLD: u32 = 1;
 
 fn migrate_config_keys(raw: &str) -> String {
     let mut lines: Vec<&str> = Vec::new();
@@ -363,7 +363,6 @@ impl Default for UiConfig {
 
 // -- Bootloop guard --
 
-fn default_guard_threshold() -> u32 { 2 }
 fn default_boot_timeout() -> u32 { 100 }
 fn default_watch_secs() -> u32 { 30 }
 fn default_zygote_poll() -> u32 { 4 }
@@ -371,14 +370,11 @@ fn default_zygote_restarts() -> u32 { 4 }
 fn default_systemui_poll() -> u32 { 4 }
 fn default_systemui_restarts() -> u32 { 3 }
 fn default_systemui_absent() -> u32 { 25 }
-fn default_allowed_modules() -> Vec<String> { vec!["meta-zeromount".to_string()] }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuardConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
-    #[serde(default = "default_guard_threshold")]
-    pub marker_threshold: u32,
     #[serde(default = "default_boot_timeout")]
     pub boot_timeout_secs: u32,
     #[serde(default = "default_watch_secs")]
@@ -397,17 +393,12 @@ pub struct GuardConfig {
     pub systemui_absent_timeout_secs: u32,
     #[serde(default)]
     pub systemui_monitor_enabled: bool,
-    #[serde(default = "default_allowed_modules")]
-    pub allowed_modules: Vec<String>,
-    #[serde(default)]
-    pub allowed_scripts: Vec<String>,
 }
 
 impl Default for GuardConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            marker_threshold: 2,
             boot_timeout_secs: 100,
             zygote_watch_secs: 30,
             zygote_poll_secs: 4,
@@ -417,8 +408,6 @@ impl Default for GuardConfig {
             systemui_max_restarts: 3,
             systemui_absent_timeout_secs: 25,
             systemui_monitor_enabled: false,
-            allowed_modules: vec!["meta-zeromount".to_string()],
-            allowed_scripts: Vec::new(),
         }
     }
 }
@@ -658,7 +647,6 @@ impl ZeroMountConfig {
 
             // guard.*
             "guard.enabled" => Some(self.guard.enabled.to_string()),
-            "guard.marker_threshold" => Some(self.guard.marker_threshold.to_string()),
             "guard.boot_timeout_secs" => Some(self.guard.boot_timeout_secs.to_string()),
             "guard.zygote_watch_secs" => Some(self.guard.zygote_watch_secs.to_string()),
             "guard.zygote_poll_secs" => Some(self.guard.zygote_poll_secs.to_string()),
@@ -672,9 +660,6 @@ impl ZeroMountConfig {
             "guard.systemui_monitor_enabled" => {
                 Some(self.guard.systemui_monitor_enabled.to_string())
             }
-            "guard.allowed_modules" => Some(self.guard.allowed_modules.join(",")),
-            "guard.allowed_scripts" => Some(self.guard.allowed_scripts.join(",")),
-
             // ui.*
             "ui.language" => Some(self.ui.language.clone()),
 
@@ -756,7 +741,6 @@ impl ZeroMountConfig {
 
             // guard.*
             "guard.enabled" => self.guard.enabled = value.parse()?,
-            "guard.marker_threshold" => self.guard.marker_threshold = value.parse()?,
             "guard.boot_timeout_secs" => self.guard.boot_timeout_secs = value.parse()?,
             "guard.zygote_watch_secs" => self.guard.zygote_watch_secs = value.parse()?,
             "guard.zygote_poll_secs" => self.guard.zygote_poll_secs = value.parse()?,
@@ -770,9 +754,6 @@ impl ZeroMountConfig {
             "guard.systemui_monitor_enabled" => {
                 self.guard.systemui_monitor_enabled = value.parse()?
             }
-            "guard.allowed_modules" => self.guard.allowed_modules = parse_csv(value),
-            "guard.allowed_scripts" => self.guard.allowed_scripts = parse_csv(value),
-
             // ui.*
             "ui.language" => self.ui.language = value.to_string(),
 

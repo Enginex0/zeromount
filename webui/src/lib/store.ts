@@ -67,8 +67,7 @@ function createAppStore() {
   const [bridgeValues, setBridgeValues] = createSignal<BridgeValues | null>(null);
   const [verboseDumpPath, setVerboseDumpPath] = createSignal<string | null>(null);
   const [guardStatus, setGuardStatus] = createSignal<GuardStatus>({
-    enabled: true, recoveryLockout: false, pfdMarkers: 0, svcMarkers: 0,
-    threshold: 2, lastRecovery: null, allowedModules: ['meta-zeromount'],
+    enabled: true, recoveryLockout: false, bootcount: 0, disabled: false, lastRecovery: null,
   });
 
   const savedBgOpacity = typeof window !== 'undefined'
@@ -168,7 +167,6 @@ function createAppStore() {
 
   const defaultGuard: GuardSettings = {
     enabled: true,
-    marker_threshold: 2,
     boot_timeout_secs: 100,
     zygote_watch_secs: 30,
     zygote_poll_secs: 4,
@@ -178,8 +176,6 @@ function createAppStore() {
     systemui_max_restarts: 3,
     systemui_absent_timeout_secs: 25,
     systemui_monitor_enabled: true,
-    allowed_modules: ['meta-zeromount'],
-    allowed_scripts: [],
   };
 
   const [settings, setSettings] = createStore<Settings>({
@@ -948,42 +944,10 @@ function createAppStore() {
     }
   };
 
-  const guardAllowModule = async (name: string) => {
-    try {
-      await ksuExec(`${PATHS.BINARY} guard allow ${name}`);
-      setGuardStatus(prev => ({
-        ...prev,
-        allowedModules: [...prev.allowedModules.filter(m => m !== name), name],
-      }));
-      setSettings('guard', 'allowed_modules', (prev: string[]) => [...prev.filter(m => m !== name), name]);
-      showToast(t('toast.addedToWhitelist', { name }), 'success');
-    } catch (e) {
-      showToast(t('toast.failedWhitelist', { name }), 'error');
-    }
-  };
-
-  const guardDisallowModule = async (name: string) => {
-    if (name === 'meta-zeromount') {
-      showToast(t('toast.cannotRemoveSelf'), 'error');
-      return;
-    }
-    try {
-      await ksuExec(`${PATHS.BINARY} guard disallow ${name}`);
-      setGuardStatus(prev => ({
-        ...prev,
-        allowedModules: prev.allowedModules.filter(m => m !== name),
-      }));
-      setSettings('guard', 'allowed_modules', (prev: string[]) => prev.filter(m => m !== name));
-      showToast(t('toast.removedFromWhitelist', { name }), 'success');
-    } catch (e) {
-      showToast(t('toast.failedRemove', { name }), 'error');
-    }
-  };
-
   const guardClearLockout = async () => {
     try {
       await ksuExec(`${PATHS.BINARY} guard clear-lockout`);
-      setGuardStatus(prev => ({ ...prev, recoveryLockout: false, pfdMarkers: 0, svcMarkers: 0 }));
+      setGuardStatus(prev => ({ ...prev, recoveryLockout: false }));
       showToast(t('toast.lockoutCleared'), 'success');
     } catch {
       showToast(t('toast.failedClearLockout'), 'error');
@@ -1589,8 +1553,6 @@ function createAppStore() {
     setAdbToggle,
     setGuardToggle,
     guardStatus,
-    guardAllowModule,
-    guardDisallowModule,
     guardClearLockout,
     emojiConflict,
     setUnameMode,
