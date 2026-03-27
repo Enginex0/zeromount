@@ -1,4 +1,5 @@
 import { createSignal, Show, type JSX } from 'solid-js';
+import { t } from '../../lib/i18n';
 import './CollapsibleSubgroup.css';
 
 interface CollapsibleSubgroupProps {
@@ -22,7 +23,7 @@ export function CollapsibleSubgroup(props: CollapsibleSubgroupProps) {
         <Show when={hasExpandable()}>
           <div class="subgroup__meta">
             <Show when={!expanded()}>
-              <span class="subgroup__count">{props.hiddenCount} more</span>
+              <span class="subgroup__count">{t('ui.nMore', { count: props.hiddenCount })}</span>
             </Show>
             <svg
               class={`subgroup__chevron${expanded() ? ' subgroup__chevron--open' : ''}`}

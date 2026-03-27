@@ -1,6 +1,7 @@
 import type { VfsRule, ExcludedUid, SystemInfo, ActivityItem, EngineStats, InstalledApp, KsuModule, RuntimeStatus, WebUiInitResponse } from './types';
 import { runShell } from './ksuApi';
 import { PATHS, APP_VERSION } from './constants';
+import { t } from './i18n';
 // Lazy-load mock module only in dev. The import() is behind import.meta.env.DEV
 // so Vite replaces it with `false` in prod and never emits the api.mock chunk.
 let _mockModule: typeof import('./api.mock') | undefined;
@@ -77,10 +78,10 @@ function parseRulesOutput(stdout: string): VfsRule[] {
   const rules = lines.map((line, index) => {
     const idx = line.indexOf('->');
     const source = idx === -1 ? line.trim() : line.slice(0, idx).trim();
-    const target = idx === -1 ? '[BLOCKED]' : line.slice(idx + 2).trim();
+    const target = idx === -1 ? t('rules.blocked') : line.slice(idx + 2).trim();
     return {
       id: String(index + 1),
-      name: target.split('/').pop() || 'Rule',
+      name: target.split('/').pop() || t('rules.defaultName'),
       source,
       target,
       createdAt: new Date(),
@@ -129,8 +130,8 @@ async function parseExclusionFiles(): Promise<ExcludedUid[]> {
       const info = meta[String(uid)];
       return {
         uid,
-        packageName: info?.packageName || `app_${uid}`,
-        appName: info?.appName || `UID ${uid}`,
+        packageName: info?.packageName || t('exclusion.fallbackPackage', { uid }),
+        appName: info?.appName || t('exclusion.fallbackName', { uid }),
         excludedAt: info?.excludedAt ? new Date(info.excludedAt) : new Date(),
       };
     });

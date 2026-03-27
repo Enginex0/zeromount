@@ -1,6 +1,7 @@
 import { Show, createEffect, createSignal, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import type { UnameMode } from '../../lib/types';
+import { t } from '../../lib/i18n';
 import './BottomSheet.css';
 
 interface UnameSheetProps {
@@ -14,11 +15,12 @@ interface UnameSheetProps {
   onVersionChange: (value: string) => void;
 }
 
-const modes: { value: UnameMode; label: string }[] = [
-  { value: 'disabled', label: 'Disabled' },
-  { value: 'static', label: 'Static' },
-  { value: 'dynamic', label: 'Dynamic' },
-];
+const modeKeys: Record<UnameMode, string> = {
+  disabled: 'susfs.unameModeDisabled',
+  static: 'susfs.unameModeStatic',
+  dynamic: 'susfs.unameModeDynamic',
+};
+const modeValues: UnameMode[] = ['disabled', 'static', 'dynamic'];
 
 export function UnameSheet(props: UnameSheetProps) {
   const [visible, setVisible] = createSignal(false);
@@ -45,18 +47,18 @@ export function UnameSheet(props: UnameSheetProps) {
 
         <div class={`sheet${animating() ? ' sheet--visible' : ''}`}>
           <div class="sheet__handle" />
-          <div class="sheet__title">Uname Spoofing</div>
+          <div class="sheet__title">{t('susfs.unameSpoofing')}</div>
 
           <div class="sheet__options">
-            {modes.map((m) => (
+            {modeValues.map((val) => (
               <button
-                class={`sheet__option${props.mode === m.value ? ' sheet__option--selected' : ''}`}
-                onClick={() => props.onModeChange(m.value)}
+                class={`sheet__option${props.mode === val ? ' sheet__option--selected' : ''}`}
+                onClick={() => props.onModeChange(val)}
               >
                 <div class="sheet__option-content">
-                  <div class="sheet__option-label">{m.label}</div>
+                  <div class="sheet__option-label">{t(modeKeys[val])}</div>
                 </div>
-                <div class={`sheet__option-check${props.mode === m.value ? ' sheet__option-check--visible' : ''}`}>
+                <div class={`sheet__option-check${props.mode === val ? ' sheet__option-check--visible' : ''}`}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
@@ -68,7 +70,7 @@ export function UnameSheet(props: UnameSheetProps) {
           <Show when={props.mode !== 'disabled'}>
             <div class="sheet__custom" style={{ "flex-direction": "column", gap: "12px", "margin-top": "16px" }}>
               <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-                <label class="sheet__title" style={{ "margin-bottom": "0", "font-size": "11px" }}>Release</label>
+                <label class="sheet__title" style={{ "margin-bottom": "0", "font-size": "11px" }}>{t('uname.release')}</label>
                 <input
                   class="sheet__custom-input"
                   type="text"
@@ -78,7 +80,7 @@ export function UnameSheet(props: UnameSheetProps) {
                 />
               </div>
               <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-                <label class="sheet__title" style={{ "margin-bottom": "0", "font-size": "11px" }}>Version</label>
+                <label class="sheet__title" style={{ "margin-bottom": "0", "font-size": "11px" }}>{t('uname.version')}</label>
                 <input
                   class="sheet__custom-input"
                   type="text"

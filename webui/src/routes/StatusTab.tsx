@@ -706,7 +706,7 @@ export function StatusTab() {
               <span class="color-text-accent">
                 {(() => {
                   const s = store.runtimeStrategy() || store.effectiveStrategy();
-                  return s === 'Vfs' ? 'VFS' : s === 'Overlay' ? 'OverlayFS' : s === 'MagicMount' ? 'MagicMount' : 'Auto';
+                  return s === 'Vfs' ? t('status.modeVfs') : s === 'Overlay' ? t('status.modeOverlay') : s === 'MagicMount' ? t('status.modeMagicMount') : t('engine.storageAuto');
                 })()}
               </span>
             </div>

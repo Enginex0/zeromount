@@ -1,35 +1,33 @@
 import { Show, For, createMemo } from 'solid-js';
 import { store } from '../../lib/store';
+import { t } from '../../lib/i18n';
 import type { CapabilityFlags, MountStrategy } from '../../lib/types';
 import './ScenarioIndicator.css';
 
 type IndicatorConfig = { label: string; color: string; description: string };
 
+const strategyKeys: Record<string, string> = {
+  Vfs: 'status.modeVfs',
+  Overlay: 'status.modeOverlay',
+  MagicMount: 'status.modeMagicMount',
+};
+
 function strategyLabel(s: MountStrategy): string {
-  switch (s) {
-    case 'Vfs': return 'VFS Redirection';
-    case 'Overlay': return 'OverlayFS';
-    case 'MagicMount': return 'Magic Mount';
-    default: return s;
-  }
+  return t(strategyKeys[s] ?? s);
 }
 
 function strategyColor(s: MountStrategy): string {
-  switch (s) {
-    case 'Vfs': return 'var(--color-success)';
-    case 'Overlay': return 'var(--color-info, #3b82f6)';
-    case 'MagicMount': return 'var(--color-info, #3b82f6)';
-    default: return 'var(--color-success)';
-  }
+  return s === 'Vfs' ? 'var(--color-success)' : 'var(--color-info, #3b82f6)';
 }
 
 function buildConfig(scenario: string, strategy: MountStrategy | null, susfsEnabled: boolean, susfsMode?: string): IndicatorConfig {
   const active = strategy || 'Vfs';
   const susfsLabel = susfsMode === 'enhanced'
-    ? ' + Enhanced SUSFS'
+    ? t('scenario.susfsEnhanced')
     : susfsMode === 'embedded'
-      ? ' + Embedded SUSFS'
-      : susfsEnabled ? ' + SUSFS' : '';
+      ? t('scenario.susfsEmbedded')
+      : susfsEnabled ? t('scenario.susfsSuffix') : '';
+  const name = strategyLabel(active);
 
   switch (scenario) {
     case 'full':
@@ -37,34 +35,34 @@ function buildConfig(scenario: string, strategy: MountStrategy | null, susfsEnab
     case 'kernel_only': {
       if (active === 'Vfs') {
         return {
-          label: susfsEnabled ? 'Full Protection' : 'VFS Active',
+          label: susfsEnabled ? t('scenario.fullProtection') : t('scenario.vfsActive'),
           color: 'var(--color-success)',
-          description: `VFS kernel driver${susfsLabel}`,
+          description: t('scenario.descVfs', { susfs: susfsLabel }),
         };
       }
       return {
-        label: `${strategyLabel(active)} Active`,
+        label: t('scenario.strategyActive', { strategy: name }),
         color: strategyColor(active),
-        description: `${strategyLabel(active)}${susfsLabel} · VFS available`,
+        description: t('scenario.descAltVfsAvail', { strategy: name, susfs: susfsLabel }),
       };
     }
     case 'susfs_only':
       return {
-        label: `${strategyLabel(active)} Active`,
+        label: t('scenario.strategyActive', { strategy: name }),
         color: strategyColor(active),
-        description: `${strategyLabel(active)} + SUSFS protections`,
+        description: t('scenario.descSusfsOnly', { strategy: name }),
       };
     case 'none':
       return {
-        label: `${strategyLabel(active)} Active`,
+        label: t('scenario.strategyActive', { strategy: name }),
         color: strategyColor(active),
-        description: `${strategyLabel(active)} module mounts`,
+        description: t('scenario.descModuleMounts', { strategy: name }),
       };
     default:
       return {
-        label: 'Initializing',
+        label: t('scenario.initializing'),
         color: 'var(--color-info, #3b82f6)',
-        description: 'Detecting kernel capabilities...',
+        description: t('scenario.descInitializing'),
       };
   }
 }

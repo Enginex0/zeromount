@@ -649,7 +649,7 @@ function createAppStore() {
 
     const newState = !engineActive();
     setEngineActive(newState);
-    pushActivity(newState ? 'engine_enabled' : 'engine_disabled', newState ? 'Engine → ON' : 'Engine → OFF');
+    pushActivity(newState ? 'engine_enabled' : 'engine_disabled', newState ? t('activity.engineOn') : t('activity.engineOff'));
     setLoading('engine', true);
     try {
       await api.toggleEngine(newState);
@@ -676,7 +676,7 @@ function createAppStore() {
       const excluded = await api.excludeUid(uid, packageName, appName);
       setExcludedUids(prev => [...prev, excluded]);
       setStats('excludedUids', s => s + 1);
-      pushActivity('uid_excluded', `${appName} (UID ${uid})`);
+      pushActivity('uid_excluded', t('activity.uidExcluded', { name: appName, uid }));
       showToast(t('toast.excludedApp', { appName }), 'success');
       return excluded;
     } catch (err) {
@@ -702,7 +702,7 @@ function createAppStore() {
       await api.includeUid(uid);
       setExcludedUids(prev => prev.filter(u => u.uid !== uid));
       setStats('excludedUids', s => s - 1);
-      pushActivity('uid_included', `UID ${uid} included`);
+      pushActivity('uid_included', t('activity.uidIncluded', { uid }));
       showToast(t('toast.uidIncluded'), 'success');
     } catch (err) {
       showToast(t('toast.failedIncludeUid'), 'error');
@@ -718,7 +718,7 @@ function createAppStore() {
       await api.clearAllRules();
       setRules([]);
       setStats('activeRules', 0);
-      pushActivity('rule_removed', 'All rules cleared');
+      pushActivity('rule_removed', t('activity.allRulesCleared'));
       showToast(t('toast.allRulesCleared'), 'success');
     } catch (err) {
       const msg = String(err).includes('errno') || String(err).includes('No such')
@@ -731,9 +731,9 @@ function createAppStore() {
 
   const updateSettings = (updates: Partial<Settings>) => {
     setSettings(updates);
-    if (updates.theme) pushActivity('theme_changed', `Theme → ${updates.theme}`);
-    if (updates.accentColor) pushActivity('theme_changed', `Accent → ${accentNames[updates.accentColor] || updates.accentColor}`);
-    if (updates.fixedNav !== undefined) pushActivity('setting_changed', `Fixed nav → ${updates.fixedNav ? 'ON' : 'OFF'}`);
+    if (updates.theme) pushActivity('theme_changed', t('activity.themeChanged', { value: updates.theme }));
+    if (updates.accentColor) pushActivity('theme_changed', t('activity.accentChanged', { value: accentNames[updates.accentColor] || updates.accentColor }));
+    if (updates.fixedNav !== undefined) pushActivity('setting_changed', t('activity.fixedNavChanged', { value: updates.fixedNav ? t('activity.on') : t('activity.off') }));
   };
 
   const fetchSystemColor = async () => {
@@ -750,7 +750,7 @@ function createAppStore() {
     setSettings({ verboseLogging: enabled });
     try {
       await api.setVerboseLogging(enabled);
-      pushActivity('setting_changed', `Verbose logging → ${enabled ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.verboseChanged', { value: enabled ? t('activity.on') : t('activity.off') }));
       if (enabled) {
         showToast(t('toast.rebootingVerbose'), 'warning', 3000);
         const timerId = setTimeout(async () => {
@@ -863,7 +863,7 @@ function createAppStore() {
       // Bridge write syncs config.toml -> external module config.sh
       await api.bridgeWrite(`brene.${key}`, String(value));
 
-      pushActivity('brene_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('brene_toggle', t('activity.settingChanged', { key, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('brene', key, !value);
@@ -886,7 +886,7 @@ function createAppStore() {
     setSettings('brene', key, value);
     try {
       await api.configSet(`brene.${key}`, value);
-      pushActivity('setting_changed', `${key} → ${value || '(empty)'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key, value: value || t('activity.empty') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('brene', key, prev);
@@ -897,7 +897,7 @@ function createAppStore() {
     setSettings('susfs', key, value);
     try {
       await api.configSet(`susfs.${key}`, String(value));
-      pushActivity('susfs_toggle', `${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('susfs_toggle', t('activity.settingChanged', { key, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('susfs', key, !value);
@@ -908,7 +908,7 @@ function createAppStore() {
     setSettings('perf', key, value);
     try {
       await api.configSet(`perf.${key}`, String(value));
-      pushActivity('setting_changed', `perf.${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `perf.${key}`, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('perf', key, !value);
@@ -919,7 +919,7 @@ function createAppStore() {
     setSettings('emoji', key, value);
     try {
       await api.configSet(`emoji.${key}`, String(value));
-      pushActivity('setting_changed', `emoji.${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `emoji.${key}`, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('emoji', key, !value);
@@ -930,7 +930,7 @@ function createAppStore() {
     setSettings('adb', key, value);
     try {
       await api.configSet(`adb.${key}`, String(value));
-      pushActivity('setting_changed', `adb.${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `adb.${key}`, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('adb', key, !value);
@@ -942,7 +942,7 @@ function createAppStore() {
     if (key === 'enabled') setGuardStatus(prev => ({ ...prev, enabled: value }));
     try {
       await api.configSet(`guard.${key}`, String(value));
-      pushActivity('setting_changed', `guard.${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `guard.${key}`, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key: `guard.${key}` }), 'error');
       setSettings('guard', key, !value);
@@ -995,7 +995,7 @@ function createAppStore() {
     setSettings('uname', 'mode', mode);
     try {
       await api.configSet('uname.mode', mode);
-      pushActivity('setting_changed', `Uname mode → ${mode}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: 'uname.mode', value: mode }));
     } catch (e) {
       showToast(t('toast.failedSaveUnameMode'), 'error');
       setSettings('uname', 'mode', prev);
@@ -1007,7 +1007,7 @@ function createAppStore() {
     setSettings('uname', field, value);
     try {
       await api.configSet(`uname.${field}`, value);
-      pushActivity('setting_changed', `Uname ${field} → ${value || '(empty)'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `uname.${field}`, value: value || t('activity.empty') }));
     } catch (e) {
       showToast(t('toast.failedSaveUname', { field }), 'error');
       setSettings('uname', field, prev);
@@ -1214,7 +1214,7 @@ function createAppStore() {
     setSettings('mount', 'storage_mode', mode);
     try {
       await api.configSet('mount.storage_mode', mode);
-      pushActivity('setting_changed', `Storage mode → ${mode}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: 'storage_mode', value: mode }));
     } catch (e) {
       showToast(t('toast.failedSaveStorageMode'), 'error');
       setSettings('mount', 'storage_mode', prev);
@@ -1226,7 +1226,7 @@ function createAppStore() {
     setSettings('mount', key, value);
     try {
       await api.configSet(`mount.${key}`, String(value));
-      pushActivity('setting_changed', `${key} → ${value ? 'ON' : 'OFF'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key, value: value ? t('activity.on') : t('activity.off') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       setSettings('mount', key, prev);
@@ -1238,7 +1238,7 @@ function createAppStore() {
     setSettings('mount', 'mount_source', value);
     try {
       await api.configSet('mount.mount_source', value);
-      pushActivity('setting_changed', `Staging source → ${value}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: 'mount_source', value }));
     } catch (e) {
       showToast(t('toast.failedSaveMountSource'), 'error');
       setSettings('mount', 'mount_source', prev);
@@ -1250,7 +1250,7 @@ function createAppStore() {
     setSettings('mount', 'overlay_source', value);
     try {
       await api.configSet('mount.overlay_source', value);
-      pushActivity('setting_changed', `Overlay source → ${value}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key: 'overlay_source', value }));
     } catch (e) {
       showToast(t('toast.failedSaveOverlaySource'), 'error');
       setSettings('mount', 'overlay_source', prev);
@@ -1262,7 +1262,7 @@ function createAppStore() {
     (setSettings as any)('mount', key, value);
     try {
       await api.configSet(`mount.${key}`, String(value));
-      pushActivity('setting_changed', `${key} → ${value || '(empty)'}`);
+      pushActivity('setting_changed', t('activity.settingChanged', { key, value: value || t('activity.empty') }));
     } catch (e) {
       showToast(t('toast.failedSaveKey', { key }), 'error');
       (setSettings as any)('mount', key, prev);
@@ -1288,7 +1288,7 @@ function createAppStore() {
         api.configSet('mount.overlay_preferred', String(newOverlay)),
         api.configSet('mount.magic_mount_fallback', String(newMagic)),
       ]);
-      pushActivity('mount_strategy_changed', `Strategy → ${strategy}`);
+      pushActivity('mount_strategy_changed', t('activity.strategyChanged', { value: strategy }));
       showToast(t('toast.mountStrategyChanged'), 'warning');
     } catch (e) {
       showToast(t('toast.failedSaveMountStrategy'), 'error');
