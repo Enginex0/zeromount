@@ -149,7 +149,7 @@ if [ "$FRESH_INSTALL" = false ]; then
     zm_print "  🔊 $(_msg vol_up_preserve)"
     zm_print "  🔉 $(_msg vol_down_reset)"
     ui_print ""
-    choose_config 0
+    choose_config 60
     if [ $? -eq 1 ]; then
         USER_RESET=true
     fi
