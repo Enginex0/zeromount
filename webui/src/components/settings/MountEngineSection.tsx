@@ -87,6 +87,11 @@ export function MountEngineSection() {
         <div class="settings__item-desc" style={{ "margin-top": "8px", "font-style": "italic" }}>
           {t('engine.switchingRequiresReboot')}
         </div>
+        <Show when={store.effectiveStrategy() === 'MagicMount' && !caps()?.susfs_available}>
+          <div class="settings__item-desc" style={{ "margin-top": "6px", color: "var(--warning)" }}>
+            {t('engine.magicMountNoSusfsWarning')}
+          </div>
+        </Show>
       </div>
 
       <Show when={store.effectiveStrategy() !== 'Vfs'}>

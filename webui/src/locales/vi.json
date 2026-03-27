@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Chuyển chế độ cần khởi động lại",
+  "engine.magicMountNoSusfsWarning": "MagicMount để lại dấu vết bind-mount có thể phát hiện được khi không có SUSFS. Hãy cân nhắc dùng OverlayFS để ẩn tốt hơn.",
   "engine.storageBackend": "Backend lưu trữ",
   "engine.storageBackendDesc": "Hệ thống tệp để dàn dựng nội dung mô-đun",
   "engine.storageBackendNoXattr": "tmpfs thiếu xattr — overlay whiteout không khả dụng",

@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Mengganti mode memerlukan reboot",
+  "engine.magicMountNoSusfsWarning": "MagicMount meninggalkan jejak bind-mount yang dapat terdeteksi tanpa SUSFS. Pertimbangkan OverlayFS untuk stealth yang lebih baik.",
   "engine.storageBackend": "Backend Penyimpanan",
   "engine.storageBackendDesc": "Sistem berkas untuk penyiapan konten modul",
   "engine.storageBackendNoXattr": "tmpfs tidak memiliki xattr — overlay whiteouts tidak tersedia",

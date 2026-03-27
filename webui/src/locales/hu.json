@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "A módváltás újraindítást igényel",
+  "engine.magicMountNoSusfsWarning": "A MagicMount észlelhető bind-mount nyomokat hagy SUSFS nélkül. Fontolja meg az OverlayFS használatát a jobb rejtőzéshez.",
   "engine.storageBackend": "Tárháttér",
   "engine.storageBackendDesc": "Fájlrendszer a modulok tartalmának előkészítéséhez",
   "engine.storageBackendNoXattr": "A tmpfs-nek nincs xattr-ja — overlay whiteoutok nem elérhetők",

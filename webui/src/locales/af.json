@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Moduswissel vereis herlaai",
+  "engine.magicMountNoSusfsWarning": "MagicMount laat opspoorbare bind-mount-spore sonder SUSFS. Oorweeg OverlayFS vir beter stealth.",
   "engine.storageBackend": "Bergingsagterste",
   "engine.storageBackendDesc": "Lêerstelsel vir opstelling van module-inhoud",
   "engine.storageBackendNoXattr": "tmpfs ontbreek xattr — oortrekking-whiteouts nie beskikbaar",

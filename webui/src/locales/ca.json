@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Màgic",
   "engine.strategyMagicHint": "Muntatge Vinculat",
   "engine.switchingRequiresReboot": "Canviar de mode requereix reinici",
+  "engine.magicMountNoSusfsWarning": "MagicMount deixa rastres de bind-mount detectables sense SUSFS. Considereu OverlayFS per a una millor discreció.",
   "engine.storageBackend": "Backend d'Emmagatzematge",
   "engine.storageBackendDesc": "Sistema de fitxers per a la preparació del contingut dels mòduls",
   "engine.storageBackendNoXattr": "tmpfs no té xattr — whiteouts d'OverlayFS no disponibles",

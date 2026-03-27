@@ -180,6 +180,7 @@
   "engine.strategyMagic": "ম্যাজিক",
   "engine.strategyMagicHint": "বাইন্ড মাউন্ট",
   "engine.switchingRequiresReboot": "মোড পরিবর্তনের জন্য রিবুট প্রয়োজন",
+  "engine.magicMountNoSusfsWarning": "MagicMount SUSFS ছাড়া শনাক্তযোগ্য bind-mount চিহ্ন রেখে যায়। ভালো গোপনীয়তার জন্য OverlayFS বিবেচনা করুন।",
   "engine.storageBackend": "স্টোরেজ ব্যাকএন্ড",
   "engine.storageBackendDesc": "মডিউল কন্টেন্ট স্টেজিংয়ের জন্য ফাইলসিস্টেম",
   "engine.storageBackendNoXattr": "tmpfs-এ xattr নেই — ওভারলে হোয়াইটআউট অনুপলব্ধ",

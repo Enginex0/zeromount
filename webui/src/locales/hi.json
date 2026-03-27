@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "मोड बदलने के लिए रीबूट आवश्यक है",
+  "engine.magicMountNoSusfsWarning": "MagicMount बिना SUSFS के पहचान योग्य bind-mount निशान छोड़ता है। बेहतर छुपाव के लिए OverlayFS पर विचार करें।",
   "engine.storageBackend": "स्टोरेज बैकएंड",
   "engine.storageBackendDesc": "मॉड्यूल सामग्री स्टेजिंग के लिए फ़ाइल सिस्टम",
   "engine.storageBackendNoXattr": "tmpfs में xattr नहीं — overlay whiteouts अनुपलब्ध",

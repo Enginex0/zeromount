@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "バインドマウント",
   "engine.switchingRequiresReboot": "モード切替には再起動が必要です",
+  "engine.magicMountNoSusfsWarning": "MagicMount は SUSFS なしでは検出可能な bind-mount の痕跡が残ります。より高いステルス性を求める場合は OverlayFS を検討してください。",
   "engine.storageBackend": "ストレージバックエンド",
   "engine.storageBackendDesc": "モジュールコンテンツのステージングに使用するファイルシステム",
   "engine.storageBackendNoXattr": "tmpfs は xattr 非対応 — Overlay ホワイトアウト利用不可",

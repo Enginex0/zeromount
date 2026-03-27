@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "מעבר מצב דורש אתחול מחדש",
+  "engine.magicMountNoSusfsWarning": "MagicMount משאיר עקבות bind-mount ניתנים לזיהוי ללא SUSFS. שקול להשתמש ב-OverlayFS להסתרה טובה יותר.",
   "engine.storageBackend": "ממשק אחסון",
   "engine.storageBackendDesc": "מערכת קבצים לשלב תוכן מודול",
   "engine.storageBackendNoXattr": "tmpfs חסר xattr — overlay whiteouts לא זמינים",

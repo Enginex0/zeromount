@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Промена режима захтева поновно покретање",
+  "engine.magicMountNoSusfsWarning": "MagicMount оставља детектабилне трагове bind-mount без SUSFS. Размотрите OverlayFS за бољу прикривеност.",
   "engine.storageBackend": "Складишни бекенд",
   "engine.storageBackendDesc": "Фајл систем за припрему садржаја модула",
   "engine.storageBackendNoXattr": "tmpfs нема xattr — overlay whiteouts нису доступни",

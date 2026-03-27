@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Schimbarea modului necesită repornire",
+  "engine.magicMountNoSusfsWarning": "MagicMount lasă urme de bind-mount detectabile fără SUSFS. Luați în considerare OverlayFS pentru o discreție mai bună.",
   "engine.storageBackend": "Backend stocare",
   "engine.storageBackendDesc": "Sistem de fișiere pentru stocarea provizorie a conținutului modulului",
   "engine.storageBackendNoXattr": "tmpfs nu are xattr — overlay whiteouts indisponibile",

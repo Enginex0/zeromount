@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "تغییر حالت نیاز به راه‌اندازی مجدد دارد",
+  "engine.magicMountNoSusfsWarning": "MagicMount بدون SUSFS ردپای قابل شناسایی bind-mount بر جای می‌گذارد. برای پنهان‌سازی بهتر، OverlayFS را در نظر بگیرید.",
   "engine.storageBackend": "پشتیبان ذخیره‌سازی",
   "engine.storageBackendDesc": "سیستم‌فایل برای آماده‌سازی محتوای ماژول",
   "engine.storageBackendNoXattr": "tmpfs فاقد xattr است — overlay whiteout‌ها در دسترس نیست",

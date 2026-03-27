@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind-montering",
   "engine.switchingRequiresReboot": "Tilstandsskift kræver genstart",
+  "engine.magicMountNoSusfsWarning": "MagicMount efterlader sporbare bind-mount-spor uden SUSFS. Overvej OverlayFS for bedre stealth.",
   "engine.storageBackend": "Lagerbackend",
   "engine.storageBackendDesc": "Filsystem til mellemlagring af modulindhold",
   "engine.storageBackendNoXattr": "tmpfs mangler xattr — overlay whiteouts ikke tilgængelige",

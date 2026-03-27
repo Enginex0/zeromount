@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bindningsmontering",
   "engine.switchingRequiresReboot": "Lägesbyte kräver omstart",
+  "engine.magicMountNoSusfsWarning": "MagicMount lämnar spårbara bind-mount-spår utan SUSFS. Överväg OverlayFS för bättre stealth.",
   "engine.storageBackend": "Lagringsbakände",
   "engine.storageBackendDesc": "Filsystem för mellanlagring av modulinnehåll",
   "engine.storageBackendNoXattr": "tmpfs saknar xattr — overlay-whiteouts ej tillgängliga",

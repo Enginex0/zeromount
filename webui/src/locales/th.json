@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "บายด์เมาท์",
   "engine.switchingRequiresReboot": "การเปลี่ยนโหมดต้องรีบูต",
+  "engine.magicMountNoSusfsWarning": "MagicMount ทิ้งร่องรอย bind-mount ที่ตรวจจับได้หากไม่มี SUSFS พิจารณาใช้ OverlayFS เพื่อการซ่อนตัวที่ดีกว่า",
   "engine.storageBackend": "แบ็คเอนด์พื้นที่เก็บข้อมูล",
   "engine.storageBackendDesc": "ระบบไฟล์สำหรับจัดเตรียมเนื้อหาโมดูล",
   "engine.storageBackendNoXattr": "tmpfs ไม่รองรับ xattr — Overlay whiteout ไม่พร้อมใช้งาน",

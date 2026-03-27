@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Vázané připojení",
   "engine.switchingRequiresReboot": "Změna režimu vyžaduje restart",
+  "engine.magicMountNoSusfsWarning": "MagicMount zanechává detekovatelné stopy bind-mount bez SUSFS. Zvažte OverlayFS pro lepší utajení.",
   "engine.storageBackend": "Backend úložiště",
   "engine.storageBackendDesc": "Souborový systém pro přípravné uchování obsahu modulů",
   "engine.storageBackendNoXattr": "tmpfs nemá xattr — překryvné whiteouty nedostupné",

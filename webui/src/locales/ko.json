@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "바인드 마운트",
   "engine.switchingRequiresReboot": "모드 전환 시 재부팅 필요",
+  "engine.magicMountNoSusfsWarning": "MagicMount는 SUSFS 없이 감지 가능한 bind-mount 흔적을 남깁니다. 더 나은 은닉을 위해 OverlayFS를 고려하세요.",
   "engine.storageBackend": "스토리지 백엔드",
   "engine.storageBackendDesc": "모듈 콘텐츠 스테이징용 파일시스템",
   "engine.storageBackendNoXattr": "tmpfs는 xattr 미지원 — Overlay 화이트아웃 사용 불가",

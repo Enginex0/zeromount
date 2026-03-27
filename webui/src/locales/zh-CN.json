@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "绑定挂载",
   "engine.switchingRequiresReboot": "切换模式需要重启",
+  "engine.magicMountNoSusfsWarning": "MagicMount 在没有 SUSFS 的情况下会留下可检测的 bind-mount 痕迹。建议使用 OverlayFS 以获得更好的隐蔽性。",
   "engine.storageBackend": "存储后端",
   "engine.storageBackendDesc": "用于暂存模块内容的文件系统",
   "engine.storageBackendNoXattr": "tmpfs 不支持 xattr——Overlay 白名单不可用",

@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Tilan vaihto vaatii uudelleenkäynnistyksen",
+  "engine.magicMountNoSusfsWarning": "MagicMount jättää havaittavia bind-mount-jälkiä ilman SUSFS:ää. Harkitse OverlayFS:ää parempaan piiloutumiseen.",
   "engine.storageBackend": "Tallennustausta",
   "engine.storageBackendDesc": "Tiedostojärjestelmä moduulin sisällön väliaikaiseen tallentamiseen",
   "engine.storageBackendNoXattr": "tmpfs:ltä puuttuu xattr — overlay-whiteoutit eivät saatavilla",

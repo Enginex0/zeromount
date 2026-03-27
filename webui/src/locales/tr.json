@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Mod değiştirmek için yeniden başlatma gereklidir",
+  "engine.magicMountNoSusfsWarning": "MagicMount, SUSFS olmadan tespit edilebilir bind-mount izleri bırakır. Daha iyi gizlilik için OverlayFS kullanmayı düşünün.",
   "engine.storageBackend": "Depolama Arka Ucu",
   "engine.storageBackendDesc": "Modül içeriğini hazırlamak için dosya sistemi",
   "engine.storageBackendNoXattr": "tmpfs xattr eksik — overlay whiteout'lar kullanılamaz",

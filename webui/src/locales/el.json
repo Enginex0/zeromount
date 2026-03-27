@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Η αλλαγή λειτουργίας απαιτεί επανεκκίνηση",
+  "engine.magicMountNoSusfsWarning": "Το MagicMount αφήνει ανιχνεύσιμα ίχνη bind-mount χωρίς SUSFS. Σκεφτείτε το OverlayFS για καλύτερη απόκρυψη.",
   "engine.storageBackend": "Υπόστρωμα Αποθήκευσης",
   "engine.storageBackendDesc": "Σύστημα αρχείων για προετοιμασία περιεχομένου ενότητας",
   "engine.storageBackendNoXattr": "tmpfs δεν έχει xattr — overlay whiteouts μη διαθέσιμα",

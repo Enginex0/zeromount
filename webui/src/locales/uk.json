@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Зміна режиму потребує перезавантаження",
+  "engine.magicMountNoSusfsWarning": "MagicMount залишає виявлювані сліди bind-mount без SUSFS. Розгляньте OverlayFS для кращого приховування.",
   "engine.storageBackend": "Сховище даних",
   "engine.storageBackendDesc": "Файлова система для підготовки вмісту модуля",
   "engine.storageBackendNoXattr": "tmpfs не має xattr — overlay whiteouts недоступні",

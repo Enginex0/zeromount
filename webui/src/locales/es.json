@@ -180,6 +180,7 @@
   "engine.strategyMagic": "Magic",
   "engine.strategyMagicHint": "Bind Mount",
   "engine.switchingRequiresReboot": "Cambiar de modo requiere reinicio",
+  "engine.magicMountNoSusfsWarning": "MagicMount deja rastros de bind-mount detectables sin SUSFS. Considera OverlayFS para mayor sigilo.",
   "engine.storageBackend": "Backend de Almacenamiento",
   "engine.storageBackendDesc": "Sistema de archivos para staging del contenido de módulos",
   "engine.storageBackendNoXattr": "tmpfs no tiene xattr — whiteouts de overlay no disponibles",
