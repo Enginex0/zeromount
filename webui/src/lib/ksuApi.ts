@@ -3,18 +3,27 @@ import type { ExecResult } from 'kernelsu-alt';
 
 export type { ExecResult };
 
-const VALID_PACKAGE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_.]*$/;
-
-function isValidPackageName(name: string): boolean {
-  return VALID_PACKAGE_PATTERN.test(name) && name.length <= 256;
+export interface PackagesInfo {
+  packageName: string;
+  versionName: string;
+  versionCode: number;
+  appLabel: string;
+  isSystem: boolean;
+  uid: number;
 }
 
-function isRealEnvironment(): boolean {
+const VALID_PACKAGE_RE = /^[a-zA-Z][a-zA-Z0-9_.]*$/;
+
+function isValidPackageName(name: string): boolean {
+  return VALID_PACKAGE_RE.test(name) && name.length <= 256;
+}
+
+export function isRealEnvironment(): boolean {
   return typeof ksu !== 'undefined';
 }
 
 export function runShell(command: string): Promise<ExecResult> {
-  if (!isRealEnvironment()) return Promise.resolve({ errno: -1, stdout: '', stderr: 'KSU not available' });
+  if (!isRealEnvironment()) return Promise.reject(new Error('KSU not available'));
   return exec(command);
 }
 
@@ -23,7 +32,7 @@ export async function listPackages(type: 'all' | 'user' | 'system'): Promise<str
   try {
     const result = await altListPackages(type);
     if (Array.isArray(result) && result.length > 0) return result;
-  } catch { /* fallback */ }
+  } catch {}
 
   const pmFlags = { all: '', user: '-3', system: '-s' };
   const { stdout, errno } = await runShell(`pm list packages ${pmFlags[type]} | sed 's/package://'`);
@@ -40,7 +49,7 @@ export async function getPackagesInfo(packageNames: string[]): Promise<PackagesI
     try {
       const result = await altGetPackagesInfo(packageNames);
       if (Array.isArray(result) && result.length > 0) return result;
-    } catch { /* fallback */ }
+    } catch {}
   }
 
   const valid = packageNames.filter(isValidPackageName);
@@ -64,15 +73,6 @@ export async function getPackagesInfo(packageNames: string[]): Promise<PackagesI
   }
 
   return results;
-}
-
-interface PackagesInfo {
-  packageName: string;
-  versionName: string;
-  versionCode: number;
-  appLabel: string;
-  isSystem: boolean;
-  uid: number;
 }
 
 export async function ksuWriteFile(content: string, path: string): Promise<ExecResult> {
