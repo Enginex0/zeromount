@@ -175,6 +175,9 @@ export interface GuardStatus {
   bootcount: number;
   disabled: boolean;
   lastRecovery: string | null;
+  allowedModules: string[];
+  pfdMarkers: number;
+  svcMarkers: number;
 }
 
 export type UnameMode = 'disabled' | 'static' | 'dynamic';

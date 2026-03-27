@@ -349,7 +349,7 @@ if [ "$BUILD" = true ]; then
 
     if [ -f "$WEBUI_DIR/package.json" ]; then
         echo "==> Building WebUI"
-        (cd "$WEBUI_DIR" && npm install && npm run build)
+        (cd "$WEBUI_DIR" && pnpm install && pnpm run build)
         echo "==> WebUI built"
     else
         echo "WARN: webui/package.json not found, skipping WebUI build" >&2

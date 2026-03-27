@@ -1,5 +1,5 @@
 import type { VfsRule, ExcludedUid, SystemInfo, ActivityItem, EngineStats, InstalledApp, KsuModule, RuntimeStatus, WebUiInitResponse } from './types';
-import { ksuExec } from './ksuApi';
+import { runShell } from './ksuApi';
 import { PATHS, APP_VERSION } from './constants';
 // Lazy-load mock module only in dev. The import() is behind import.meta.env.DEV
 // so Vite replaces it with `false` in prod and never emits the api.mock chunk.
@@ -30,21 +30,18 @@ export async function readFromCache(): Promise<WebUiInitResponse | null> {
   // Hot path: in-memory TTL cache
   if (_cacheData && Date.now() - _cacheTs < CACHE_TTL) return _cacheData;
 
-  // Layer 2: boot-time inlined data (zero I/O)
   const inlined = (window as any).__ZM_CACHE__;
   if (inlined && typeof inlined === 'object') {
     _cacheData = inlined as WebUiInitResponse;
     _cacheTs = Date.now();
+    (window as any).__ZM_CACHE__ = null;
     return _cacheData;
   }
 
-  // Fallback: fetch from file (first install before reboot)
   try {
-    const res = await fetch(`./cache.json?t=${Date.now()}`);
-    if (!res.ok) return null;
-    const text = await res.text();
-    if (!text.trim()) return null;
-    _cacheData = JSON.parse(text) as WebUiInitResponse;
+    const { errno, stdout } = await runShell(`cat '${CACHE_PATH}'`);
+    if (errno !== 0 || !stdout.trim()) return null;
+    _cacheData = JSON.parse(stdout) as WebUiInitResponse;
     _cacheTs = Date.now();
     return _cacheData;
   } catch {
@@ -52,18 +49,24 @@ export async function readFromCache(): Promise<WebUiInitResponse | null> {
   }
 }
 
-export async function refreshCache(): Promise<void> {
-  if (shouldUseMock()) return;
-  try {
-    await ksuExec(`${PATHS.BINARY} webui-init > ${CACHE_PATH} 2>/dev/null`);
-  } catch {}
-  invalidateCache();
-}
-
 export function invalidateCache(): void {
   _cacheData = null;
   _cacheTs = 0;
   (window as any).__ZM_CACHE__ = null;
+}
+
+export function refreshCacheBg(): void {
+  if (shouldUseMock()) return;
+  runShell(`${PATHS.BINARY} webui-init > ${CACHE_PATH} 2>/dev/null`).then(() => {
+    invalidateCache();
+  }).catch(() => {});
+}
+
+let _writeQueue: Promise<void> = Promise.resolve();
+
+export function enqueueWrite(fn: () => Promise<void>): void {
+  const p = _writeQueue.then(fn, () => fn());
+  _writeQueue = p.then(() => {}, () => {});
 }
 
 function parseRulesOutput(stdout: string): VfsRule[] {
@@ -105,7 +108,7 @@ function withMetaLock<T>(fn: () => Promise<T>): Promise<T> {
 
 async function parseExclusionFiles(): Promise<ExcludedUid[]> {
   try {
-    const { errno: listErr, stdout: listOut } = await ksuExec(`cat "${PATHS.EXCLUSION_FILE}"`);
+    const { errno: listErr, stdout: listOut } = await runShell(`cat "${PATHS.EXCLUSION_FILE}"`);
     if (listErr !== 0 || !listOut.trim()) {
       return [];
     }
@@ -114,7 +117,7 @@ async function parseExclusionFiles(): Promise<ExcludedUid[]> {
 
     let meta: ExclusionMeta = {};
     try {
-      const { errno: metaErr, stdout: metaOut } = await ksuExec(`cat "${PATHS.EXCLUSION_META}"`);
+      const { errno: metaErr, stdout: metaOut } = await runShell(`cat "${PATHS.EXCLUSION_META}"`);
       if (metaErr === 0 && metaOut.trim()) {
         meta = JSON.parse(metaOut);
       }
@@ -139,7 +142,7 @@ async function parseExclusionFiles(): Promise<ExcludedUid[]> {
 
 async function parseActivityLog(): Promise<ActivityItem[]> {
   try {
-    const { errno, stdout } = await ksuExec(`tail -10 "${PATHS.ACTIVITY_LOG}"`);
+    const { errno, stdout } = await runShell(`tail -10 "${PATHS.ACTIVITY_LOG}"`);
     if (errno !== 0 || !stdout.trim()) {
       return [];
     }
@@ -173,14 +176,14 @@ async function logActivity(type: string, message: string): Promise<void> {
   try {
     const timestamp = new Date().toISOString();
     const line = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
-    await ksuExec(`echo ${escapeShellArg(line)} >> "${PATHS.ACTIVITY_LOG}"`);
+    await runShell(`echo ${escapeShellArg(line)} >> "${PATHS.ACTIVITY_LOG}"`);
   } catch (e) {
   }
 }
 
 function syncDescription(): void {
   if (shouldUseMock()) return;
-  ksuExec(`${PATHS.BINARY} sync-description`).catch(() => {});
+  runShell(`${PATHS.BINARY} sync-description`).catch(() => {});
 }
 
 export const api = {
@@ -189,7 +192,7 @@ export const api = {
       return (await getMock()).getVersion();
     }
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} version`);
+      const { errno, stdout } = await runShell(`${PATHS.BINARY} version`);
       if (errno === 0 && stdout) {
         return stdout.trim();
       }
@@ -216,13 +219,13 @@ export const api = {
 
     try {
       const [verRes, kernRes, uptimeRes, modelRes, androidRes, selinuxRes, susfsRes] = await Promise.all([
-        ksuExec(`${PATHS.BINARY} version`).catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('uname -r').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('cat /proc/uptime').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('getprop ro.product.model').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('getprop ro.build.version.release').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('getenforce').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
-        ksuExec('ksu_susfs show version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell(`${PATHS.BINARY} version`).catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('uname -r').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('cat /proc/uptime').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('getprop ro.product.model').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('getprop ro.build.version.release').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('getenforce').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
+        runShell('ksu_susfs show version 2>/dev/null || echo ""').catch(() => ({ errno: 1, stdout: '', stderr: '' })),
       ]);
 
       if (verRes.errno === 0 && verRes.stdout) {
@@ -273,7 +276,7 @@ export const api = {
     };
 
     try {
-      const { errno, stdout } = await ksuExec(
+      const { errno, stdout } = await runShell(
         [
           `${PATHS.BINARY} version 2>/dev/null || echo ''`,
           'uname -r',
@@ -313,7 +316,7 @@ export const api = {
       return (await getMock()).getRules();
     }
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} vfs list`);
+      const { errno, stdout } = await runShell(`${PATHS.BINARY} vfs list`);
       if (errno === 0 && stdout.trim()) {
         return parseRulesOutput(stdout);
       }
@@ -329,7 +332,7 @@ export const api = {
     }
 
     const cmd = `${PATHS.BINARY} vfs clear`;
-    const { errno, stderr } = await ksuExec(cmd);
+    const { errno, stderr } = await runShell(cmd);
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to clear rules');
     }
@@ -352,17 +355,17 @@ export const api = {
     if (!Number.isInteger(uid) || uid < 0) throw new Error('Invalid UID');
 
     const cmd = `${PATHS.BINARY} uid block ${escapeShellArg(String(uid))}`;
-    const { errno, stderr } = await ksuExec(cmd);
+    const { errno, stderr } = await runShell(cmd);
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to exclude UID');
     }
 
-    await ksuExec(`echo ${escapeShellArg(String(uid))} >> "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
+    await runShell(`echo ${escapeShellArg(String(uid))} >> "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
 
     await withMetaLock(async () => {
       try {
         let meta: Record<string, { packageName: string; appName: string; excludedAt: string }> = {};
-        const { errno: metaErr, stdout: metaOut } = await ksuExec(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
+        const { errno: metaErr, stdout: metaOut } = await runShell(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
         if (metaErr === 0 && metaOut.trim()) {
           try {
             meta = JSON.parse(metaOut);
@@ -371,7 +374,7 @@ export const api = {
           }
         }
         meta[String(uid)] = { packageName, appName, excludedAt: new Date().toISOString() };
-        await ksuExec(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
+        await runShell(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
       } catch (e) {
       }
     });
@@ -390,22 +393,22 @@ export const api = {
     }
 
     const cmd = `${PATHS.BINARY} uid unblock ${escapeShellArg(String(uid))}`;
-    const { errno, stderr } = await ksuExec(cmd);
+    const { errno, stderr } = await runShell(cmd);
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to include UID');
     }
 
     if (!/^\d+$/.test(String(uid))) throw new Error('invalid uid');
-    await ksuExec(`sed -i '/^${uid}$/d' "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
+    await runShell(`sed -i '/^${uid}$/d' "${PATHS.EXCLUSION_FILE}"`).catch(() => {});
 
     await withMetaLock(async () => {
       try {
-        const { errno: metaErr, stdout: metaOut } = await ksuExec(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
+        const { errno: metaErr, stdout: metaOut } = await runShell(`cat "${PATHS.EXCLUSION_META}" 2>/dev/null`);
         if (metaErr === 0 && metaOut.trim()) {
           try {
             const meta = JSON.parse(metaOut);
             delete meta[String(uid)];
-            await ksuExec(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
+            await runShell(`echo ${escapeShellArg(JSON.stringify(meta))} > "${PATHS.EXCLUSION_META}"`);
           } catch (parseErr) {
           }
         }
@@ -446,7 +449,7 @@ export const api = {
     }
 
     const cmd = enable ? `${PATHS.BINARY} vfs enable` : `${PATHS.BINARY} vfs disable`;
-    const { errno, stderr } = await ksuExec(cmd);
+    const { errno, stderr } = await runShell(cmd);
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to toggle engine');
     }
@@ -459,14 +462,14 @@ export const api = {
 
     const subcmd = enabled ? 'enable' : 'disable';
     const cmd = `${PATHS.BINARY} log ${subcmd}`;
-    const { errno, stderr } = await ksuExec(cmd);
+    const { errno, stderr } = await runShell(cmd);
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to set verbose logging');
     }
   },
 
   async reboot(): Promise<void> {
-    await ksuExec('svc power reboot');
+    await runShell('svc power reboot');
   },
 
   async getVerboseLogging(): Promise<boolean> {
@@ -475,7 +478,7 @@ export const api = {
     }
 
     const cmd = `${PATHS.BINARY} config get logging.verbose`;
-    const { errno, stdout } = await ksuExec(cmd);
+    const { errno, stdout } = await runShell(cmd);
     if (errno !== 0) {
       return false;
     }
@@ -485,7 +488,7 @@ export const api = {
   async getVerboseDumpPath(): Promise<string | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await ksuExec(`cat /data/adb/zeromount/.dump_path 2>/dev/null`);
+      const { errno, stdout } = await runShell(`cat /data/adb/zeromount/.dump_path 2>/dev/null`);
       if (errno === 0 && stdout.trim()) return stdout.trim();
     } catch (e) {
     }
@@ -563,7 +566,7 @@ for dir in /data/adb/modules/*/; do
 done
 echo "]"
 `;
-      const { errno, stdout } = await ksuExec(script);
+      const { errno, stdout } = await runShell(script);
       if (errno !== 0) {
         return [];
       }
@@ -589,7 +592,7 @@ echo "]"
     }
 
     try {
-      const { stdout } = await ksuExec(
+      const { stdout } = await runShell(
         `find ${escapeShellArg(modulePath)} \\( -type f -o -type c \\) \\( -path "*/system/*" -o -path "*/vendor/*" -o -path "*/product/*" \\) 2>/dev/null`
       );
       const files = stdout.trim().split('\n').filter(Boolean);
@@ -601,7 +604,7 @@ echo "]"
 
       let addedCount = 0;
       if (cmds.length > 0) {
-        const { stdout: batchOut } = await ksuExec(cmds.join('\n'));
+        const { stdout: batchOut } = await runShell(cmds.join('\n'));
         addedCount = (batchOut.match(/\bOK\b/g) ?? []).length;
       }
 
@@ -619,7 +622,7 @@ echo "]"
     }
 
     const moduleId = modulePath.split('/').pop() || '';
-    const { errno, stdout } = await ksuExec(
+    const { errno, stdout } = await runShell(
       `${PATHS.BINARY} module unload ${escapeShellArg(moduleId)}`
     );
 
@@ -652,7 +655,7 @@ echo "]"
     if (typeof inlined === 'string' && inlined) return inlined;
 
     try {
-      const { errno, stdout } = await ksuExec(
+      const { errno, stdout } = await runShell(
         'settings get secure theme_customization_overlay_packages'
       );
       if (errno !== 0 || !stdout.trim()) return null;
@@ -669,7 +672,7 @@ echo "]"
       return (await getMock()).getRuntimeStatus();
     }
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} status --json`, { timeout: 5000 });
+      const { errno, stdout } = await runShell(`${PATHS.BINARY} status --json`);
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as RuntimeStatus;
       }
@@ -681,7 +684,7 @@ echo "]"
   async configDump(): Promise<Record<string, any> | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} config dump --json`);
+      const { errno, stdout } = await runShell(`${PATHS.BINARY} config dump --json`);
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim());
       }
@@ -695,7 +698,7 @@ echo "]"
       return (await getMock()).configGet(key);
     }
     try {
-      const { errno, stdout } = await ksuExec(
+      const { errno, stdout } = await runShell(
         `${PATHS.BINARY} config get ${escapeShellArg(key)}`
       );
       if (errno === 0 && stdout.trim()) {
@@ -710,7 +713,7 @@ echo "]"
     if (shouldUseMock()) {
       return (await getMock()).configSet(key, value);
     }
-    const { errno, stderr } = await ksuExec(
+    const { errno, stderr } = await runShell(
       `${PATHS.BINARY} config set ${escapeShellArg(key)} ${escapeShellArg(value)}`
     );
     if (errno !== 0) {
@@ -720,7 +723,7 @@ echo "]"
 
   async setSusfsAvcSpoofing(enabled: boolean): Promise<void> {
     if (shouldUseMock()) return;
-    await ksuExec(`ksu_susfs enable_avc_log_spoofing ${enabled ? 1 : 0}`);
+    await runShell(`ksu_susfs enable_avc_log_spoofing ${enabled ? 1 : 0}`);
   },
 
   async logActivity(type: string, message: string): Promise<void> {
@@ -729,15 +732,15 @@ echo "]"
 
   async setSusfsLog(enabled: boolean): Promise<void> {
     if (shouldUseMock()) return;
-    await ksuExec(`ksu_susfs enable_log ${enabled ? 1 : 0}`);
+    await runShell(`ksu_susfs enable_log ${enabled ? 1 : 0}`);
   },
 
   async setSusfsHideMounts(enabled: boolean): Promise<void> {
     if (shouldUseMock()) return;
     // v2.0.0+ uses hide_sus_mnts_for_all_procs, fallback to non_su_procs
-    const { errno } = await ksuExec(`ksu_susfs hide_sus_mnts_for_all_procs ${enabled ? 1 : 0}`);
+    const { errno } = await runShell(`ksu_susfs hide_sus_mnts_for_all_procs ${enabled ? 1 : 0}`);
     if (errno !== 0) {
-      await ksuExec(`ksu_susfs hide_sus_mnts_for_non_su_procs ${enabled ? 1 : 0}`);
+      await runShell(`ksu_susfs hide_sus_mnts_for_non_su_procs ${enabled ? 1 : 0}`);
     }
   },
 
@@ -745,24 +748,24 @@ echo "]"
     if (shouldUseMock()) return;
     const ksud = '/data/adb/ksu/bin/ksud';
     const apKsud = '/data/adb/ap/bin/ksud';
-    await ksuExec(`{ [ -x ${ksud} ] && ${ksud} feature set kernel_umount ${enabled ? 1 : 0}; } || { [ -x ${apKsud} ] && ${apKsud} feature set kernel_umount ${enabled ? 1 : 0}; } || true`);
+    await runShell(`{ [ -x ${ksud} ] && ${ksud} feature set kernel_umount ${enabled ? 1 : 0}; } || { [ -x ${apKsud} ] && ${apKsud} feature set kernel_umount ${enabled ? 1 : 0}; } || true`);
   },
 
   async writeSusfsConfigVar(key: string, value: string): Promise<void> {
     if (shouldUseMock()) return;
     const configPath = '/data/adb/susfs4ksu/config.sh';
-    await ksuExec(`sed -i 's/^${escapeShellArg(key)}=.*/${escapeShellArg(key)}=${escapeShellArg(value)}/' ${escapeShellArg(configPath)}`);
+    await runShell(`sed -i 's/^${escapeShellArg(key)}=.*/${escapeShellArg(key)}=${escapeShellArg(value)}/' ${escapeShellArg(configPath)}`);
   },
 
   async bridgeWrite(_key: string, _value: string): Promise<void> {
     if (shouldUseMock()) return;
-    await ksuExec(`${PATHS.BINARY} bridge write`);
+    await runShell(`${PATHS.BINARY} bridge write`);
   },
 
   async readSusfsConfigVar(key: string, basePath = '/data/adb/susfs4ksu/config.sh'): Promise<string | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await ksuExec(
+      const { errno, stdout } = await runShell(
         `grep -m1 '^${escapeShellArg(key)}=' ${escapeShellArg(basePath)} | cut -d= -f2`
       );
       if (errno === 0 && stdout.trim()) return stdout.trim();
@@ -774,7 +777,7 @@ echo "]"
   async readAllBridgeValues(basePath: string): Promise<Record<string, string>> {
     if (shouldUseMock()) return {};
     try {
-      const { errno, stdout } = await ksuExec(
+      const { errno, stdout } = await runShell(
         `grep -E '^[a-zA-Z_]+=.' ${escapeShellArg(basePath)} 2>/dev/null`
       );
       if (errno !== 0 || !stdout.trim()) return {};
@@ -794,7 +797,7 @@ echo "]"
   async webuiInit(): Promise<WebUiInitResponse | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await ksuExec(`${PATHS.BINARY} webui-init`, { timeout: 10000 });
+      const { errno, stdout } = await runShell(`${PATHS.BINARY} webui-init`);
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as WebUiInitResponse;
       }

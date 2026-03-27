@@ -3,10 +3,10 @@ import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, GuardSettings, GuardStatus, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
 import { api, shouldUseMock, invalidateCache, readFromCache } from './api';
 import { PATHS } from './constants';
-import { listPackages, getPackagesInfo, getAppLabelViaAapt, ksuExec } from './ksuApi';
+import { listPackages, getPackagesInfo, getAppLabelViaAapt, runShell } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
 import { readCache, writeCache, type HydratableState } from './cache';
-import { t, loadLocale } from './i18n';
+import { t, loadLocale, detectLocale, LANGUAGES } from './i18n';
 
 function createAppStore() {
   const [activeTab, setActiveTab] = createSignal<Tab>('status');
@@ -68,6 +68,7 @@ function createAppStore() {
   const [verboseDumpPath, setVerboseDumpPath] = createSignal<string | null>(null);
   const [guardStatus, setGuardStatus] = createSignal<GuardStatus>({
     enabled: true, recoveryLockout: false, bootcount: 0, disabled: false, lastRecovery: null,
+    allowedModules: [], pfdMarkers: 0, svcMarkers: 0,
   });
 
   const savedBgOpacity = typeof window !== 'undefined'
@@ -101,7 +102,12 @@ function createAppStore() {
   const savedLanguage = typeof window !== 'undefined'
     ? localStorage.getItem('zeromount-language')
     : null;
-  if (savedLanguage) loadLocale(savedLanguage);
+  if (savedLanguage) {
+    loadLocale(savedLanguage);
+  } else if (typeof window !== 'undefined') {
+    const detected = detectLocale(LANGUAGES.map(l => l.code));
+    if (detected !== 'en') loadLocale(detected);
+  }
 
   const accentColors = Object.keys(accentPresets);
   const randomAccent = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -944,10 +950,40 @@ function createAppStore() {
     }
   };
 
+  const guardAllowModule = async (name: string) => {
+    try {
+      await runShell(`${PATHS.BINARY} guard allow ${name}`);
+      setGuardStatus(prev => ({
+        ...prev,
+        allowedModules: [...prev.allowedModules.filter(m => m !== name), name],
+      }));
+      showToast(t('toast.addedToWhitelist', { name }), 'success');
+    } catch (e) {
+      showToast(t('toast.failedWhitelist', { name }), 'error');
+    }
+  };
+
+  const guardDisallowModule = async (name: string) => {
+    if (name === 'meta-zeromount') {
+      showToast(t('toast.cannotRemoveSelf'), 'error');
+      return;
+    }
+    try {
+      await runShell(`${PATHS.BINARY} guard disallow ${name}`);
+      setGuardStatus(prev => ({
+        ...prev,
+        allowedModules: prev.allowedModules.filter(m => m !== name),
+      }));
+      showToast(t('toast.removedFromWhitelist', { name }), 'success');
+    } catch (e) {
+      showToast(t('toast.failedRemove', { name }), 'error');
+    }
+  };
+
   const guardClearLockout = async () => {
     try {
-      await ksuExec(`${PATHS.BINARY} guard clear-lockout`);
-      setGuardStatus(prev => ({ ...prev, recoveryLockout: false }));
+      await runShell(`${PATHS.BINARY} guard clear-lockout`);
+      setGuardStatus(prev => ({ ...prev, recoveryLockout: false, pfdMarkers: 0, svcMarkers: 0 }));
       showToast(t('toast.lockoutCleared'), 'success');
     } catch {
       showToast(t('toast.failedClearLockout'), 'error');
@@ -1051,8 +1087,8 @@ function createAppStore() {
     // developer_options and usb_debugging: read live device state
     // so toggles reflect reality, not stale config
     const [devResult, usbResult] = await Promise.allSettled([
-      ksuExec('settings get global development_settings_enabled'),
-      ksuExec('settings get global adb_enabled'),
+      runShell('settings get global development_settings_enabled'),
+      runShell('settings get global adb_enabled'),
     ]);
     const live: Partial<AdbSettings> = {};
     if (devResult.status === 'fulfilled') {
@@ -1553,6 +1589,8 @@ function createAppStore() {
     setAdbToggle,
     setGuardToggle,
     guardStatus,
+    guardAllowModule,
+    guardDisallowModule,
     guardClearLockout,
     emojiConflict,
     setUnameMode,

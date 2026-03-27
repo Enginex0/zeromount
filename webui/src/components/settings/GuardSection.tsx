@@ -1,15 +1,58 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, createMemo, onMount, Show } from 'solid-js';
 import { Card } from '../core/Card';
 import { Toggle } from '../core/Toggle';
 import { CollapsibleSubgroup } from '../ui/CollapsibleSubgroup';
 import { store } from '../../lib/store';
 import { api } from '../../lib/api';
+import { runShell } from '../../lib/ksuApi';
 import { t } from '../../lib/i18n';
 import './GuardSection.css';
 
+interface ModuleEntry {
+  name: string;
+  disabled: boolean;
+  locked: boolean;
+}
+
 export function GuardSection() {
   const [expanded, setExpanded] = createSignal(false);
+  const [modules, setModules] = createSignal<ModuleEntry[]>([]);
   const gs = () => store.guardStatus();
+  const allowed = createMemo(() => new Set(gs().allowedModules));
+
+  const fetchModules = async () => {
+    const { errno, stdout } = await runShell(
+      'for d in /data/adb/modules/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ -f "$d/disable" ] && echo "1:$n" || echo "0:$n"; done'
+    );
+    if (errno !== 0) return;
+    const entries: ModuleEntry[] = stdout.trim().split('\n').filter(Boolean).map(line => {
+      const disabled = line.startsWith('1:');
+      const name = line.substring(2);
+      return { name, disabled, locked: name === 'meta-zeromount' };
+    });
+    if (!entries.some(e => e.name === 'meta-zeromount')) {
+      entries.unshift({ name: 'meta-zeromount', disabled: false, locked: true });
+    }
+    entries.sort((a, b) => {
+      if (a.locked !== b.locked) return a.locked ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    setModules(entries);
+  };
+
+  onMount(fetchModules);
+
+  const protectedCount = createMemo(() =>
+    modules().filter(m => allowed().has(m.name)).length
+  );
+
+  const handleCheck = (name: string, checked: boolean) => {
+    if (checked) store.guardAllowModule(name);
+    else store.guardDisallowModule(name);
+  };
+
+  const markerChipClass = (count: number) =>
+    count > 0 ? 'guard__chip guard__chip--warn' : 'guard__chip guard__chip--ok';
 
   return (
     <Card>

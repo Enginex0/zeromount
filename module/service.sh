@@ -38,10 +38,21 @@ if [ -d "$WEBROOT" ]; then
         LOCALES=""
         [ -f "$WEBROOT/locales-bundle.json" ] && LOCALES=$(cat "$WEBROOT/locales-bundle.json" 2>/dev/null)
 
+        LOCALE_CODE=$(getprop persist.sys.locale 2>/dev/null || getprop ro.product.locale 2>/dev/null || echo "en")
+        LOCALE_CODE=$(printf '%s' "$LOCALE_CODE" | sed 's/_/-/g')
+        case "$LOCALE_CODE" in
+            zh-Hans*|zh-CN*) LOCALE_CODE="zh-CN" ;;
+            zh-Hant*|zh-TW*) LOCALE_CODE="zh-TW" ;;
+            pt-BR*) LOCALE_CODE="pt-BR" ;;
+            pt*) LOCALE_CODE="pt-PT" ;;
+            *-*) LOCALE_CODE="${LOCALE_CODE%%-*}" ;;
+        esac
+
         {
             printf 'window.__ZM_CACHE__=%s;\n' "$CACHE"
             [ -n "$ACCENT" ] && printf 'window.__ZM_ACCENT__="%s";\n' "$ACCENT"
             [ -n "$LOCALES" ] && printf 'window.__ZM_LOCALES__=%s;\n' "$LOCALES"
+            printf 'window.__ZM_LOCALE_CODE__="%s";\n' "$LOCALE_CODE"
         } > "$WEBROOT/zm-init.js"
 
         # Inject script reference (idempotent: skip if already present)

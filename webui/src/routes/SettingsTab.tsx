@@ -9,7 +9,7 @@ import { MountEngineSection } from '../components/settings/MountEngineSection';
 import { SusfsSection } from '../components/settings/SusfsSection';
 import { AboutSection } from '../components/settings/AboutSection';
 import { store } from '../lib/store';
-import { ksuExec } from '../lib/ksuApi';
+import { runShell } from '../lib/ksuApi';
 import { t } from '../lib/i18n';
 import type { BreneSettings } from '../lib/types';
 import "./SettingsTab.css";
@@ -166,7 +166,7 @@ export function SettingsTab() {
                 checked={store.settings.adb.developer_options}
                 onChange={async (v) => {
                   store.setAdbToggle('developer_options', v);
-                  await ksuExec(`settings put global development_settings_enabled ${v ? 1 : 0}`);
+                  await runShell(`settings put global development_settings_enabled ${v ? 1 : 0}`);
                 }}
               />
             </div>
@@ -179,7 +179,7 @@ export function SettingsTab() {
                 checked={store.settings.adb.usb_debugging}
                 onChange={async (v) => {
                   store.setAdbToggle('usb_debugging', v);
-                  await ksuExec(`settings put global adb_enabled ${v ? 1 : 0}`);
+                  await runShell(`settings put global adb_enabled ${v ? 1 : 0}`);
                 }}
               />
             </div>

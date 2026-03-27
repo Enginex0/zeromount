@@ -11,16 +11,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "kernelsu": "^3.0.0",
+    "kernelsu-alt": "^3.1.1",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^24.10.1",
+    "jsdom": "^29.0.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "vite-plugin-solid": "^2.11.10"
+    "vite-plugin-solid": "^2.11.10",
+    "vitest": "^4.1.1"
   }
 }

@@ -49,6 +49,36 @@ export async function loadLocale(code: string) {
   setLocaleSignal(code);
 }
 
+export function detectLocale(available: string[]): string {
+  const stored = localStorage.getItem('zeromount-language');
+  if (stored && available.includes(stored)) return stored;
+
+  const hint = (window as any).__ZM_LOCALE_CODE__;
+  if (typeof hint === 'string' && available.includes(hint)) return hint;
+
+  const raw = navigator.language || 'en';
+  if (available.includes(raw)) return raw;
+
+  const normalized = raw.replace(/_/g, '-');
+  if (available.includes(normalized)) return normalized;
+
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith('zh-hans') || lower.startsWith('zh-cn')) {
+    if (available.includes('zh-CN')) return 'zh-CN';
+  }
+  if (lower.startsWith('zh-hant') || lower.startsWith('zh-tw')) {
+    if (available.includes('zh-TW')) return 'zh-TW';
+  }
+
+  const base = raw.split('-')[0];
+  if (available.includes(base)) return base;
+
+  const partial = available.find(c => c.split('-')[0] === base);
+  if (partial) return partial;
+
+  return 'en';
+}
+
 export const RTL_LOCALES = new Set(['ar', 'fa', 'he']);
 
 export const LANGUAGES = [

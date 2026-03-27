@@ -21,6 +21,8 @@ zm_print() {
 
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
 
+. "$MODPATH/install_i18n.sh"
+
 rm -f "$MODPATH/disable"
 
 for _mgr_bin in /data/adb/ksu/bin /data/adb/ap/bin /data/adb/magisk; do
@@ -33,27 +35,26 @@ ui_print ""
 ui_print "==========================================="
 ui_print "  ⚡ ZeroMount ${ZM_VERSION} ⚡"
 ui_print "==========================================="
-ui_print "  🛡️  Ghost-level mount management"
+ui_print "  🛡️  $(_msg installing)"
 ui_print "  ✅ KSU / APatch / Magisk"
 ui_print "==========================================="
 ui_print ""
 sleep 0.5
 
-zm_print "📱 Detecting Architecture" 0.3 "h"
+zm_print "📱 $(_msg detect_arch)" 0.3 "h"
 
 . "$MODPATH/common.sh"
-. "$MODPATH/install_i18n.sh"
 . "$MODPATH/install_func.sh"
 if [ -z "$ABI" ]; then
-    abort "  ❌ Unsupported architecture: $(uname -m)"
+    abort "  ❌ $(_msg arch_unsupported): $(uname -m)"
 fi
 
-zm_print "  ✅ Architecture: $ABI"
+zm_print "  ✅ $(_msg arch_ok | sed "s/%s/$ABI/")"
 
 BIN="$MODPATH/bin/${ABI}/zeromount"
 
 if [ ! -f "$BIN" ]; then
-    abort "  ❌ Binary not found: bin/${ABI}/zeromount"
+    abort "  ❌ $(_msg binary_missing): bin/${ABI}/zeromount"
 fi
 
 set_perm_recursive "$MODPATH/bin/${ABI}" 0 0 0755 0755
@@ -65,17 +66,17 @@ done
 
 cp "$BIN" "$MODPATH/bin/zm" || abort "  ❌ Failed to copy binary"
 set_perm "$MODPATH/bin/zm" 0 0 0755
-zm_print "  ✅ Binary ready"
+zm_print "  ✅ $(_msg binary_ready)"
 
 if [ -c /dev/zeromount ] || [ -e /dev/zeromount ]; then
-    zm_print "  ✅ ZeroMount VFS driver detected"
+    zm_print "  ✅ $(_msg vfs_detected)"
 else
-    zm_print "  ⚠️ ZeroMount VFS driver not found"
-    zm_print "  ⚠️ Module will use overlay/magic mount mode"
-    zm_print "  ℹ️ Flash a ZeroMount-patched kernel for VFS mode"
+    zm_print "  ⚠️ $(_msg vfs_missing)"
+    zm_print "  ⚠️ $(_msg vfs_fallback)"
+    zm_print "  ℹ️ $(_msg vfs_hint)"
 fi
 
-zm_print "🔍 Checking Metamodule Conflicts" 0.3 "h"
+zm_print "🔍 $(_msg conflict_check)" 0.3 "h"
 
 _found_conflict=false
 for _mod_dir in /data/adb/modules/*/; do
@@ -88,7 +89,7 @@ for _mod_dir in /data/adb/modules/*/; do
     case "$_meta" in
         1|true)
             _conflict_name=$(grep -E '^name[[:space:]]*=' "$_prop" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//')
-            zm_print "  ⚠️ Removing metamodule: ${_conflict_name:-$_mod_id}"
+            zm_print "  ⚠️ $(_msg conflict_removing | sed "s/%s/${_conflict_name:-$_mod_id}/")"
             # Run its uninstall hook if present
             [ -f "$_mod_dir/uninstall.sh" ] && sh "$_mod_dir/uninstall.sh" 2>/dev/null
             touch "$_mod_dir/remove"
@@ -100,9 +101,9 @@ done
 unset _mod_dir _mod_id _prop _meta _conflict_name
 
 if [ "$_found_conflict" = true ]; then
-    zm_print "  ✅ Conflicting metamodules marked for removal"
+    zm_print "  ✅ $(_msg conflict_cleared)"
 else
-    zm_print "  ✅ No conflicts found"
+    zm_print "  ✅ $(_msg conflict_none)"
 fi
 unset _found_conflict
 
@@ -117,7 +118,7 @@ if [ -n "$APATCH" ] && [ "${APATCH_VER_CODE:-0}" -lt 11170 ] && [ "$APATCH_BIND_
 fi
 
 ZM_DATA="/data/adb/zeromount"
-zm_print "📁 Preparing Data" 0.3 "h"
+zm_print "📁 $(_msg data_prep)" 0.3 "h"
 
 FRESH_INSTALL=false
 USER_RESET=false
@@ -138,6 +139,8 @@ if [ -d "$OLD_MODULE" ] && [ "$FRESH_INSTALL" = false ]; then
     IS_UPGRADE=true
 fi
 
+mkdir -p "$ZM_DATA"
+mkdir -p "$ZM_DATA/logs"
 zm_print "  ✅ $(_msg data_ready)"
 
 if [ "$FRESH_INSTALL" = false ]; then
@@ -180,6 +183,7 @@ if [ "$FRESH_INSTALL" = true ] || [ "$USER_RESET" = true ]; then
     "$BIN" config set ui.language "$LANG_CODE" 2>/dev/null
 else
     zm_print "  ✅ $(_msg config_preserved)"
+    "$BIN" config dump > "$ZM_DATA/config.toml.tmp" 2>/dev/null && mv "$ZM_DATA/config.toml.tmp" "$ZM_DATA/config.toml"
 fi
 
 if [ "$IS_UPGRADE" = true ]; then
@@ -194,7 +198,7 @@ if [ "$IS_UPGRADE" = true ]; then
             [ -d "$mod_dir" ] && chcon -R u:object_r:system_file:s0 "$mod_dir" 2>/dev/null
         done
     fi
-    zm_print "  ✅ Upgrade: peer module contexts restored"
+    zm_print "  ✅ $(_msg upgrade_ok)"
 fi
 
 # Stage emoji font for runtime use
@@ -203,14 +207,14 @@ mkdir -p "$EMOJI_DIR"
 if [ -f "$MODPATH/emoji/NotoColorEmoji.ttf" ]; then
     cp "$MODPATH/emoji/NotoColorEmoji.ttf" "$EMOJI_DIR/" 2>/dev/null
     set_perm "$EMOJI_DIR/NotoColorEmoji.ttf" 0 0 0644 u:object_r:system_file:s0
-    zm_print "  ✅ Emoji font staged"
+    zm_print "  ✅ $(_msg emoji_staged)"
 fi
 
 # Xiaomi/Redmi/POCO devices have mi_ext overlay mounts that trigger detection
 BRAND=$(getprop ro.product.brand 2>/dev/null | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer 2>/dev/null | tr '[:upper:]' '[:lower:]')
 
-zm_print "🛡️ External Module Bridge" 0.3 "h"
+zm_print "🛡️ $(_msg bridge_header)" 0.3 "h"
 
 # Import VerifiedBootHash from susfs4ksu's standalone file if present
 VBH_FILE="/data/adb/VerifiedBootHash/VerifiedBootHash.txt"
@@ -235,9 +239,9 @@ fi
 _detect_out=$("$BIN" detect 2>/dev/null)
 if echo "$_detect_out" | grep -q 'susfs: true'; then
     if [ "$KSU_SUKISU" = "true" ]; then
-        zm_print "  ✅ SUSFS +enhanced (manager-integrated)"
+        zm_print "  ✅ $(_msg susfs_enhanced)"
     else
-        zm_print "  ✅ SUSFS detected in kernel"
+        zm_print "  ✅ $(_msg susfs_detected)"
     fi
     _susfs_ver=$(echo "$_detect_out" | grep '  version:' | sed 's/.*version: //')
     case "$_susfs_ver" in
@@ -248,14 +252,14 @@ if echo "$_detect_out" | grep -q 'susfs: true'; then
     esac
     unset _susfs_ver
 else
-    zm_print "  ⚠️ SUSFS not detected in kernel"
+    zm_print "  ⚠️ $(_msg susfs_missing)"
 fi
 unset _detect_out
 
-zm_print "  🔄 Syncing SUSFS bidirectional"
-"$BIN" bridge init 2>/dev/null && zm_print "  ✅ External configs synced" || zm_print "  ⚠️ Bridge init skipped (binary error)"
+zm_print "  🔄 $(_msg bridge_sync)"
+"$BIN" bridge init 2>/dev/null && zm_print "  ✅ $(_msg bridge_ok)" || zm_print "  ⚠️ $(_msg bridge_skip)"
 
-zm_print "🚀 Finalizing" 0.3 "h"
+zm_print "🚀 $(_msg finalizing)" 0.3 "h"
 
 echo 0 > "$ZM_DATA/.bootcount"
 
@@ -278,11 +282,11 @@ set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
 chmod 755 "$MODPATH"/*.sh
 set_perm "$MODPATH/module.prop" 0 0 0644
 
-zm_print "  ✅ Permissions set"
-zm_print "  ✅ Boot counter reset"
+zm_print "  ✅ $(_msg perms_set)"
+zm_print "  ✅ $(_msg boot_reset)"
 
 ui_print ""
 ui_print "==========================================="
-ui_print "  ✨ ZeroMount installed successfully ✨"
+ui_print "  ✨ $(_msg complete) ✨"
 ui_print "==========================================="
 ui_print ""

@@ -1,8 +1,6 @@
-import { moduleInfo } from 'kernelsu';
-
 const MODULE_ID = (() => {
   try {
-    const id = moduleInfo();
+    const id = globalThis.ksu?.moduleInfo?.();
     if (id && /^[a-zA-Z][a-zA-Z0-9._-]+$/.test(id)) return id;
   } catch {}
   return 'meta-zeromount';
