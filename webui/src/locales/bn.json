@@ -390,5 +390,12 @@
   "activity.strategyChanged": "কৌশল → {value}",
   "activity.on": "চালু",
   "activity.off": "বন্ধ",
-  "activity.empty": "(খালি)"
+  "activity.empty": "(খালি)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

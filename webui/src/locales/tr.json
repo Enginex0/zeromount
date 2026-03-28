@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Strateji → {value}",
   "activity.on": "AÇIK",
   "activity.off": "KAPALI",
-  "activity.empty": "(boş)"
+  "activity.empty": "(boş)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

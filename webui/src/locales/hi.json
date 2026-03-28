@@ -390,5 +390,12 @@
   "activity.strategyChanged": "रणनीति → {value}",
   "activity.on": "चालू",
   "activity.off": "बंद",
-  "activity.empty": "(खाली)"
+  "activity.empty": "(खाली)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

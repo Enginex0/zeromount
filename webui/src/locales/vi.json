@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Chiến lược → {value}",
   "activity.on": "BẬT",
   "activity.off": "TẮT",
-  "activity.empty": "(trống)"
+  "activity.empty": "(trống)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

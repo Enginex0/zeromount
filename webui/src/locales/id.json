@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Strategi → {value}",
   "activity.on": "AKTIF",
   "activity.off": "NONAKTIF",
-  "activity.empty": "(kosong)"
+  "activity.empty": "(kosong)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

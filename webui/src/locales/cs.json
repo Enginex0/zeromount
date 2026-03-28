@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Strategie → {value}",
   "activity.on": "ZAP",
   "activity.off": "VYP",
-  "activity.empty": "(prázdné)"
+  "activity.empty": "(prázdné)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

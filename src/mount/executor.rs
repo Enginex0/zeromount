@@ -96,8 +96,6 @@ fn execute_overlay(
     let mut succeeded_module_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for (pm, lower_dirs) in &staged {
-        if pm.is_bind { continue; }
-
         let adjusted: Vec<PathBuf> = lower_dirs
             .iter()
             .map(|d| if pm.staging_rel.as_os_str().is_empty() { d.clone() } else { d.join(&pm.staging_rel) })
@@ -151,39 +149,6 @@ fn execute_overlay(
             }
         };
         results.push(result);
-    }
-
-    // Bind-mount shallow files from narrow dirs (staged with correct SELinux context)
-    for (pm, lower_dirs) in &staged {
-        if !pm.is_bind { continue; }
-        if !pm.mount_point.exists() { continue; }
-
-        for lower in lower_dirs {
-            let src = lower.join(&pm.staging_rel);
-            if !src.exists() { continue; }
-
-            let target = &pm.mount_point;
-            let c_src = std::ffi::CString::new(src.to_string_lossy().as_bytes().to_vec());
-            let c_tgt = std::ffi::CString::new(target.to_string_lossy().as_bytes().to_vec());
-            if let (Ok(s), Ok(t)) = (c_src, c_tgt) {
-                let ret = unsafe {
-                    libc::mount(s.as_ptr(), t.as_ptr(), std::ptr::null(), libc::MS_BIND, std::ptr::null())
-                };
-                if ret == 0 {
-                    info!(src = %src.display(), target = %target.display(), "bind mount OK");
-                    for mid in &pm.contributing_modules {
-                        succeeded_module_ids.insert(mid.clone());
-                    }
-                } else {
-                    warn!(
-                        src = %src.display(), target = %target.display(),
-                        error = %std::io::Error::last_os_error(),
-                        "bind mount failed"
-                    );
-                }
-            }
-            break; // first matching lower dir wins
-        }
     }
 
     storage.detach_staging();

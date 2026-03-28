@@ -143,6 +143,7 @@ fn collect_device_info() -> String {
     let device = run("getprop", &["ro.product.device"]);
     let build = run("getprop", &["ro.build.display.id"]);
     let android = run("getprop", &["ro.build.version.release"]);
+    let logd = run("getprop", &["init.svc.logd"]);
     let ksu_ver = fs::read_to_string("/data/adb/ksu/version").unwrap_or_default();
     let module_ver = fs::read_to_string("/data/adb/modules/meta-zeromount/module.prop")
         .unwrap_or_default()
@@ -152,7 +153,7 @@ fn collect_device_info() -> String {
         .unwrap_or_default();
 
     format!(
-        "uname={uname}\ndevice={device}\nbuild={build}\nandroid={android}\nksu={}\nmodule={module_ver}\n",
+        "uname={uname}\ndevice={device}\nbuild={build}\nandroid={android}\nlogd={logd}\nksu={}\nmodule={module_ver}\n",
         ksu_ver.trim(),
     )
 }

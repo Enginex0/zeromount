@@ -118,8 +118,6 @@ pub struct PartitionMount {
     /// under <staging>/<module>/system/vendor/etc.
     pub staging_rel: PathBuf,
     pub contributing_modules: Vec<String>,
-    #[serde(default)]
-    pub is_bind: bool,
 }
 
 // -- Mount Results --

@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Estratégia → {value}",
   "activity.on": "LIGADO",
   "activity.off": "DESLIGADO",
-  "activity.empty": "(vazio)"
+  "activity.empty": "(vazio)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

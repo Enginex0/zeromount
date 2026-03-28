@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Stratégia → {value}",
   "activity.on": "BE",
   "activity.off": "KI",
-  "activity.empty": "(üres)"
+  "activity.empty": "(üres)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

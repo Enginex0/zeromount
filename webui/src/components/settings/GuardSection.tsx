@@ -1,4 +1,4 @@
-import { createSignal, createMemo, onMount, Show } from 'solid-js';
+import { createSignal, createMemo, onMount, Show, For } from 'solid-js';
 import { Card } from '../core/Card';
 import { Toggle } from '../core/Toggle';
 import { CollapsibleSubgroup } from '../ui/CollapsibleSubgroup';
@@ -129,6 +129,38 @@ export function GuardSection() {
               />
             </div>
           </div>
+
+          <CollapsibleSubgroup
+            label={t('guard.protectedModules', { protected: protectedCount(), total: modules().length })}
+            hiddenCount={modules().length}
+            defaultItems={<></>}
+            expandedItems={
+              <div class="guard__module-list">
+                <For each={modules()}>
+                  {(mod) => {
+                    const checked = () => mod.locked || allowed().has(mod.name);
+                    return (
+                      <div
+                        class={`guard__check-row${mod.locked ? ' guard__check-row--locked' : ''}`}
+                        onClick={() => !mod.locked && handleCheck(mod.name, !checked())}
+                      >
+                        <div class={`guard__checkbox${checked() ? ' guard__checkbox--on' : ''}`}>
+                          <Show when={checked()}>
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                          </Show>
+                        </div>
+                        <div class="guard__check-label">
+                          <span>{mod.name}</span>
+                          {mod.locked && <span class="guard__tag guard__tag--locked">{t('guard.tagAlways')}</span>}
+                          {mod.disabled && <span class="guard__tag guard__tag--disabled">{t('guard.tagDisabled')}</span>}
+                        </div>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            }
+          />
 
           <CollapsibleSubgroup
             label={t('guard.thresholds')}

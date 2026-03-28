@@ -130,7 +130,6 @@ struct DirNode {
     contributing_modules: BTreeSet<String>,
     children: BTreeMap<String, DirNode>,
     has_files: bool,
-    file_names: Vec<String>,
 }
 
 /// Build per-partition directory trees from all modules' files.
@@ -185,7 +184,6 @@ fn insert_into_tree(
             _ => {
                 node.has_files = true;
                 node.contributing_modules.insert(module_id.to_string());
-                node.file_names.push(path_components[0].to_string());
             }
         }
         return;
@@ -236,8 +234,9 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
             .map(|n| NARROW_DIRS.contains(&n))
             .unwrap_or(false);
 
-        let mount_here = !force_descend && !narrow
-            && (node.has_files || should_mount_here(node));
+        let narrow_with_files = narrow && node.has_files;
+        let mount_here = !force_descend
+            && (narrow_with_files || (!narrow && (node.has_files || should_mount_here(node))));
 
         if mount_here {
             let (mp, sr) = elevate_novel_target(&path, &staging_rel);
@@ -265,7 +264,6 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
                     mount_point: mp,
                     staging_rel: sr,
                     contributing_modules: contributors,
-                    is_bind: false,
                 });
             }
         } else if has_any_contributors(node) {
@@ -273,7 +271,7 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
                 debug!(mount_point = %path.display(), "sensitive partition path — descending to subdirs");
             }
             if narrow {
-                debug!(mount_point = %path.display(), "narrow dir — descending to subdirs, deferring shallow files");
+                debug!(mount_point = %path.display(), "narrow dir — descending to subdirs");
             }
             for (child_name, child_node) in &node.children {
                 queue.push_back((
@@ -282,25 +280,6 @@ fn bfs_mount_points(partition: &str, root: &DirNode) -> Vec<PartitionMount> {
                     child_node,
                     false,
                 ));
-            }
-
-            if narrow && node.has_files {
-                let contributors: Vec<String> = node.contributing_modules.iter().cloned().collect();
-                for fname in &node.file_names {
-                    let file_mp = path.join(fname);
-                    let file_sr = staging_rel.join(fname);
-                    debug!(
-                        bind_target = %file_mp.display(),
-                        "narrow dir shallow file — deferred to bind mount"
-                    );
-                    mounts.push(PartitionMount {
-                        partition: partition.to_string(),
-                        mount_point: file_mp,
-                        staging_rel: file_sr,
-                        contributing_modules: contributors.clone(),
-                        is_bind: true,
-                    });
-                }
             }
         }
     }

@@ -390,5 +390,12 @@
   "activity.strategyChanged": "전략 → {value}",
   "activity.on": "ON",
   "activity.off": "OFF",
-  "activity.empty": "(비어 있음)"
+  "activity.empty": "(비어 있음)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

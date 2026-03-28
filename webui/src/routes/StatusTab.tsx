@@ -4,11 +4,29 @@ import { Button } from '../components/core/Button';
 import { Skeleton } from '../components/core/Skeleton';
 import { ScenarioIndicator } from '../components/core/ScenarioIndicator';
 import { Badge } from '../components/core/Badge';
+import { CollapsibleSubgroup } from '../components/ui/CollapsibleSubgroup';
 import { GuardSection } from '../components/settings/GuardSection';
 import { store } from '../lib/store';
 import { t } from '../lib/i18n';
 import type { MountStrategy } from '../lib/types';
 import './StatusTab.css';
+
+const MODE_COLOR_POOL = [
+  '#00BCD4', '#9C27B0', '#009688', '#4CAF50',
+  '#FFC107', '#7C4DFF', '#FF6D00', '#26A69A',
+];
+
+function pickModeColor(accentRgb: string): string {
+  const [ar, ag, ab] = accentRgb.split(',').map(s => parseInt(s.trim()));
+  const far = MODE_COLOR_POOL.filter(hex => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return Math.sqrt((r - ar) ** 2 + (g - ag) ** 2 + (b - ab) ** 2) > 120;
+  });
+  const pool = far.length ? far : MODE_COLOR_POOL;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 export function StatusTab() {
   const [animatedActiveRules, setAnimatedActiveRules] = createSignal(0);
@@ -71,16 +89,6 @@ export function StatusTab() {
     return t('status.modeValueStandby');
   });
 
-  const mountModeColor = createMemo(() => {
-    const theme = store.currentTheme();
-    switch (effectiveMode()) {
-      case 'vfs': return theme.colorSuccess;
-      case 'overlay': return theme.colorInfo || '#3b82f6';
-      case 'magicmount': return theme.colorInfo || '#3b82f6';
-      case 'susfs_only': return '#FF8E53';
-    }
-  });
-
   const mountModeDescription = createMemo(() => {
     const mode = effectiveMode();
     const storage = store.settings.mount.storage_mode;
@@ -91,6 +99,8 @@ export function StatusTab() {
       case 'susfs_only': return t('status.modeDescSusfsOnly');
     }
   });
+
+  const [modeColor] = createSignal(pickModeColor(store.currentTheme().accentRgb));
 
   const isVfsMode = createMemo(() => effectiveMode() === 'vfs');
 
@@ -241,37 +251,29 @@ export function StatusTab() {
           </Card>
         }
       >
-        <Card variant="gradient-border" padding="large" class={isModuleActive() ? 'status-hero-card status-hero-card--active' : 'status-hero-card'}>
+        <Card variant="gradient-border" padding="large" class="status-hero-card status-hero-card--active">
           <div class="status-hero">
             <div
               class="status-hero__indicator"
-              style={{
-                color: isModuleActive()
-                  ? store.currentTheme().textOnAccent
-                  : store.currentTheme().textTertiary
-              }}
+              style={{ color: store.currentTheme().textOnAccent }}
             >
               <span
-                class={`status-hero__dot ${isModuleActive() ? 'status-hero__dot--active' : ''}`}
+                class="status-hero__dot status-hero__dot--active"
                 style={{
-                  background: isModuleActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary,
-                  'box-shadow': isModuleActive() ? `0 0 12px rgba(${store.currentTheme().accentRgb}, 0.5)` : 'none'
+                  background: store.currentTheme().textOnAccent,
+                  'box-shadow': `0 0 12px rgba(${store.currentTheme().accentRgb}, 0.5)`
                 }}
               />
               {heroStatusLabel()}
             </div>
 
-            <ScenarioIndicator />
+            <ScenarioIndicator color={modeColor()} />
 
-            <div
-              class={`status-hero__shield ${isModuleActive() ? 'status-hero__shield--active' : ''}`}
-            >
+            <div class="status-hero__shield status-hero__shield--active">
               <div
-                class={`status-hero__glow ${isModuleActive() ? 'status-hero__glow--active' : 'status-hero__glow--inactive'}`}
+                class="status-hero__glow status-hero__glow--active"
                 style={{
-                  background: isModuleActive()
-                    ? `radial-gradient(circle, ${store.currentTheme().colorSuccessGlow} 0%, transparent 60%)`
-                    : 'transparent'
+                  background: `radial-gradient(circle, ${modeColor()}40 0%, transparent 60%)`
                 }}
               />
 
@@ -282,8 +284,8 @@ export function StatusTab() {
                 class="status-hero__shield-svg"
               >
                 <path
-                  fill={isModuleActive() ? store.currentTheme().textOnAccent : store.currentTheme().textTertiary}
-                  opacity={isModuleActive() ? 0.9 : 0.5}
+                  fill={store.currentTheme().textOnAccent}
+                  opacity={0.9}
                   d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
                 />
               </svg>
@@ -370,7 +372,7 @@ export function StatusTab() {
             <div class="status-mode__label">
               <span
                 class="status-mode__dot"
-                style={{ background: mountModeColor() }}
+                style={{ background: modeColor() }}
               />
               <span class="status-mode__text color-text-primary">
                 {mountModeLabel()}
@@ -528,6 +530,61 @@ export function StatusTab() {
           </div>
         </Show>
       </Card>
+
+      <Show when={(() => {
+        const c = store.capabilities?.();
+        return c && (!c.vfs_driver || !c.susfs_available || !c.overlay_supported || !c.susfs_kstat_redirect);
+      })()}>
+        <Card>
+          <h3 class="status-section__header color-text-secondary">
+            {t('capabilities.title')}
+          </h3>
+          <div class="settings__item-desc color-text-tertiary" style={{ "margin-bottom": "12px" }}>
+            {t('capabilities.desc')}
+          </div>
+          <CollapsibleSubgroup
+            label={t('capabilities.expandLabel')}
+            hiddenCount={(() => {
+              const c = store.capabilities?.()!;
+              let n = 0;
+              if (!c.vfs_driver) n++;
+              if (!c.susfs_available) n++;
+              if (!c.overlay_supported) n++;
+              if (!c.susfs_kstat_redirect && c.susfs_available) n++;
+              return n;
+            })()}
+            defaultItems={<></>}
+            expandedItems={
+              <>
+                <Show when={!store.capabilities?.()!.vfs_driver}>
+                  <div class="settings__item settings__item--stacked">
+                    <div class="settings__item-label">{t('capabilities.vfsDriver')}</div>
+                    <div class="settings__item-desc">{t('capabilities.vfsDriverDesc')}</div>
+                  </div>
+                </Show>
+                <Show when={!store.capabilities?.()!.susfs_available}>
+                  <div class="settings__item settings__item--stacked">
+                    <div class="settings__item-label">{t('capabilities.susfs')}</div>
+                    <div class="settings__item-desc">{t('capabilities.susfsDesc')}</div>
+                  </div>
+                </Show>
+                <Show when={!store.capabilities?.()!.overlay_supported}>
+                  <div class="settings__item settings__item--stacked">
+                    <div class="settings__item-label">{t('capabilities.overlayFs')}</div>
+                    <div class="settings__item-desc">{t('capabilities.overlayFsDesc')}</div>
+                  </div>
+                </Show>
+                <Show when={store.capabilities?.()!.susfs_available && !store.capabilities?.()!.susfs_kstat_redirect}>
+                  <div class="settings__item settings__item--stacked">
+                    <div class="settings__item-label">{t('capabilities.kstatRedirect')}</div>
+                    <div class="settings__item-desc">{t('capabilities.kstatRedirectDesc')}</div>
+                  </div>
+                </Show>
+              </>
+            }
+          />
+        </Card>
+      </Show>
 
       {/* System Health */}
       <Card>

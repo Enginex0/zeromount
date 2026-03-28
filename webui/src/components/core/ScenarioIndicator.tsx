@@ -77,7 +77,7 @@ function getMissingCapabilities(caps: CapabilityFlags | null): string[] {
   return missing;
 }
 
-export function ScenarioIndicator() {
+export function ScenarioIndicator(props: { color?: string }) {
   const scenario = () => store.scenario?.() || 'none';
   const activeStrategy = () => store.runtimeStrategy() || store.effectiveStrategy();
   const susfsEnabled = () => (store.capabilities?.()?.susfs_available ?? false) && store.settings.susfs.enabled;
@@ -87,8 +87,8 @@ export function ScenarioIndicator() {
 
   return (
     <div class="scenario">
-      <div class="scenario__chip" style={{ 'border-color': config().color }}>
-        <span class="scenario__dot" style={{ background: config().color, color: config().color }} />
+      <div class="scenario__chip" style={{ 'border-color': props.color || config().color }}>
+        <span class="scenario__dot" style={{ background: props.color || config().color, color: props.color || config().color }} />
         <span class="scenario__label">
           {config().label}
         </span>

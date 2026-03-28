@@ -60,7 +60,7 @@
 }
 
 .status-hero__shield--active {
-  animation: shieldFloat 3s ease-in-out 1 forwards;
+  animation: shieldFloat 3s ease-in-out infinite;
 }
 
 @keyframes shieldFloat {

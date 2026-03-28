@@ -74,64 +74,6 @@ export function SettingsTab() {
 
       <MountEngineSection />
 
-      <Show when={(() => {
-        const c = caps();
-        return c && (!c.vfs_driver || !c.susfs_available || !c.overlay_supported || !c.susfs_kstat_redirect);
-      })()}>
-        <Card>
-          <h3 class="settings__section-title">
-            <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-            </svg>
-            {t('capabilities.title')}
-          </h3>
-          <div class="settings__item-desc color-text-tertiary" style={{ "margin-bottom": "12px" }}>
-            {t('capabilities.desc')}
-          </div>
-          <CollapsibleSubgroup
-            label={t('capabilities.expandLabel')}
-            hiddenCount={(() => {
-              const c = caps()!;
-              let n = 0;
-              if (!c.vfs_driver) n++;
-              if (!c.susfs_available) n++;
-              if (!c.overlay_supported) n++;
-              if (!c.susfs_kstat_redirect && c.susfs_available) n++;
-              return n;
-            })()}
-            defaultItems={<></>}
-            expandedItems={
-              <>
-                <Show when={!caps()!.vfs_driver}>
-                  <div class="settings__item settings__item--stacked">
-                    <div class="settings__item-label">{t('capabilities.vfsDriver')}</div>
-                    <div class="settings__item-desc">{t('capabilities.vfsDriverDesc')}</div>
-                  </div>
-                </Show>
-                <Show when={!caps()!.susfs_available}>
-                  <div class="settings__item settings__item--stacked">
-                    <div class="settings__item-label">{t('capabilities.susfs')}</div>
-                    <div class="settings__item-desc">{t('capabilities.susfsDesc')}</div>
-                  </div>
-                </Show>
-                <Show when={!caps()!.overlay_supported}>
-                  <div class="settings__item settings__item--stacked">
-                    <div class="settings__item-label">{t('capabilities.overlayFs')}</div>
-                    <div class="settings__item-desc">{t('capabilities.overlayFsDesc')}</div>
-                  </div>
-                </Show>
-                <Show when={caps()!.susfs_available && !caps()!.susfs_kstat_redirect}>
-                  <div class="settings__item settings__item--stacked">
-                    <div class="settings__item-label">{t('capabilities.kstatRedirect')}</div>
-                    <div class="settings__item-desc">{t('capabilities.kstatRedirectDesc')}</div>
-                  </div>
-                </Show>
-              </>
-            }
-          />
-        </Card>
-      </Show>
-
       <SusfsSection />
 
       {/* Property Spoofing — uses resetprop, independent of SUSFS */}

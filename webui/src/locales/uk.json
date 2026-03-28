@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Стратегія → {value}",
   "activity.on": "УВІМК",
   "activity.off": "ВИМК",
-  "activity.empty": "(порожньо)"
+  "activity.empty": "(порожньо)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

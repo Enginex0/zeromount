@@ -390,5 +390,12 @@
   "activity.strategyChanged": "استراتژی → {value}",
   "activity.on": "روشن",
   "activity.off": "خاموش",
-  "activity.empty": "(خالی)"
+  "activity.empty": "(خالی)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }

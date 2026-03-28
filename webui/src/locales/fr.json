@@ -390,5 +390,12 @@
   "activity.strategyChanged": "Stratégie → {value}",
   "activity.on": "ON",
   "activity.off": "OFF",
-  "activity.empty": "(vide)"
+  "activity.empty": "(vide)",
+  "guard.moduleDisabled": "Module disabled",
+  "guard.moduleActive": "Active",
+  "guard.bootcount": "Boot #{count}",
+  "guard.whitelist": "Module Whitelist",
+  "guard.whitelistDesc": "Whitelisted modules survive boot guard recovery",
+  "guard.self": "self",
+  "guard.disabled": "disabled"
 }
