@@ -63,7 +63,6 @@ const DEX2OAT_UMOUNT_PATHS: &[&str] = &[
     "/apex/com.android.art/bin/dex2oat64",
 ];
 
-
 /// Summary of all BRENE operations applied during a boot cycle.
 #[derive(Debug, Default)]
 pub struct BreneResult {
@@ -88,42 +87,41 @@ pub fn apply_brene(
     fonts_overlay_mounted: bool,
     _susfs_mode: SusfsMode,
     external_module: ExternalSusfsModule,
+    deferred: bool,
 ) -> Result<BreneResult> {
     let mut result = BreneResult::default();
     let brene = &config.brene;
 
-    // Fonts and emoji use bind mounts / overlayfs — standard Linux ops that
-    // work on any kernel. SUSFS kstat/path is layered on top when available.
     let susfs_cfg = &config.susfs;
     let has_kstat = client.features().kstat && susfs_cfg.kstat;
     let has_path = client.features().path && susfs_cfg.path_hide;
 
-    if brene.auto_hide_fonts {
-        let fonts = if fonts_overlay_mounted {
-            hide_font_modules_overlay(client, has_kstat, has_path)
-        } else {
-            process_font_modules(client, &config.mount.overlay_source)
-        };
-        info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
-        result.font_modules = fonts;
-    }
+    if !deferred {
+        if brene.auto_hide_fonts {
+            let fonts = if fonts_overlay_mounted {
+                hide_font_modules_overlay(client, has_kstat, has_path)
+            } else {
+                process_font_modules(client, &config.mount.overlay_source)
+            };
+            info!("BRENE: processed {} font modules (overlay={}): {:?}", fonts.len(), fonts_overlay_mounted, fonts);
+            result.font_modules = fonts;
+        }
 
-    if config.emoji.enabled {
-        info!("BRENE: emoji toggle ON, checking conflicts");
-        if let Some(conflict_id) = super::emoji::check_emoji_font_conflict(&result.font_modules) {
-            warn!("BRENE: emoji SKIPPED — conflicting font module: {conflict_id}");
-        } else {
-            match super::emoji::apply_emoji_fonts(client, &config.mount.overlay_source, fonts_overlay_mounted) {
-                Ok(er) => {
-                    info!("BRENE: emoji applied — strategy={}, mounts={}, redirects={}, vfs={}",
-                          er.strategy, er.mounts, er.redirects, er.vfs_rules);
-                    result.emoji_applied = true;
+        if config.emoji.enabled {
+            info!("BRENE: emoji toggle ON, checking conflicts");
+            if let Some(conflict_id) = super::emoji::check_emoji_font_conflict(&result.font_modules) {
+                warn!("BRENE: emoji SKIPPED — conflicting font module: {conflict_id}");
+            } else {
+                match super::emoji::apply_emoji_fonts(client, &config.mount.overlay_source, fonts_overlay_mounted) {
+                    Ok(er) => {
+                        info!("BRENE: emoji applied — strategy={}, mounts={}, redirects={}, vfs={}",
+                              er.strategy, er.mounts, er.redirects, er.vfs_rules);
+                        result.emoji_applied = true;
+                    }
+                    Err(e) => error!("BRENE: emoji mount failed: {e}"),
                 }
-                Err(e) => error!("BRENE: emoji mount failed: {e}"),
             }
         }
-    } else {
-        debug!("BRENE: emoji toggle OFF, skipping");
     }
 
     if !client.is_available() {
@@ -143,109 +141,111 @@ pub fn apply_brene(
 
     let has_maps = client.features().maps && susfs_cfg.maps_hide;
 
-    if brene.auto_hide_rooted_folders && has_path {
-        let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: rooted folders hidden ({count})");
-    }
-
-    if brene.auto_hide_recovery && has_path {
-        let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: recovery paths hidden ({count})");
-    }
-
-    if brene.auto_hide_tmp && has_path {
-        let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: tmp children hidden via loop ({count})");
-    }
-
-    if run_complement {
-        if brene.auto_hide_apk && has_path {
-            let count = hide_apk_paths(client);
+    // Path hiding: boot-completed only (real BRENE timing)
+    if deferred {
+        if brene.auto_hide_rooted_folders && has_path {
+            let count = paths::hide_paths(client, ROOTED_FOLDER_PATHS).unwrap_or(0);
             result.paths_hidden += count;
-            info!("BRENE: APK paths hidden ({count})");
+            info!("BRENE: rooted folders hidden ({count})");
         }
-    }
 
-    if brene.auto_hide_zygisk && has_maps {
-        let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
-        result.maps_hidden += count;
-        info!("BRENE: zygisk maps hidden ({count})");
-    }
-
-    if !brene.custom_sus_paths.is_empty() && has_path {
-        let path_refs: Vec<&str> = brene.custom_sus_paths.iter().map(|s| s.as_str()).collect();
-        let count = paths::hide_paths(client, &path_refs).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: custom sus_paths hidden ({count}/{})", path_refs.len());
-    }
-
-    if !brene.custom_sus_path_loops.is_empty() && has_path {
-        let path_refs: Vec<&str> = brene.custom_sus_path_loops.iter().map(|s| s.as_str()).collect();
-        let count = paths::hide_paths_loop(client, &path_refs).unwrap_or(0);
-        result.paths_hidden += count;
-        info!("BRENE: custom sus_path_loops hidden ({count}/{})", path_refs.len());
-    }
-
-    if !brene.custom_sus_maps.is_empty() && has_maps {
-        let path_refs: Vec<&str> = brene.custom_sus_maps.iter().map(|s| s.as_str()).collect();
-        let count = paths::hide_maps(client, &path_refs).unwrap_or(0);
-        result.maps_hidden += count;
-        info!("BRENE: custom sus_maps hidden ({count}/{})", path_refs.len());
-    }
-
-    if !defer_supercalls {
-        match client.hide_sus_mounts(brene.hide_sus_mounts) {
-            Ok(()) => info!("BRENE: hide_sus_mounts set to {}", brene.hide_sus_mounts),
-            Err(e) => warn!("BRENE: hide_sus_mounts failed: {e}"),
-        }
-    }
-
-    if !defer_supercalls {
-        if brene.avc_log_spoofing {
-            match client.enable_avc_log_spoofing(true) {
-                Ok(()) => {
-                    result.avc_spoofed = true;
-                    info!("BRENE: AVC log spoofing enabled");
-                }
-                Err(e) => warn!("BRENE: AVC log spoofing failed: {e}"),
-            }
-        }
-    }
-
-    if !defer_supercalls {
-        if brene.susfs_log {
-            match client.enable_log(true) {
-                Ok(()) => {
-                    result.log_enabled = true;
-                    info!("BRENE: SUSFS logging enabled");
-                }
-                Err(e) => warn!("BRENE: SUSFS log enable failed: {e}"),
-            }
-        }
-    }
-
-    if run_complement {
-        if brene.spoof_cmdline {
-            apply_spoof_cmdline(client);
-        }
-    }
-
-    if run_complement {
-        if brene.hide_ksu_loops && has_path {
-            let count = hide_ksu_loop_devices(client);
+        if brene.auto_hide_recovery && has_path {
+            let count = paths::hide_paths(client, RECOVERY_PATHS).unwrap_or(0);
             result.paths_hidden += count;
-            if count > 0 {
-                info!("BRENE: KSU loop devices hidden ({count})");
+            info!("BRENE: recovery paths hidden ({count})");
+        }
+
+        if brene.auto_hide_tmp && has_path {
+            let count = paths::hide_dir_children_loop(client, TMP_PATHS).unwrap_or(0);
+            result.paths_hidden += count;
+            info!("BRENE: tmp children hidden via loop ({count})");
+        }
+
+        if run_complement {
+            if brene.auto_hide_apk && has_path {
+                let count = hide_apk_paths(client);
+                result.paths_hidden += count;
+                info!("BRENE: APK paths hidden ({count})");
             }
         }
-    }
 
-    if run_complement {
-        if brene.force_hide_lsposed {
+        if brene.auto_hide_zygisk && has_maps {
+            let count = paths::hide_maps(client, ZYGISK_MAP_PATTERNS).unwrap_or(0);
+            result.maps_hidden += count;
+            info!("BRENE: zygisk maps hidden ({count})");
+        }
+
+        if !brene.custom_sus_paths.is_empty() && has_path {
+            let path_refs: Vec<&str> = brene.custom_sus_paths.iter().map(|s| s.as_str()).collect();
+            let count = paths::hide_paths(client, &path_refs).unwrap_or(0);
+            result.paths_hidden += count;
+            info!("BRENE: custom sus_paths hidden ({count}/{})", path_refs.len());
+        }
+
+        if !brene.custom_sus_path_loops.is_empty() && has_path {
+            let path_refs: Vec<&str> = brene.custom_sus_path_loops.iter().map(|s| s.as_str()).collect();
+            let count = paths::hide_paths_loop(client, &path_refs).unwrap_or(0);
+            result.paths_hidden += count;
+            info!("BRENE: custom sus_path_loops hidden ({count}/{})", path_refs.len());
+        }
+
+        if !brene.custom_sus_maps.is_empty() && has_maps {
+            let path_refs: Vec<&str> = brene.custom_sus_maps.iter().map(|s| s.as_str()).collect();
+            let count = paths::hide_maps(client, &path_refs).unwrap_or(0);
+            result.maps_hidden += count;
+            info!("BRENE: custom sus_maps hidden ({count}/{})", path_refs.len());
+        }
+
+        if run_complement {
+            if brene.hide_ksu_loops && has_path {
+                let count = hide_ksu_loop_devices(client);
+                result.paths_hidden += count;
+                if count > 0 {
+                    info!("BRENE: KSU loop devices hidden ({count})");
+                }
+            }
+        }
+
+        if run_complement && brene.force_hide_lsposed {
             apply_force_hide_lsposed();
+        }
+    }
+
+    // Supercalls: boot time only (kernel state toggles, not path-specific)
+    if !deferred {
+        if !defer_supercalls {
+            match client.hide_sus_mounts(brene.hide_sus_mounts) {
+                Ok(()) => info!("BRENE: hide_sus_mounts set to {}", brene.hide_sus_mounts),
+                Err(e) => warn!("BRENE: hide_sus_mounts failed: {e}"),
+            }
+        }
+
+        if !defer_supercalls {
+            if brene.avc_log_spoofing {
+                match client.enable_avc_log_spoofing(true) {
+                    Ok(()) => {
+                        result.avc_spoofed = true;
+                        info!("BRENE: AVC log spoofing enabled");
+                    }
+                    Err(e) => warn!("BRENE: AVC log spoofing failed: {e}"),
+                }
+            }
+        }
+
+        if !defer_supercalls {
+            if brene.susfs_log {
+                match client.enable_log(true) {
+                    Ok(()) => {
+                        result.log_enabled = true;
+                        info!("BRENE: SUSFS logging enabled");
+                    }
+                    Err(e) => warn!("BRENE: SUSFS log enable failed: {e}"),
+                }
+            }
+        }
+
+        if run_complement && brene.spoof_cmdline {
+            apply_spoof_cmdline(client);
         }
     }
 
@@ -1032,7 +1032,7 @@ mod tests {
     fn brene_skips_susfs_ops_when_unavailable() {
         let client = SusfsClient::new_for_test(false, SusfsFeatures::default());
         let config = ZeroMountConfig::default();
-        let result = apply_brene(&client, &config, false, SusfsMode::Enhanced, ExternalSusfsModule::None).expect("should not error");
+        let result = apply_brene(&client, &config, false, SusfsMode::Enhanced, ExternalSusfsModule::None, false).expect("should not error");
         assert_eq!(result.paths_hidden, 0);
         assert_eq!(result.maps_hidden, 0);
         assert!(!result.uname_spoofed);

@@ -7,23 +7,9 @@ MODDIR="${0%/*}"
 
 rm -f /data/adb/zeromount/.bootcount
 
-EXTERNAL_SUSFS=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null)
-
-# kernel_umount via ksud — only when no external module handles it
-if [ "$EXTERNAL_SUSFS" = "none" ] || [ -z "$EXTERNAL_SUSFS" ]; then
-    if [ "$("$BIN" config get brene.kernel_umount 2>/dev/null)" = "true" ]; then
-        KSUD=""
-        [ -x /data/adb/ksu/bin/ksud ] && KSUD=/data/adb/ksu/bin/ksud
-        [ -z "$KSUD" ] && [ -x /data/adb/ap/bin/ksud ] && KSUD=/data/adb/ap/bin/ksud
-        if [ -n "$KSUD" ]; then
-            "$KSUD" feature set kernel_umount 1 2>/dev/null && \
-                "$KSUD" feature save 2>/dev/null
-            echo "zeromount: kernel_umount enabled via ksud" > /dev/kmsg 2>/dev/null
-        fi
-    fi
-else
-    echo "zeromount: kernel_umount deferred to external module ($EXTERNAL_SUSFS)" > /dev/kmsg 2>/dev/null
-fi
+# Deferred BRENE path hiding (add_sus_path, add_sus_path_loop, add_sus_map)
+# Real BRENE runs all path ops at boot-completed, not post-fs-data
+"$BIN" hide-paths 2>/dev/null || true
 
 # Emoji needs pm (package manager), only available post-boot
 "$BIN" emoji apply-apps 2>/dev/null || true
@@ -35,7 +21,6 @@ fi
 
 # vold-app-data: wait for FUSE sdcard like susfs4ksu
 if [ "$("$BIN" config get brene.emulate_vold_app_data 2>/dev/null)" = "true" ]; then
-    # 60-second timeout in case FUSE never mounts (no sdcard, encryption failure)
     _waited=0
     until [ -d "/sdcard/Android/data" ] || [ $_waited -ge 60 ]; do
         sleep 1

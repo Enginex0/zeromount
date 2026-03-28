@@ -85,6 +85,9 @@ pub enum Commands {
     /// Auto-discover KSU mounts and register kernel umount paths (post-boot)
     #[command(name = "try-umount")]
     TryUmount,
+    /// Deferred BRENE path hiding (post-boot, matches real BRENE timing)
+    #[command(name = "hide-paths")]
+    HidePaths,
     /// Device-wide bootloop guard
     Guard {
         #[command(subcommand)]

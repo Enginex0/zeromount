@@ -88,6 +88,7 @@ fn main() -> Result<()> {
         Commands::Emoji { action } => cli::handlers::handle_emoji(action),
         Commands::VoldAppData => cli::handlers::handle_vold_app_data(),
         Commands::TryUmount => cli::handlers::handle_try_umount(),
+        Commands::HidePaths => cli::handlers::handle_hide_paths(),
         Commands::WebUiInit => cli::webui_init::handle_webui_init(),
         Commands::Guard { action } => guard::handle_guard(action),
         Commands::SyncDescription => cli::handlers::handle_sync_description(),

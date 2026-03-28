@@ -510,6 +510,20 @@ pub fn handle_try_umount() -> Result<()> {
     Ok(())
 }
 
+pub fn handle_hide_paths() -> Result<()> {
+    let config = crate::core::config::ZeroMountConfig::load(None)?;
+    let Ok(client) = crate::susfs::SusfsClient::probe() else {
+        tracing::warn!("hide_paths: SUSFS unavailable");
+        return Ok(());
+    };
+    let external_module = read_sentinel_module();
+    match crate::susfs::brene::apply_brene(&client, &config, false, crate::core::types::SusfsMode::default(), external_module, true) {
+        Ok(r) => tracing::info!("hide_paths: {} paths, {} maps hidden", r.paths_hidden, r.maps_hidden),
+        Err(e) => tracing::warn!("hide_paths: BRENE deferred failed: {e}"),
+    }
+    Ok(())
+}
+
 const SENTINEL_PATH: &str = "/data/adb/zeromount/flags/external_susfs";
 
 fn read_sentinel_module() -> crate::core::types::ExternalSusfsModule {

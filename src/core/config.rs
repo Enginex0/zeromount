@@ -234,7 +234,7 @@ impl Default for BreneConfig {
             force_hide_lsposed: true,
             spoof_cmdline: false,
             hide_ksu_loops: true,
-            kernel_umount: true,
+            kernel_umount: false,
             try_umount: false,
             prop_spoofing: true,
             auto_hide_injections: true,
@@ -919,7 +919,7 @@ mod tests {
         assert!(config.brene.force_hide_lsposed);
         assert!(!config.brene.spoof_cmdline);
         assert!(config.brene.hide_ksu_loops);
-        assert!(config.brene.kernel_umount);
+        assert!(!config.brene.kernel_umount);
         assert!(!config.brene.try_umount);
         assert!(config.brene.auto_hide_injections);
         assert!(config.brene.emulate_vold_app_data);
