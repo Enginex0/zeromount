@@ -14,6 +14,10 @@ export function escapeShellArg(arg: string): string {
   return "'" + arg.replace(/'/g, "'\\''") + "'";
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+
 export function shouldUseMock(): boolean {
   return import.meta.env.DEV && typeof globalThis.ksu === 'undefined';
 }
@@ -673,7 +677,7 @@ echo "]"
       return (await getMock()).getRuntimeStatus();
     }
     try {
-      const { errno, stdout } = await runShell(`${PATHS.BINARY} status --json`);
+      const { errno, stdout } = await withTimeout(runShell(`${PATHS.BINARY} status --json`), 5000);
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as RuntimeStatus;
       }
@@ -798,7 +802,7 @@ echo "]"
   async webuiInit(): Promise<WebUiInitResponse | null> {
     if (shouldUseMock()) return null;
     try {
-      const { errno, stdout } = await runShell(`${PATHS.BINARY} webui-init`);
+      const { errno, stdout } = await withTimeout(runShell(`${PATHS.BINARY} webui-init`), 10000);
       if (errno === 0 && stdout.trim()) {
         return JSON.parse(stdout.trim()) as WebUiInitResponse;
       }

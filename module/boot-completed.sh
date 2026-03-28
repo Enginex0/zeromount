@@ -41,5 +41,6 @@ if [ "$("$BIN" config get brene.emulate_vold_app_data 2>/dev/null)" = "true" ]; 
         sleep 1
         _waited=$((_waited + 1))
     done
+    [ $_waited -ge 60 ] && echo "zeromount: vold-app-data skipped, /sdcard/Android/data not ready after 60s" > /dev/kmsg 2>/dev/null
     [ -d "/sdcard/Android/data" ] && "$BIN" vold-app-data 2>/dev/null || true
 fi

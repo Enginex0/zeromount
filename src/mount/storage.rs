@@ -219,6 +219,7 @@ fn try_mode_ext4(base_path: &Path, overlay_source: &str, ext4_override_mb: u32) 
 
             if has_ksud_nuke() || select_nuke_ko(base_path).is_some() {
                 nuke_ext4_sysfs(base_path);
+                let _ = nuke_backing_file(&base_path.with_extension("ext4.img"));
                 Some(StorageHandle {
                     mode: StorageMode::Ext4,
                     base_path: base_path.to_path_buf(),
@@ -240,6 +241,7 @@ fn try_mode_ext4(base_path: &Path, overlay_source: &str, ext4_override_mb: u32) 
                     Err(e) => {
                         debug!(error = %e, "APEX spoof failed, running nuke best-effort");
                         nuke_ext4_sysfs(base_path);
+                        let _ = nuke_backing_file(&base_path.with_extension("ext4.img"));
                         Some(StorageHandle {
                             mode: StorageMode::Ext4,
                             base_path: base_path.to_path_buf(),

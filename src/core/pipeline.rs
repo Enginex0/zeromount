@@ -212,6 +212,11 @@ impl MountController<Planned> {
                                 info!(fail, "VFS fallback for failed overlay mounts");
                                 let executor = crate::vfs::VfsExecutor::new(driver);
                                 if let Ok(mut vfs) = executor.execute(&self.state.plan, &self.state.modules) {
+                                    let vfs_ok: std::collections::HashSet<&str> = vfs.iter()
+                                        .filter(|r| r.success)
+                                        .map(|r| r.module_id.as_str())
+                                        .collect();
+                                    results.retain(|r| r.success || !vfs_ok.contains(r.module_id.as_str()));
                                     results.append(&mut vfs);
                                 }
                             }
@@ -282,6 +287,10 @@ impl MountController<Planned> {
             Ok(d) => d,
             Err(e) => {
                 warn!("VFS driver open failed, falling back: {e}");
+                crate::mount::executor::manage_skip_mount_flags(
+                    modules,
+                    self.state.root_mgr.mount_mode(),
+                );
                 return self.execute_overlay_or_magic(modules, plan, config);
             }
         };

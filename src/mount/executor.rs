@@ -261,6 +261,10 @@ fn prepare_lower_dir(
         if sub.is_empty() {
             continue;
         }
+        if sub.contains("..") {
+            tracing::warn!(module = %module.id, path = %sub, "skipping traversal path");
+            continue;
+        }
 
         let src = module.path.join(&file.relative_path);
         let dst = lower_dir.join(sub);

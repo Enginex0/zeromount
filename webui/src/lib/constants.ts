@@ -1,7 +1,9 @@
+export const MODULE_ID_RE = /^[a-zA-Z][a-zA-Z0-9._-]+$/;
+
 const MODULE_ID = (() => {
   try {
     const id = globalThis.ksu?.moduleInfo?.();
-    if (id && /^[a-zA-Z][a-zA-Z0-9._-]+$/.test(id)) return id;
+    if (id && MODULE_ID_RE.test(id)) return id;
   } catch {}
   return 'meta-zeromount';
 })();

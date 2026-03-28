@@ -2,7 +2,7 @@ import { createSignal, createRoot, createMemo, createEffect, batch } from 'solid
 import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, GuardSettings, GuardStatus, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
 import { api, shouldUseMock, invalidateCache, readFromCache } from './api';
-import { PATHS } from './constants';
+import { PATHS, MODULE_ID_RE } from './constants';
 import { listPackages, getPackagesInfo, getAppLabelViaAapt, runShell } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
 import { readCache, writeCache, type HydratableState } from './cache';
@@ -951,6 +951,10 @@ function createAppStore() {
   };
 
   const guardAllowModule = async (name: string) => {
+    if (!MODULE_ID_RE.test(name) || name.length > 256) {
+      showToast(t('toast.failedWhitelist', { name }), 'error');
+      return;
+    }
     try {
       await runShell(`${PATHS.BINARY} guard allow ${name}`);
       setGuardStatus(prev => ({
@@ -966,6 +970,10 @@ function createAppStore() {
   const guardDisallowModule = async (name: string) => {
     if (name === 'meta-zeromount') {
       showToast(t('toast.cannotRemoveSelf'), 'error');
+      return;
+    }
+    if (!MODULE_ID_RE.test(name) || name.length > 256) {
+      showToast(t('toast.failedRemove', { name }), 'error');
       return;
     }
     try {

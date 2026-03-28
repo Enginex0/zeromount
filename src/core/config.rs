@@ -250,7 +250,7 @@ impl Default for BreneConfig {
 
 impl BreneConfig {
     pub fn validate_paths(&self) -> Result<()> {
-        for path in self.custom_sus_paths.iter().chain(&self.custom_sus_maps) {
+        for path in self.custom_sus_paths.iter().chain(&self.custom_sus_maps).chain(&self.custom_sus_path_loops) {
             if !path.starts_with('/') || path.contains('\0') {
                 anyhow::bail!("invalid sus path: {path:?} (must be absolute, no NUL)");
             }
@@ -533,7 +533,9 @@ impl ZeroMountConfig {
             return Ok(Self::default());
         }
         let content = std::fs::read_to_string(backup).context("reading config backup")?;
+        let content = migrate_config_keys(&content);
         let config: Self = toml::from_str(&content).context("parsing config backup")?;
+        config.brene.validate_paths().context("invalid sus paths in config backup")?;
         tracing::info!("config restored from backup");
         Ok(config)
     }

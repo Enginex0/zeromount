@@ -13,10 +13,12 @@ describe('runShell', () => {
     vi.restoreAllMocks();
   });
 
-  it('rejects when ksu is undefined', async () => {
+  it('resolves with errno -1 when ksu is undefined', async () => {
     vi.stubGlobal('ksu', undefined);
     const { runShell } = await import('../ksuApi');
-    await expect(runShell('echo hi')).rejects.toThrow('KSU not available');
+    const result = await runShell('echo hi');
+    expect(result.errno).toBe(-1);
+    expect(result.stderr).toBe('KSU not available');
   });
 
   it('delegates to exec from kernelsu-alt when ksu exists', async () => {

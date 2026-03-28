@@ -150,8 +150,10 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
                 // VFS clear for specific module would need kernel support;
                 // for now, full clear + re-mount is the safe path
                 if let Ok(driver) = crate::vfs::VfsDriver::open() {
-                    let _ = driver.clear_all();
-                    tracing::debug!("cleared VFS rules after module uninstall");
+                    match driver.clear_all() {
+                        Ok(()) => tracing::debug!("cleared VFS rules after module uninstall"),
+                        Err(e) => tracing::warn!(error = %e, "failed to clear VFS rules"),
+                    }
                 }
             }
 
@@ -178,7 +180,7 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
 
             let module = state.modules.iter().find(|m| m.id == id);
             let Some(module) = module else {
-                println!("{{\"error\":\"module_not_found\",\"id\":\"{id}\"}}");
+                println!("{}", serde_json::json!({"error": "module_not_found", "id": id}));
                 return Ok(());
             };
 
@@ -222,11 +224,10 @@ pub fn handle_module(action: ModuleAction) -> Result<()> {
 
             state.modules.retain(|m| m.id != id);
             state.font_modules.retain(|f| f != &id);
-            let _ = state.write_status_file(status_path);
+            state.write_status_file(status_path)
+                .context("persisting status after unload")?;
 
-            println!(
-                "{{\"removed\":{removed},\"strategy\":\"{strategy:?}\"}}",
-            );
+            println!("{}", serde_json::json!({"removed": removed, "strategy": format!("{strategy:?}")}));
         }
     }
     Ok(())
@@ -467,7 +468,7 @@ pub fn handle_cleanup_stale() -> Result<()> {
         }
         Err(e) => {
             tracing::warn!(error = %e, "stale overlay cleanup failed");
-            Ok(())
+            Err(e.into())
         }
     }
 }

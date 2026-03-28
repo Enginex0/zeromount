@@ -23,7 +23,7 @@ export function isRealEnvironment(): boolean {
 }
 
 export function runShell(command: string): Promise<ExecResult> {
-  if (!isRealEnvironment()) return Promise.reject(new Error('KSU not available'));
+  if (!isRealEnvironment()) return Promise.resolve({ errno: -1, stdout: '', stderr: 'KSU not available' });
   return exec(command);
 }
 

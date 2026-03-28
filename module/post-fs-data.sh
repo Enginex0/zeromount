@@ -25,13 +25,15 @@ if [ -z "$KSU" ] && [ -z "$APATCH" ]; then
         EXTERNAL=$(cat /data/adb/zeromount/flags/external_susfs 2>/dev/null || echo none)
         [ "$EXTERNAL" != "none" ] && "$BIN" bridge reconcile "$EXTERNAL" 2>/dev/null
         timeout 60 "$BIN" mount
-        echo "zeromount: magisk mount pipeline exited (rc=$?)" > /dev/kmsg 2>/dev/null
+        _mount_rc=$?
+        echo "zeromount: magisk mount pipeline exited (rc=$_mount_rc)" > /dev/kmsg 2>/dev/null
     fi
 fi
 
 # ADB Root via axon injection
 ADB_ROOT=$("$BIN" config get adb.adb_root 2>/dev/null)
 if [ "$ADB_ROOT" != "true" ]; then
+    rm -rf /data/adb/axon 2>/dev/null
     echo "zeromount: adb_root disabled, skipping axon injection" > /dev/kmsg 2>/dev/null
     exit 0
 fi
@@ -54,8 +56,8 @@ fi
 
 echo "zeromount: staging axon libraries to $AXON_PATH" > /dev/kmsg 2>/dev/null
 mkdir -p "$AXON_PATH"
-cp "$MODDIR/lib/${ABI}/libaxon_init.so" "$AXON_PATH/"
-cp "$MODDIR/lib/${ABI}/libaxon_adbd.so" "$AXON_PATH/"
+cp "$MODDIR/lib/${ABI}/libaxon_init.so" "$AXON_PATH/" || { echo "zeromount: cp libaxon_init.so failed" > /dev/kmsg 2>/dev/null; exit 0; }
+cp "$MODDIR/lib/${ABI}/libaxon_adbd.so" "$AXON_PATH/" || { echo "zeromount: cp libaxon_adbd.so failed" > /dev/kmsg 2>/dev/null; exit 0; }
 chcon -R u:object_r:system_file:s0 "$AXON_PATH"
 
 # Patch linker config for ADBD APEX namespace

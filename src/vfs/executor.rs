@@ -46,6 +46,10 @@ impl VfsExecutor {
         let total_failed: u32 = results.iter().map(|r| r.rules_failed).sum();
         info!(applied = total_applied, failed = total_failed, "rule injection complete");
 
+        if total_failed > 0 {
+            warn!(failed = total_failed, applied = total_applied, "enabling VFS with partial injection failures");
+        }
+
         // Phase 3: Enable engine
         info!("phase 3: enabling VFS engine");
         self.driver.enable().context("failed to enable VFS engine")?;
