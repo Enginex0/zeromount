@@ -335,10 +335,9 @@ fn ensure_parent_dirs_with_context(
 // BindMount (Magisk) needs flags so the root manager doesn't double-mount.
 //
 // Exception: modules with post-fs-data.sh may create files at runtime that
-// ZeroMount cannot see during its scan pass (e.g., MSD generates
-// system/etc/selinux/plat_seapp_contexts). Leaving skip_mount unset for
+// ZeroMount cannot see during its scan pass. Leaving skip_mount unset for
 // these modules lets the root manager mount those late-created files in its
-// own pass (which runs after all post-fs-data scripts have completed).
+// own pass (which runs after KSU executes all post-fs-data scripts).
 pub fn manage_skip_mount_flags(modules: &[ScannedModule], mode: RootMountMode) {
     if mode == RootMountMode::Metamodule {
         return;
