@@ -108,17 +108,60 @@ fi
 PROP_SPOOF=$("$BIN" config get brene.prop_spoofing 2>/dev/null)
 
 if [ "$PROP_SPOOF" = "true" ]; then
-    {
-        while true; do
-            "$BIN" prop-watch
-            rc=$?
-            [ $rc -eq 0 ] && break
-            echo "zeromount: prop-watch crashed ($rc), restarting" > /dev/kmsg 2>/dev/null
-            sleep 1
+    # External SUSFS module handles props — defer (matches mod.rs:22-25)
+    _ext_susfs="/data/adb/zeromount/flags/external_susfs"
+    _ext_val=""
+    [ -f "$_ext_susfs" ] && _ext_val=$(cat "$_ext_susfs" 2>/dev/null)
+    _ext_val=$(echo "$_ext_val" | tr -d '[:space:]')
+
+    if [ -n "$_ext_val" ] && [ "$_ext_val" != "none" ]; then
+        echo "zeromount: prop spoofing deferred to external module" > /dev/kmsg 2>/dev/null
+    elif [ ! -x "$RP" ]; then
+        echo "zeromount: resetprop-rs not found at $RP, skipping prop spoofing" > /dev/kmsg 2>/dev/null
+    else
+        . "$MODDIR/prop_table.sh"
+
+        # Phase 1: Nuke PIF + ROM props (enforcer.rs:20-46)
+        _nuke_prop() {
+            if [ -z "$(getprop "$1" 2>/dev/null)" ]; then return; fi
+            if [ "${1#persist.}" != "$1" ]; then
+                "$RP" -p --nuke "$1" 2>/dev/null || "$RP" --hexpatch-delete "$1" 2>/dev/null || true
+            else
+                "$RP" --nuke "$1" 2>/dev/null || "$RP" --hexpatch-delete "$1" 2>/dev/null || true
+            fi
+        }
+
+        echo "$NUKE_PIF" | while IFS= read -r _prop; do
+            [ -n "$_prop" ] && _nuke_prop "$_prop"
         done
-    } &
-    _bg_pids="$_bg_pids $!"
-    echo "zeromount: prop-watch daemon started (pid $!)" > /dev/kmsg 2>/dev/null
+
+        echo "$NUKE_CUSTOM_ROM" | while IFS= read -r _prop; do
+            [ -n "$_prop" ] && _nuke_prop "$_prop"
+        done
+
+        # Phase 2: Stealth-set props (enforcer.rs:4-18)
+        echo "$STEALTH_PROPS" | while IFS='=' read -r _name _val; do
+            [ -z "$_name" ] && continue
+            _cur=$(getprop "$_name" 2>/dev/null)
+            [ "$_cur" = "$_val" ] && continue
+            "$RP" -st "$_name" "$_val" 2>/dev/null || true
+        done
+
+        # Phase 3: vbmeta config props (mod.rs:44-52)
+        _vbsize=$("$BIN" config get brene.vbmeta_size 2>/dev/null)
+        if [ -n "$_vbsize" ]; then
+            _cur=$(getprop ro.boot.vbmeta.size 2>/dev/null)
+            [ "$_cur" != "$_vbsize" ] && "$RP" -st ro.boot.vbmeta.size "$_vbsize" 2>/dev/null || true
+        fi
+
+        _vbhash=$("$BIN" config get brene.verified_boot_hash 2>/dev/null)
+        if [ -n "$_vbhash" ]; then
+            _cur=$(getprop ro.boot.vbmeta.digest 2>/dev/null)
+            [ "$_cur" != "$_vbhash" ] && "$RP" -st ro.boot.vbmeta.digest "$_vbhash" 2>/dev/null || true
+        fi
+
+        echo "zeromount: prop spoofing applied (shell, stealth)" > /dev/kmsg 2>/dev/null
+    fi
 fi
 
 # Performance tuning + input boost daemon (Rust-native, auto-detects device)
