@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full build pipeline: cross-compile Rust (debug + release), build WebUI, package module ZIPs.
-# Usage: ./scripts/package.sh --build [--version v2.0.0-dev] [--clean]
+# Usage: ./scripts/package.sh --build [--version v2.0.0-dev] [--clean] [--deploy] [--reboot]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,12 +13,16 @@ CURRENT_VERSION="$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | sed 's
 VERSION=""
 BUILD=false
 CLEAN=false
+DEPLOY=false
+REBOOT=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) VERSION="$2"; shift 2 ;;
         --build)   BUILD=true; shift ;;
         --clean)   CLEAN=true; shift ;;
+        --deploy)  DEPLOY=true; shift ;;
+        --reboot)  REBOOT=true; shift ;;
         *)         echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
@@ -359,3 +363,30 @@ echo ""
 echo "==> Build complete"
 echo "    Debug:   $RELEASE_DIR/debug/zeromount-${VERSION}-debug.zip"
 echo "    Release: $RELEASE_DIR/release/zeromount-${VERSION}.zip"
+
+if [ "$DEPLOY" = true ]; then
+    ZIP="$RELEASE_DIR/debug/zeromount-${VERSION}-debug.zip"
+    if [ ! -f "$ZIP" ]; then
+        echo "FATAL: debug zip not found at $ZIP" >&2
+        exit 1
+    fi
+
+    if ! adb devices 2>/dev/null | grep -q 'device$'; then
+        echo "FATAL: no adb device connected" >&2
+        exit 1
+    fi
+
+    REMOTE="/data/local/tmp/zeromount-deploy.zip"
+    echo "==> Deploying $ZIP to device"
+    adb push "$ZIP" "$REMOTE"
+    adb shell "su -c 'ksud module install $REMOTE'" 2>/dev/null \
+        || adb shell "su -c 'magisk --install-module $REMOTE'" 2>/dev/null \
+        || { echo "FATAL: module install failed" >&2; exit 1; }
+    adb shell "rm -f $REMOTE"
+    echo "==> Module installed"
+
+    if [ "$REBOOT" = true ]; then
+        echo "==> Rebooting device"
+        adb reboot
+    fi
+fi
