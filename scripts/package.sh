@@ -71,6 +71,7 @@ SCRIPTS=(
     metainstall.sh
     metauninstall.sh
     customize.sh
+    prop_table.sh
 )
 
 declare -A ABI_TARGET=(
@@ -238,6 +239,10 @@ package_zip() {
             cp "$MODULE_DIR/bin/$abi/aapt" "$staging/bin/$abi/aapt"
         fi
 
+        if [ -f "$MODULE_DIR/bin/$abi/resetprop-rs" ]; then
+            cp "$MODULE_DIR/bin/$abi/resetprop-rs" "$staging/bin/$abi/resetprop-rs"
+        fi
+
         # axon prebuilt staging (binaries present when available)
         if [ -f "$MODULE_DIR/bin/$abi/axon_inject" ]; then
             cp "$MODULE_DIR/bin/$abi/axon_inject" "$staging/bin/$abi/axon_inject"
@@ -302,7 +307,7 @@ ui_print() { echo -e "ui_print $1\nui_print" >> $OUTFD; }
 MODPATH="${MODPATH:-/data/adb/modules/meta-zeromount}"
 mkdir -p "$MODPATH"
 unzip -o "$ZIPFILE" -d "$MODPATH" >&2
-chmod 755 "$MODPATH"/*.sh "$MODPATH"/bin/*/zeromount 2>/dev/null || true
+chmod 755 "$MODPATH"/*.sh "$MODPATH"/bin/*/zeromount "$MODPATH"/bin/*/resetprop-rs 2>/dev/null || true
 ui_print "ZeroMount installed via recovery"
 exit 0
 UPDATER
@@ -349,8 +354,11 @@ if [ "$BUILD" = true ]; then
 
     if [ -f "$WEBUI_DIR/package.json" ]; then
         echo "==> Building WebUI"
-        (cd "$WEBUI_DIR" && pnpm install && pnpm run build)
-        echo "==> WebUI built"
+        if (cd "$WEBUI_DIR" && pnpm install && pnpm run build); then
+            echo "==> WebUI built"
+        else
+            echo "WARN: WebUI build failed, falling back to pre-built webroot" >&2
+        fi
     else
         echo "WARN: webui/package.json not found, skipping WebUI build" >&2
     fi
