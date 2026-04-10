@@ -1,10 +1,14 @@
 use std::ffi::CString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::core::types::{MountResult, MountStrategy};
+
+// Kernel overlayfs layer limit varies: 64 on older kernels, 128 on 5.10+.
+// Use a conservative threshold that leaves room for the target + decoy layers.
+const MAX_LOWER_LAYERS: usize = 50;
 
 // Syscall numbers for the new mount API (Linux 5.2+)
 #[cfg(target_arch = "aarch64")]
@@ -83,7 +87,18 @@ pub fn mount_overlay(
         });
     }
 
-    let lowerdir = build_lowerdir_string(lower_dirs, target, decoy_dir);
+    // Collapse excess layers into staging overlays to stay under kernel limits.
+    // Each staging mount merges a chunk of lowerdirs into one read-only overlay,
+    // reducing the final layer count.
+    let (owned_dirs, _staging_guard) = if lower_dirs.len() > MAX_LOWER_LAYERS {
+        let (dirs, guard) = collapse_excess_layers(lower_dirs, target, overlay_source)?;
+        (dirs, Some(guard))
+    } else {
+        (lower_dirs.iter().map(|p| p.to_path_buf()).collect(), None)
+    };
+    let effective_dirs: Vec<&Path> = owned_dirs.iter().map(|p| p.as_path()).collect();
+
+    let lowerdir = build_lowerdir_string(&effective_dirs, target, decoy_dir);
 
     // Try new mount API first, fall back to legacy
     let result = match mount_overlay_new_api(&lowerdir, target, overlay_source) {
@@ -299,4 +314,80 @@ fn mount_overlay_legacy(lowerdir: &str, target: &Path, overlay_source: &str) -> 
     }
 
     Ok(())
+}
+
+/// Collapse excess lower directories into intermediate staging overlays.
+///
+/// Splits the bottom layers into chunks, mounts each chunk as a read-only
+/// overlay on a tmpfs staging dir, then returns the staging dirs + remaining
+/// top layers as the new effective lowerdir list. The StagingGuard unmounts
+/// and removes staging dirs on drop.
+fn collapse_excess_layers(
+    lower_dirs: &[&Path],
+    target: &Path,
+    overlay_source: &str,
+) -> Result<(Vec<PathBuf>, StagingGuard)> {
+    let mut staging_dirs: Vec<PathBuf> = Vec::new();
+    let mut remaining: Vec<PathBuf> = lower_dirs.iter().map(|p| p.to_path_buf()).collect();
+
+    let mut pass = 0u32;
+    while remaining.len() > MAX_LOWER_LAYERS {
+        let split_at = remaining.len() - MAX_LOWER_LAYERS + 1;
+        let bottom_chunk: Vec<PathBuf> = remaining.drain(..split_at).collect();
+
+        let staging_dir = PathBuf::from(format!(
+            "/dev/zeromount_staging_{}_{}",
+            target.file_name().unwrap_or_default().to_string_lossy(),
+            pass,
+        ));
+        std::fs::create_dir_all(&staging_dir)?;
+
+        let chunk_refs: Vec<&Path> = bottom_chunk.iter().map(|p| p.as_path()).collect();
+        let lowerdir = build_lowerdir_string(&chunk_refs, target, None);
+
+        match mount_overlay_new_api(&lowerdir, &staging_dir, overlay_source) {
+            Ok(()) => {}
+            Err(e) => {
+                debug!(error = %e, "staging: new API failed, trying legacy");
+                mount_overlay_legacy(&lowerdir, &staging_dir, overlay_source)?;
+            }
+        }
+
+        info!(
+            pass,
+            collapsed = bottom_chunk.len(),
+            staging = %staging_dir.display(),
+            "overlay layer staging complete"
+        );
+
+        remaining.insert(0, staging_dir.clone());
+        staging_dirs.push(staging_dir);
+        pass += 1;
+    }
+
+    warn!(
+        layers = lower_dirs.len(),
+        staging_mounts = staging_dirs.len(),
+        "collapsed overlay layers to fit kernel limit"
+    );
+
+    Ok((remaining, StagingGuard { dirs: staging_dirs }))
+}
+
+/// Unmounts and removes staging overlay directories when dropped.
+struct StagingGuard {
+    dirs: Vec<PathBuf>,
+}
+
+impl Drop for StagingGuard {
+    fn drop(&mut self) {
+        for dir in self.dirs.iter().rev() {
+            let c_path = match CString::new(dir.as_os_str().as_encoded_bytes()) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            unsafe { libc::umount2(c_path.as_ptr(), libc::MNT_DETACH) };
+            let _ = std::fs::remove_dir(dir);
+        }
+    }
 }
