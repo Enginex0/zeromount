@@ -808,7 +808,6 @@ mod tests {
         fn busybox_path(&self) -> std::path::PathBuf { "/tmp/busybox".into() }
         fn susfs_binary_paths(&self) -> Vec<std::path::PathBuf> { vec![] }
         fn update_description(&self, _text: &str) -> Result<()> { Ok(()) }
-        fn notify_module_mounted(&self) -> Result<()> { Ok(()) }
         fn mount_mode(&self) -> RootMountMode { RootMountMode::Metamodule }
     }
 

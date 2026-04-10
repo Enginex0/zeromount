@@ -1,10 +1,8 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{Context, Result};
 
 use crate::core::types::{RootManager, RootMountMode};
-use crate::utils::command::{run_command_with_timeout, CMD_TIMEOUT};
 
 const ZEROMOUNT_MODULE_DIR: &str = "/data/adb/modules/meta-zeromount";
 
@@ -34,25 +32,6 @@ impl RootManager for KsuManager {
 
     fn update_description(&self, text: &str) -> Result<()> {
         write_description_to_module_prop(text)
-    }
-
-    fn notify_module_mounted(&self) -> Result<()> {
-        let ksud = if Path::new("/data/adb/ksu/bin/ksud").exists() {
-            "/data/adb/ksu/bin/ksud"
-        } else {
-            "ksud"
-        };
-        let output = run_command_with_timeout(
-            Command::new(ksud).args(["kernel", "notify-module-mounted"]),
-            CMD_TIMEOUT,
-        )
-        .context("failed to exec ksud kernel notify-module-mounted")?;
-        let status = output.status;
-        if !status.success() {
-            anyhow::bail!("notify-module-mounted failed (exit {})",
-                status.code().unwrap_or(-1));
-        }
-        Ok(())
     }
 
     fn mount_mode(&self) -> RootMountMode {
@@ -91,25 +70,6 @@ impl RootManager for APatchManager {
         write_description_to_module_prop(text)
     }
 
-    fn notify_module_mounted(&self) -> Result<()> {
-        let ksud = if Path::new("/data/adb/ap/bin/ksud").exists() {
-            "/data/adb/ap/bin/ksud"
-        } else {
-            "ksud"
-        };
-        let output = run_command_with_timeout(
-            Command::new(ksud).args(["kernel", "notify-module-mounted"]),
-            CMD_TIMEOUT,
-        )
-        .context("failed to exec ksud kernel notify-module-mounted")?;
-        let status = output.status;
-        if !status.success() {
-            anyhow::bail!("notify-module-mounted failed (exit {})",
-                status.code().unwrap_or(-1));
-        }
-        Ok(())
-    }
-
     fn mount_mode(&self) -> RootMountMode {
         if Path::new("/data/adb/.litemode_enable").exists() {
             return RootMountMode::BindMount;
@@ -141,10 +101,6 @@ impl RootManager for MagiskManager {
 
     fn update_description(&self, text: &str) -> Result<()> {
         write_description_to_module_prop(text)
-    }
-
-    fn notify_module_mounted(&self) -> Result<()> {
-        Ok(())
     }
 
     fn mount_mode(&self) -> RootMountMode {

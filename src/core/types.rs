@@ -312,6 +312,5 @@ pub trait RootManager {
     fn busybox_path(&self) -> PathBuf;
     fn susfs_binary_paths(&self) -> Vec<PathBuf>;
     fn update_description(&self, text: &str) -> Result<()>;
-    fn notify_module_mounted(&self) -> Result<()>;
     fn mount_mode(&self) -> RootMountMode;
 }
