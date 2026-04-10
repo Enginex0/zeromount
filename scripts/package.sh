@@ -379,7 +379,8 @@ if [ "$DEPLOY" = true ]; then
     REMOTE="/data/local/tmp/zeromount-deploy.zip"
     echo "==> Deploying $ZIP to device"
     adb push "$ZIP" "$REMOTE"
-    adb shell "su -c 'ksud module install $REMOTE'" 2>/dev/null \
+    adb shell "/data/adb/ksu/bin/ksud module install $REMOTE" 2>/dev/null \
+        || adb shell "/data/adb/ap/bin/apd module install $REMOTE" 2>/dev/null \
         || adb shell "su -c 'magisk --install-module $REMOTE'" 2>/dev/null \
         || { echo "FATAL: module install failed" >&2; exit 1; }
     adb shell "rm -f $REMOTE"
