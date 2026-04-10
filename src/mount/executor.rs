@@ -11,6 +11,7 @@ use crate::core::types::{
 
 use super::magic::mount_magic;
 use super::overlay::mount_overlay;
+use super::planner::resolve_file_partition;
 use super::storage::init_storage;
 use super::decoy;
 
@@ -251,13 +252,12 @@ fn prepare_lower_dir(
     fs::create_dir_all(lower_dir)
         .with_context(|| format!("cannot create lower dir: {}", lower_dir.display()))?;
 
-    let prefix = format!("{}/", partition);
     for file in &module.files {
-        let rel_str = file.relative_path.to_string_lossy();
-        if !rel_str.starts_with(&prefix) {
+        let (resolved_partition, sub_path) = resolve_file_partition(&file.relative_path);
+        if resolved_partition != partition {
             continue;
         }
-        let sub = &rel_str[prefix.len()..];
+        let sub = sub_path.to_string_lossy();
         if sub.is_empty() {
             continue;
         }
@@ -267,7 +267,7 @@ fn prepare_lower_dir(
         }
 
         let src = module.path.join(&file.relative_path);
-        let dst = lower_dir.join(sub);
+        let dst = lower_dir.join(&sub_path);
 
         if src.is_dir() {
             fs::create_dir_all(&dst)?;
@@ -283,17 +283,22 @@ fn prepare_lower_dir(
                 // Copy SELinux context from the real system path, not the
                 // module source on /data. Falls back to system_data_file
                 // for novel files that don't exist on the stock system.
-                let real_path = PathBuf::from(format!("/{partition}")).join(sub);
+                let real_path = PathBuf::from(format!("/{partition}")).join(&sub_path);
                 crate::utils::selinux::copy_selinux_context(&real_path, &dst);
             }
         }
     }
 
-    // Mark directories with .replace as opaque in the overlay
-    let system_dir = module.path.join(partition);
-    if system_dir.is_dir() {
-        if let Err(e) = super::opaque::mark_opaque_dirs(&system_dir, lower_dir) {
-            warn!(module = %module.id, error = %e, "opaque dir marking failed (non-fatal)");
+    // Mark directories with .replace as opaque in the overlay.
+    // Check both direct path (module/vendor/) and SAR alias (module/system/vendor/).
+    for source_dir in [
+        module.path.join(partition),
+        module.path.join("system").join(partition),
+    ] {
+        if source_dir.is_dir() {
+            if let Err(e) = super::opaque::mark_opaque_dirs(&source_dir, lower_dir) {
+                warn!(module = %module.id, error = %e, "opaque dir marking failed (non-fatal)");
+            }
         }
     }
 
