@@ -1,25 +1,6 @@
 name: Build
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.cargo/**'
-      - 'module/**'
-      - 'webui/**'
-      - 'external/axon/**'
-      - 'scripts/package.sh'
-      - '.github/workflows/build.yaml'
-  pull_request:
-    branches: [master]
-    paths:
-      - 'src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.cargo/**'
   workflow_dispatch:
 
 env:
@@ -223,7 +204,7 @@ jobs:
 
   release:
     needs: [build, package]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
