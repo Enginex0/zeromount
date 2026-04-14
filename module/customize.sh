@@ -216,26 +216,6 @@ MANUFACTURER=$(getprop ro.product.manufacturer 2>/dev/null | tr '[:upper:]' '[:l
 
 zm_print "🛡️ $(_msg bridge_header)" 0.3 "h"
 
-# Import VerifiedBootHash from susfs4ksu's standalone file if present
-VBH_FILE="/data/adb/VerifiedBootHash/VerifiedBootHash.txt"
-if [ -f "$VBH_FILE" ]; then
-    VBH=$(cat "$VBH_FILE" 2>/dev/null | head -1 | tr -d '[:space:]')
-    if [ -n "$VBH" ]; then
-        if [ "$FRESH_INSTALL" = true ] || [ "$USER_RESET" = true ]; then
-            "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
-            zm_print "  ✅ $(_msg vbh_imported)"
-        else
-            EXISTING_VBH=$("$BIN" config get brene.verified_boot_hash 2>/dev/null)
-            if [ -z "$EXISTING_VBH" ]; then
-                "$BIN" config set brene.verified_boot_hash "$VBH" 2>/dev/null
-                zm_print "  ✅ $(_msg vbh_imported)"
-            else
-                zm_print "  ✅ $(_msg vbh_kept)"
-            fi
-        fi
-    fi
-fi
-
 _detect_out=$("$BIN" detect 2>/dev/null)
 if echo "$_detect_out" | grep -q 'susfs: true'; then
     if [ "$KSU_SUKISU" = "true" ]; then

@@ -132,7 +132,6 @@ export interface BreneSettings {
   try_umount: boolean;
   prop_spoofing: boolean;
   auto_hide_injections: boolean;
-  verified_boot_hash: string;
 }
 
 export interface SusfsSettings {

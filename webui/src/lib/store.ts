@@ -132,7 +132,6 @@ function createAppStore() {
     try_umount: false,
     prop_spoofing: true,
     auto_hide_injections: true,
-    verified_boot_hash: '',
   };
 
   const defaultSusfs: SusfsSettings = {
@@ -394,11 +393,7 @@ function createAppStore() {
       for (const key of Object.keys(cfg.brene) as (keyof BreneSettings)[]) {
         if (key in cfg.brene) {
           const v = cfg.brene[key];
-          if (key === 'verified_boot_hash') {
-            brene.verified_boot_hash = String(v ?? '');
-          } else {
-            (brene as any)[key] = typeof v === 'boolean' ? v : String(v) === 'true';
-          }
+          (brene as any)[key] = typeof v === 'boolean' ? v : String(v) === 'true';
         }
       }
       setSettings('brene', prev => ({ ...prev, ...brene }));
@@ -789,9 +784,6 @@ function createAppStore() {
           (brene as any)[key] = typeof v === 'boolean' ? v : String(v) === 'true';
         }
       }
-      if (dump.brene.verified_boot_hash != null) {
-        brene.verified_boot_hash = String(dump.brene.verified_boot_hash);
-      }
       setSettings('brene', prev => ({ ...prev, ...brene }));
 
       const uname: Partial<UnameSettings> = {};
@@ -805,7 +797,6 @@ function createAppStore() {
     // Fallback: individual configGet calls
     const results = await Promise.allSettled([
       ...breneKeys.map(k => api.configGet(`brene.${k}`)),
-      api.configGet('brene.verified_boot_hash'),
       api.configGet('uname.mode'),
       api.configGet('uname.release'),
       api.configGet('uname.version'),
@@ -817,15 +808,11 @@ function createAppStore() {
         (brene as any)[key] = r.value === 'true';
       }
     });
-    const vbhResult = results[breneKeys.length];
-    if (vbhResult.status === 'fulfilled' && vbhResult.value !== null) {
-      brene.verified_boot_hash = vbhResult.value;
-    }
     setSettings('brene', prev => ({ ...prev, ...brene }));
 
-    const unameMode = results[breneKeys.length + 1];
-    const unameRelease = results[breneKeys.length + 2];
-    const unameVersion = results[breneKeys.length + 3];
+    const unameMode = results[breneKeys.length];
+    const unameRelease = results[breneKeys.length + 1];
+    const unameVersion = results[breneKeys.length + 2];
     const uname: Partial<UnameSettings> = {};
     if (unameMode.status === 'fulfilled' && unameMode.value !== null) {
       uname.mode = unameMode.value as UnameMode;
@@ -878,18 +865,6 @@ function createAppStore() {
         rollbackKernel?.catch(() => {});
       }
       api.bridgeWrite(`brene.${key}`, String(old)).catch(() => {});
-    }
-  };
-
-  const setBreneField = async (key: 'verified_boot_hash', value: string) => {
-    const prev = settings.brene[key];
-    setSettings('brene', key, value);
-    try {
-      await api.configSet(`brene.${key}`, value);
-      pushActivity('setting_changed', t('activity.settingChanged', { key, value: value || t('activity.empty') }));
-    } catch (e) {
-      showToast(t('toast.failedSaveKey', { key }), 'error');
-      setSettings('brene', key, prev);
     }
   };
 
@@ -1585,7 +1560,6 @@ function createAppStore() {
     loadRuntimeStatus,
     loadBreneSettings,
     setBreneToggle,
-    setBreneField,
     setSusfsToggle,
     setPerfToggle,
     setEmojiToggle,

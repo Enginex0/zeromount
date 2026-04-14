@@ -46,11 +46,6 @@ pub fn run_prop_watch() -> Result<()> {
         let _ = sys.set_stealth("ro.boot.vbmeta.size", &size);
     }
 
-    let hash = &config.brene.verified_boot_hash;
-    if !hash.is_empty() && sys.get("ro.boot.vbmeta.digest").as_deref() != Some(hash.as_str()) {
-        let _ = sys.set_stealth("ro.boot.vbmeta.digest", hash);
-    }
-
     info!("prop spoofing applied (stealth mode)");
     Ok(())
 }

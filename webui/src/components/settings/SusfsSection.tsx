@@ -1,7 +1,6 @@
 import { createSignal, Show } from 'solid-js';
 import { Card } from '../core/Card';
 import { Toggle } from '../core/Toggle';
-import { Input } from '../core/Input';
 import { CollapsibleSubgroup } from '../ui/CollapsibleSubgroup';
 import { UnameSheet } from '../ui/UnameSheet';
 import { store } from '../../lib/store';
@@ -10,7 +9,6 @@ import type { BreneSettings, SusfsSettings } from '../../lib/types';
 
 export function SusfsSection() {
   const [showAdvanced, setShowAdvanced] = createSignal(false);
-  const [showVbh, setShowVbh] = createSignal(false);
   const [showUnameSheet, setShowUnameSheet] = createSignal(false);
 
   const caps = () => store.capabilities?.() || null;
@@ -107,7 +105,7 @@ export function SusfsSection() {
             <path d="M7 10l5 5 5-5z"/>
           </svg>
           <span>{t('susfs.advancedSettings')}</span>
-          <span class="settings__advanced-badge">17</span>
+          <span class="settings__advanced-badge">16</span>
         </button>
 
         <Show when={showAdvanced()}>
@@ -249,24 +247,6 @@ export function SusfsSection() {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
                   </button>
                 </div>
-                <div class="settings__glass-row" onClick={() => setShowVbh(!showVbh())}>
-                  <div class="settings__item-content">
-                    <div class="settings__item-label">{t('susfs.verifiedBootHash')}</div>
-                    <div class="settings__item-desc">{t('susfs.verifiedBootHashDesc')}</div>
-                  </div>
-                  <svg class={`settings__glass-chevron${showVbh() ? ' settings__glass-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
-                </div>
-                <Show when={showVbh()}>
-                  <div class="settings__glass-slider">
-                    <Input
-                      value={store.settings.brene.verified_boot_hash}
-                      placeholder={t('susfs.verifiedBootHashPlaceholder')}
-                      onBlur={(e) => store.setBreneField('verified_boot_hash', e.currentTarget.value)}
-                    />
-                  </div>
-                </Show>
               </>}
             />
           </div>

@@ -43,7 +43,6 @@ _msg() {
         upgrade_ok)         echo "升级：同级模块上下文已恢复" ;;
         emoji_staged)       echo "Emoji 字体已暂存" ;;
         bridge_header)      echo "外部模块桥接" ;;
-        vbh_imported)       echo "VerifiedBootHash 已导入" ;;
         susfs_enhanced)     echo "SUSFS +增强（管理器集成）" ;;
         susfs_detected)     echo "内核中检测到 SUSFS" ;;
         susfs_missing)      echo "内核中未检测到 SUSFS" ;;
@@ -57,7 +56,6 @@ _msg() {
         config_stash_restored)  echo "已从上次安装恢复配置" ;;
         vol_up_preserve)        echo "🔊 音量+ = 保留现有配置" ;;
         vol_down_reset)         echo "🔉 音量- = 恢复默认设置" ;;
-        vbh_kept)               echo "VerifiedBootHash 已保留" ;;
     esac ;;
     zh-TW) case "$1" in
         installing)         echo "正在安裝..." ;;
@@ -82,7 +80,6 @@ _msg() {
         upgrade_ok)         echo "升級：同級模組上下文已恢復" ;;
         emoji_staged)       echo "Emoji 字體已暫存" ;;
         bridge_header)      echo "外部模組橋接" ;;
-        vbh_imported)       echo "VerifiedBootHash 已匯入" ;;
         susfs_enhanced)     echo "SUSFS +增強（管理器整合）" ;;
         susfs_detected)     echo "核心中偵測到 SUSFS" ;;
         susfs_missing)      echo "核心中未偵測到 SUSFS" ;;
@@ -96,7 +93,6 @@ _msg() {
         config_stash_restored)  echo "已從上次安裝恢復設定" ;;
         vol_up_preserve)        echo "🔊 音量+ = 保留現有設定" ;;
         vol_down_reset)         echo "🔉 音量- = 恢復預設值" ;;
-        vbh_kept)               echo "VerifiedBootHash 已保留" ;;
     esac ;;
     ja) case "$1" in
         installing)         echo "インストール中..." ;;
@@ -121,7 +117,6 @@ _msg() {
         upgrade_ok)         echo "アップグレード：関連モジュールのコンテキスト復元済み" ;;
         emoji_staged)       echo "絵文字フォントをステージング済み" ;;
         bridge_header)      echo "外部モジュールブリッジ" ;;
-        vbh_imported)       echo "VerifiedBootHash をインポート済み" ;;
         susfs_enhanced)     echo "SUSFS +拡張（マネージャー統合）" ;;
         susfs_detected)     echo "カーネルで SUSFS を検出" ;;
         susfs_missing)      echo "カーネルで SUSFS 未検出" ;;
@@ -135,7 +130,6 @@ _msg() {
         config_stash_restored)  echo "前回の設定を復元しました" ;;
         vol_up_preserve)        echo "🔊 音量+ = 既存の設定を保持" ;;
         vol_down_reset)         echo "🔉 音量- = デフォルトにリセット" ;;
-        vbh_kept)               echo "VerifiedBootHash 保持済み" ;;
     esac ;;
     ko) case "$1" in
         installing)         echo "설치 중..." ;;
@@ -160,7 +154,6 @@ _msg() {
         upgrade_ok)         echo "업그레이드: 동급 모듈 컨텍스트 복원됨" ;;
         emoji_staged)       echo "이모지 폰트 스테이징 완료" ;;
         bridge_header)      echo "외부 모듈 브리지" ;;
-        vbh_imported)       echo "VerifiedBootHash 가져옴" ;;
         susfs_enhanced)     echo "SUSFS +강화 (관리자 통합)" ;;
         susfs_detected)     echo "커널에서 SUSFS 감지됨" ;;
         susfs_missing)      echo "커널에서 SUSFS 미감지" ;;
@@ -174,7 +167,6 @@ _msg() {
         config_stash_restored)  echo "이전 설치에서 설정을 복원했습니다" ;;
         vol_up_preserve)        echo "🔊 볼륨+ = 기존 설정 유지" ;;
         vol_down_reset)         echo "🔉 볼륨- = 기본값으로 초기화" ;;
-        vbh_kept)               echo "VerifiedBootHash 유지됨" ;;
     esac ;;
     ru) case "$1" in
         installing)         echo "Установка..." ;;
@@ -199,7 +191,6 @@ _msg() {
         upgrade_ok)         echo "Обновление: контексты модулей восстановлены" ;;
         emoji_staged)       echo "Шрифт эмодзи подготовлен" ;;
         bridge_header)      echo "Мост внешних модулей" ;;
-        vbh_imported)       echo "VerifiedBootHash импортирован" ;;
         susfs_enhanced)     echo "SUSFS +расширенный (интеграция с менеджером)" ;;
         susfs_detected)     echo "SUSFS обнаружен в ядре" ;;
         susfs_missing)      echo "SUSFS не обнаружен в ядре" ;;
@@ -213,7 +204,6 @@ _msg() {
         config_stash_restored)  echo "Конфигурация восстановлена из предыдущей установки" ;;
         vol_up_preserve)        echo "🔊 Громкость+ = Сохранить текущую конфигурацию" ;;
         vol_down_reset)         echo "🔉 Громкость- = Сбросить к настройкам по умолчанию" ;;
-        vbh_kept)               echo "VerifiedBootHash сохранён" ;;
     esac ;;
     de) case "$1" in
         installing)         echo "Installation..." ;;
@@ -238,7 +228,6 @@ _msg() {
         upgrade_ok)         echo "Upgrade: Modul-Kontexte wiederhergestellt" ;;
         emoji_staged)       echo "Emoji-Schrift bereitgestellt" ;;
         bridge_header)      echo "Externe Modul-Brücke" ;;
-        vbh_imported)       echo "VerifiedBootHash importiert" ;;
         susfs_enhanced)     echo "SUSFS +erweitert (Manager-integriert)" ;;
         susfs_detected)     echo "SUSFS im Kernel erkannt" ;;
         susfs_missing)      echo "SUSFS nicht im Kernel erkannt" ;;
@@ -252,7 +241,6 @@ _msg() {
         config_stash_restored)  echo "Konfiguration von vorheriger Installation wiederhergestellt" ;;
         vol_up_preserve)        echo "🔊 Lautstärke+ = Bestehende Konfiguration beibehalten" ;;
         vol_down_reset)         echo "🔉 Lautstärke- = Auf Standardwerte zurücksetzen" ;;
-        vbh_kept)               echo "VerifiedBootHash beibehalten" ;;
     esac ;;
     fr) case "$1" in
         installing)         echo "Installation..." ;;
@@ -277,7 +265,6 @@ _msg() {
         upgrade_ok)         echo "Mise à jour : contextes des modules restaurés" ;;
         emoji_staged)       echo "Police emoji préparée" ;;
         bridge_header)      echo "Pont de modules externes" ;;
-        vbh_imported)       echo "VerifiedBootHash importé" ;;
         susfs_enhanced)     echo "SUSFS +étendu (intégré au gestionnaire)" ;;
         susfs_detected)     echo "SUSFS détecté dans le noyau" ;;
         susfs_missing)      echo "SUSFS non détecté dans le noyau" ;;
@@ -291,7 +278,6 @@ _msg() {
         config_stash_restored)  echo "Configuration restaurée depuis l'installation précédente" ;;
         vol_up_preserve)        echo "🔊 Volume+ = Garder la configuration existante" ;;
         vol_down_reset)         echo "🔉 Volume- = Réinitialiser par défaut" ;;
-        vbh_kept)               echo "VerifiedBootHash conservé" ;;
     esac ;;
     es) case "$1" in
         installing)         echo "Instalando..." ;;
@@ -316,7 +302,6 @@ _msg() {
         upgrade_ok)         echo "Actualización: contextos de módulos restaurados" ;;
         emoji_staged)       echo "Fuente emoji preparada" ;;
         bridge_header)      echo "Puente de módulos externos" ;;
-        vbh_imported)       echo "VerifiedBootHash importado" ;;
         susfs_enhanced)     echo "SUSFS +mejorado (integrado con gestor)" ;;
         susfs_detected)     echo "SUSFS detectado en el kernel" ;;
         susfs_missing)      echo "SUSFS no detectado en el kernel" ;;
@@ -330,7 +315,6 @@ _msg() {
         config_stash_restored)  echo "Configuración restaurada de la instalación anterior" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Mantener configuración existente" ;;
         vol_down_reset)         echo "🔉 Vol- = Restablecer valores predeterminados" ;;
-        vbh_kept)               echo "VerifiedBootHash conservado" ;;
     esac ;;
     it) case "$1" in
         installing)         echo "Installazione..." ;;
@@ -355,7 +339,6 @@ _msg() {
         upgrade_ok)         echo "Aggiornamento: contesti dei moduli ripristinati" ;;
         emoji_staged)       echo "Font emoji preparato" ;;
         bridge_header)      echo "Bridge moduli esterni" ;;
-        vbh_imported)       echo "VerifiedBootHash importato" ;;
         susfs_enhanced)     echo "SUSFS +avanzato (integrato nel gestore)" ;;
         susfs_detected)     echo "SUSFS rilevato nel kernel" ;;
         susfs_missing)      echo "SUSFS non rilevato nel kernel" ;;
@@ -369,7 +352,6 @@ _msg() {
         config_stash_restored)  echo "Configurazione ripristinata dall'installazione precedente" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Mantieni configurazione esistente" ;;
         vol_down_reset)         echo "🔉 Vol- = Ripristina impostazioni predefinite" ;;
-        vbh_kept)               echo "VerifiedBootHash preservato" ;;
     esac ;;
     pt-BR) case "$1" in
         installing)         echo "Instalando..." ;;
@@ -394,7 +376,6 @@ _msg() {
         upgrade_ok)         echo "Atualização: contextos de módulos restaurados" ;;
         emoji_staged)       echo "Fonte de emoji preparada" ;;
         bridge_header)      echo "Ponte de módulos externos" ;;
-        vbh_imported)       echo "VerifiedBootHash importado" ;;
         susfs_enhanced)     echo "SUSFS +aprimorado (integrado ao gerenciador)" ;;
         susfs_detected)     echo "SUSFS detectado no kernel" ;;
         susfs_missing)      echo "SUSFS não detectado no kernel" ;;
@@ -408,7 +389,6 @@ _msg() {
         config_stash_restored)  echo "Configuração restaurada da instalação anterior" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Manter configuração existente" ;;
         vol_down_reset)         echo "🔉 Vol- = Redefinir para padrão" ;;
-        vbh_kept)               echo "VerifiedBootHash preservado" ;;
     esac ;;
     pt-PT) case "$1" in
         installing)         echo "A instalar..." ;;
@@ -433,7 +413,6 @@ _msg() {
         upgrade_ok)         echo "Atualização: contextos de módulos restaurados" ;;
         emoji_staged)       echo "Tipo de letra emoji preparado" ;;
         bridge_header)      echo "Ponte de módulos externos" ;;
-        vbh_imported)       echo "VerifiedBootHash importado" ;;
         susfs_enhanced)     echo "SUSFS +melhorado (integrado no gestor)" ;;
         susfs_detected)     echo "SUSFS detetado no kernel" ;;
         susfs_missing)      echo "SUSFS não detetado no kernel" ;;
@@ -447,7 +426,6 @@ _msg() {
         config_stash_restored)  echo "Configuração restaurada da instalação anterior" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Manter configuração existente" ;;
         vol_down_reset)         echo "🔉 Vol- = Repor predefinições" ;;
-        vbh_kept)               echo "VerifiedBootHash preservado" ;;
     esac ;;
     ar) case "$1" in
         installing)         echo "جارٍ التثبيت..." ;;
@@ -472,7 +450,6 @@ _msg() {
         upgrade_ok)         echo "ترقية: تم استعادة سياقات الوحدات" ;;
         emoji_staged)       echo "تم تجهيز خط الرموز التعبيرية" ;;
         bridge_header)      echo "جسر الوحدات الخارجية" ;;
-        vbh_imported)       echo "تم استيراد VerifiedBootHash" ;;
         susfs_enhanced)     echo "SUSFS +محسّن (مدمج مع المدير)" ;;
         susfs_detected)     echo "تم اكتشاف SUSFS في النواة" ;;
         susfs_missing)      echo "لم يتم اكتشاف SUSFS في النواة" ;;
@@ -486,7 +463,6 @@ _msg() {
         config_stash_restored)  echo "تم استعادة الإعدادات من التثبيت السابق" ;;
         vol_up_preserve)        echo "🔊 رفع الصوت = الاحتفاظ بالإعدادات الحالية" ;;
         vol_down_reset)         echo "🔉 خفض الصوت = إعادة التعيين للافتراضي" ;;
-        vbh_kept)               echo "تم الاحتفاظ بـ VerifiedBootHash" ;;
     esac ;;
     fa) case "$1" in
         installing)         echo "در حال نصب..." ;;
@@ -511,7 +487,6 @@ _msg() {
         upgrade_ok)         echo "ارتقا: زمینه ماژول‌ها بازیابی شد" ;;
         emoji_staged)       echo "فونت ایموجی آماده شد" ;;
         bridge_header)      echo "پل ماژول‌های خارجی" ;;
-        vbh_imported)       echo "VerifiedBootHash وارد شد" ;;
         susfs_enhanced)     echo "SUSFS +پیشرفته (یکپارچه با مدیر)" ;;
         susfs_detected)     echo "SUSFS در هسته شناسایی شد" ;;
         susfs_missing)      echo "SUSFS در هسته شناسایی نشد" ;;
@@ -525,7 +500,6 @@ _msg() {
         config_stash_restored)  echo "پیکربندی از نصب قبلی بازیابی شد" ;;
         vol_up_preserve)        echo "🔊 صدا+ = حفظ پیکربندی موجود" ;;
         vol_down_reset)         echo "🔉 صدا- = بازنشانی به پیش‌فرض" ;;
-        vbh_kept)               echo "VerifiedBootHash حفظ شد" ;;
     esac ;;
     tr) case "$1" in
         installing)         echo "Yükleniyor..." ;;
@@ -550,7 +524,6 @@ _msg() {
         upgrade_ok)         echo "Güncelleme: modül bağlamları geri yüklendi" ;;
         emoji_staged)       echo "Emoji yazı tipi hazırlandı" ;;
         bridge_header)      echo "Harici Modül Köprüsü" ;;
-        vbh_imported)       echo "VerifiedBootHash içe aktarıldı" ;;
         susfs_enhanced)     echo "SUSFS +gelişmiş (yöneticiyle entegre)" ;;
         susfs_detected)     echo "Çekirdekte SUSFS algılandı" ;;
         susfs_missing)      echo "Çekirdekte SUSFS algılanmadı" ;;
@@ -564,7 +537,6 @@ _msg() {
         config_stash_restored)  echo "Önceki kurulumdan yapılandırma geri yüklendi" ;;
         vol_up_preserve)        echo "🔊 Ses+ = Mevcut yapılandırmayı koru" ;;
         vol_down_reset)         echo "🔉 Ses- = Varsayılanlara sıfırla" ;;
-        vbh_kept)               echo "VerifiedBootHash korundu" ;;
     esac ;;
     id) case "$1" in
         installing)         echo "Menginstal..." ;;
@@ -589,7 +561,6 @@ _msg() {
         upgrade_ok)         echo "Upgrade: konteks modul dipulihkan" ;;
         emoji_staged)       echo "Font emoji disiapkan" ;;
         bridge_header)      echo "Bridge Modul Eksternal" ;;
-        vbh_imported)       echo "VerifiedBootHash diimpor" ;;
         susfs_enhanced)     echo "SUSFS +ditingkatkan (terintegrasi manajer)" ;;
         susfs_detected)     echo "SUSFS terdeteksi di kernel" ;;
         susfs_missing)      echo "SUSFS tidak terdeteksi di kernel" ;;
@@ -603,7 +574,6 @@ _msg() {
         config_stash_restored)  echo "Konfigurasi dipulihkan dari instalasi sebelumnya" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Pertahankan konfigurasi yang ada" ;;
         vol_down_reset)         echo "🔉 Vol- = Atur ulang ke default" ;;
-        vbh_kept)               echo "VerifiedBootHash dipertahankan" ;;
     esac ;;
     vi) case "$1" in
         installing)         echo "Đang cài đặt..." ;;
@@ -628,7 +598,6 @@ _msg() {
         upgrade_ok)         echo "Nâng cấp: đã khôi phục ngữ cảnh module" ;;
         emoji_staged)       echo "Font emoji đã được chuẩn bị" ;;
         bridge_header)      echo "Cầu nối module ngoài" ;;
-        vbh_imported)       echo "Đã nhập VerifiedBootHash" ;;
         susfs_enhanced)     echo "SUSFS +nâng cao (tích hợp trình quản lý)" ;;
         susfs_detected)     echo "Phát hiện SUSFS trong kernel" ;;
         susfs_missing)      echo "Không phát hiện SUSFS trong kernel" ;;
@@ -642,7 +611,6 @@ _msg() {
         config_stash_restored)  echo "Đã khôi phục cấu hình từ lần cài đặt trước" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Giữ cấu hình hiện tại" ;;
         vol_down_reset)         echo "🔉 Vol- = Đặt lại về mặc định" ;;
-        vbh_kept)               echo "VerifiedBootHash được giữ nguyên" ;;
     esac ;;
     uk) case "$1" in
         installing)         echo "Встановлення..." ;;
@@ -667,7 +635,6 @@ _msg() {
         upgrade_ok)         echo "Оновлення: контексти модулів відновлено" ;;
         emoji_staged)       echo "Шрифт емодзі підготовлено" ;;
         bridge_header)      echo "Міст зовнішніх модулів" ;;
-        vbh_imported)       echo "VerifiedBootHash імпортовано" ;;
         susfs_enhanced)     echo "SUSFS +розширений (інтеграція з менеджером)" ;;
         susfs_detected)     echo "SUSFS виявлено в ядрі" ;;
         susfs_missing)      echo "SUSFS не виявлено в ядрі" ;;
@@ -681,7 +648,6 @@ _msg() {
         config_stash_restored)  echo "Конфігурацію відновлено з попередньої установки" ;;
         vol_up_preserve)        echo "🔊 Гучність+ = Зберегти поточну конфігурацію" ;;
         vol_down_reset)         echo "🔉 Гучність- = Скинути до стандартних налаштувань" ;;
-        vbh_kept)               echo "VerifiedBootHash збережено" ;;
     esac ;;
     pl) case "$1" in
         installing)         echo "Instalacja..." ;;
@@ -706,7 +672,6 @@ _msg() {
         upgrade_ok)         echo "Aktualizacja: konteksty modułów przywrócone" ;;
         emoji_staged)       echo "Czcionka emoji przygotowana" ;;
         bridge_header)      echo "Most modułów zewnętrznych" ;;
-        vbh_imported)       echo "VerifiedBootHash zaimportowany" ;;
         susfs_enhanced)     echo "SUSFS +rozszerzony (zintegrowany z menedżerem)" ;;
         susfs_detected)     echo "SUSFS wykryto w jądrze" ;;
         susfs_missing)      echo "SUSFS nie wykryto w jądrze" ;;
@@ -720,7 +685,6 @@ _msg() {
         config_stash_restored)  echo "Przywrócono konfigurację z poprzedniej instalacji" ;;
         vol_up_preserve)        echo "🔊 Głośność+ = Zachowaj istniejącą konfigurację" ;;
         vol_down_reset)         echo "🔉 Głośność- = Przywróć ustawienia domyślne" ;;
-        vbh_kept)               echo "VerifiedBootHash zachowany" ;;
     esac ;;
     th) case "$1" in
         installing)         echo "กำลังติดตั้ง..." ;;
@@ -745,7 +709,6 @@ _msg() {
         upgrade_ok)         echo "อัปเกรด: บริบทของโมดูลถูกกู้คืน" ;;
         emoji_staged)       echo "ฟอนต์อิโมจิพร้อม" ;;
         bridge_header)      echo "สะพานโมดูลภายนอก" ;;
-        vbh_imported)       echo "นำเข้า VerifiedBootHash แล้ว" ;;
         susfs_enhanced)     echo "SUSFS +ขั้นสูง (รวมกับตัวจัดการ)" ;;
         susfs_detected)     echo "ตรวจพบ SUSFS ในเคอร์เนล" ;;
         susfs_missing)      echo "ไม่พบ SUSFS ในเคอร์เนล" ;;
@@ -759,7 +722,6 @@ _msg() {
         config_stash_restored)  echo "กู้คืนการตั้งค่าจากการติดตั้งก่อนหน้า" ;;
         vol_up_preserve)        echo "🔊 เสียง+ = เก็บการตั้งค่าเดิม" ;;
         vol_down_reset)         echo "🔉 เสียง- = รีเซ็ตเป็นค่าเริ่มต้น" ;;
-        vbh_kept)               echo "VerifiedBootHash ถูกเก็บรักษา" ;;
     esac ;;
     el) case "$1" in
         installing)         echo "Εγκατάσταση..." ;;
@@ -784,7 +746,6 @@ _msg() {
         upgrade_ok)         echo "Αναβάθμιση: τα περιβάλλοντα modules αποκαταστάθηκαν" ;;
         emoji_staged)       echo "Γραμματοσειρά emoji έτοιμη" ;;
         bridge_header)      echo "Γέφυρα εξωτερικών modules" ;;
-        vbh_imported)       echo "Εισαγωγή VerifiedBootHash" ;;
         susfs_enhanced)     echo "SUSFS +βελτιωμένο (ενσωματωμένο στον διαχειριστή)" ;;
         susfs_detected)     echo "Ανιχνεύθηκε SUSFS στον πυρήνα" ;;
         susfs_missing)      echo "Δεν ανιχνεύθηκε SUSFS στον πυρήνα" ;;
@@ -798,7 +759,6 @@ _msg() {
         config_stash_restored)  echo "Η ρύθμιση επαναφέρθηκε από την προηγούμενη εγκατάσταση" ;;
         vol_up_preserve)        echo "🔊 Ένταση+ = Διατήρηση υπάρχουσας ρύθμισης" ;;
         vol_down_reset)         echo "🔉 Ένταση- = Επαναφορά στις προεπιλογές" ;;
-        vbh_kept)               echo "VerifiedBootHash διατηρήθηκε" ;;
     esac ;;
     bn) case "$1" in
         installing)         echo "ইনস্টল হচ্ছে..." ;;
@@ -823,7 +783,6 @@ _msg() {
         upgrade_ok)         echo "আপগ্রেড: মডিউল প্রসঙ্গ পুনরুদ্ধার হয়েছে" ;;
         emoji_staged)       echo "ইমোজি ফন্ট প্রস্তুত" ;;
         bridge_header)      echo "বাহ্যিক মডিউল ব্রিজ" ;;
-        vbh_imported)       echo "VerifiedBootHash আমদানি হয়েছে" ;;
         susfs_enhanced)     echo "SUSFS +উন্নত (ম্যানেজার-সমন্বিত)" ;;
         susfs_detected)     echo "কার্নেলে SUSFS সনাক্ত হয়েছে" ;;
         susfs_missing)      echo "কার্নেলে SUSFS সনাক্ত হয়নি" ;;
@@ -837,7 +796,6 @@ _msg() {
         config_stash_restored)  echo "পূর্ববর্তী ইনস্টল থেকে কনফিগারেশন পুনরুদ্ধার হয়েছে" ;;
         vol_up_preserve)        echo "🔊 ভলিউম+ = বিদ্যমান কনফিগারেশন রাখুন" ;;
         vol_down_reset)         echo "🔉 ভলিউম- = ডিফল্টে রিসেট করুন" ;;
-        vbh_kept)               echo "VerifiedBootHash সংরক্ষিত" ;;
     esac ;;
     af) case "$1" in
         installing)         echo "Installeer..." ;;
@@ -862,7 +820,6 @@ _msg() {
         upgrade_ok)         echo "Opgradering: module-kontekste herstel" ;;
         emoji_staged)       echo "Emoji-lettertipe voorberei" ;;
         bridge_header)      echo "Eksterne Module-brug" ;;
-        vbh_imported)       echo "VerifiedBootHash ingevoer" ;;
         susfs_enhanced)     echo "SUSFS +verbeter (bestuurder-geïntegreer)" ;;
         susfs_detected)     echo "SUSFS in kern bespeur" ;;
         susfs_missing)      echo "SUSFS nie in kern bespeur nie" ;;
@@ -876,7 +833,6 @@ _msg() {
         config_stash_restored)  echo "Konfigurasie herstel vanaf vorige installasie" ;;
         vol_up_preserve)        echo "🔊 Volume+ = Behou bestaande konfigurasie" ;;
         vol_down_reset)         echo "🔉 Volume- = Herstel na verstek" ;;
-        vbh_kept)               echo "VerifiedBootHash behou" ;;
     esac ;;
     bg) case "$1" in
         installing)         echo "Инсталиране..." ;;
@@ -901,7 +857,6 @@ _msg() {
         upgrade_ok)         echo "Надграждане: контекстите на модулите са възстановени" ;;
         emoji_staged)       echo "Емоджи шрифтът е подготвен" ;;
         bridge_header)      echo "Мост за външни модули" ;;
-        vbh_imported)       echo "VerifiedBootHash е импортиран" ;;
         susfs_enhanced)     echo "SUSFS +разширен (интегриран с мениджъра)" ;;
         susfs_detected)     echo "SUSFS е открит в ядрото" ;;
         susfs_missing)      echo "SUSFS не е открит в ядрото" ;;
@@ -915,7 +870,6 @@ _msg() {
         config_stash_restored)  echo "Конфигурацията е възстановена от предишната инсталация" ;;
         vol_up_preserve)        echo "🔊 Сила на звука+ = Запази съществуващата конфигурация" ;;
         vol_down_reset)         echo "🔉 Сила на звука- = Нулиране до стандартни настройки" ;;
-        vbh_kept)               echo "VerifiedBootHash запазен" ;;
     esac ;;
     ca) case "$1" in
         installing)         echo "Instal·lant..." ;;
@@ -940,7 +894,6 @@ _msg() {
         upgrade_ok)         echo "Actualització: contextos de mòduls restaurats" ;;
         emoji_staged)       echo "Font d'emoji preparada" ;;
         bridge_header)      echo "Pont de mòduls externs" ;;
-        vbh_imported)       echo "VerifiedBootHash importat" ;;
         susfs_enhanced)     echo "SUSFS +millorat (integrat amb el gestor)" ;;
         susfs_detected)     echo "SUSFS detectat al kernel" ;;
         susfs_missing)      echo "SUSFS no detectat al kernel" ;;
@@ -954,7 +907,6 @@ _msg() {
         config_stash_restored)  echo "Configuració restaurada de la instal·lació anterior" ;;
         vol_up_preserve)        echo "🔊 Vol+ = Mantenir configuració existent" ;;
         vol_down_reset)         echo "🔉 Vol- = Restablir valors per defecte" ;;
-        vbh_kept)               echo "VerifiedBootHash conservat" ;;
     esac ;;
     cs) case "$1" in
         installing)         echo "Instalace..." ;;
@@ -979,7 +931,6 @@ _msg() {
         upgrade_ok)         echo "Upgrade: kontexty modulů obnoveny" ;;
         emoji_staged)       echo "Písmo emoji připraveno" ;;
         bridge_header)      echo "Most externích modulů" ;;
-        vbh_imported)       echo "VerifiedBootHash importován" ;;
         susfs_enhanced)     echo "SUSFS +rozšířený (integrovaný se správcem)" ;;
         susfs_detected)     echo "SUSFS detekován v jádře" ;;
         susfs_missing)      echo "SUSFS v jádře nedetekován" ;;
@@ -993,7 +944,6 @@ _msg() {
         config_stash_restored)  echo "Konfigurace obnovena z předchozí instalace" ;;
         vol_up_preserve)        echo "🔊 Hlasitost+ = Zachovat stávající konfiguraci" ;;
         vol_down_reset)         echo "🔉 Hlasitost- = Obnovit výchozí nastavení" ;;
-        vbh_kept)               echo "VerifiedBootHash zachován" ;;
     esac ;;
     da) case "$1" in
         installing)         echo "Installerer..." ;;
@@ -1018,7 +968,6 @@ _msg() {
         upgrade_ok)         echo "Opgradering: modulkontekster gendannet" ;;
         emoji_staged)       echo "Emoji-skrifttype klargjort" ;;
         bridge_header)      echo "Ekstern modulbro" ;;
-        vbh_imported)       echo "VerifiedBootHash importeret" ;;
         susfs_enhanced)     echo "SUSFS +udvidet (managerintegration)" ;;
         susfs_detected)     echo "SUSFS registreret i kernen" ;;
         susfs_missing)      echo "SUSFS ikke registreret i kernen" ;;
@@ -1032,7 +981,6 @@ _msg() {
         config_stash_restored)  echo "Konfiguration gendannet fra tidligere installation" ;;
         vol_up_preserve)        echo "🔊 Lydstyrke+ = Behold eksisterende konfiguration" ;;
         vol_down_reset)         echo "🔉 Lydstyrke- = Nulstil til standard" ;;
-        vbh_kept)               echo "VerifiedBootHash bevaret" ;;
     esac ;;
     fi) case "$1" in
         installing)         echo "Asennetaan..." ;;
@@ -1057,7 +1005,6 @@ _msg() {
         upgrade_ok)         echo "Päivitys: moduulikontekstit palautettu" ;;
         emoji_staged)       echo "Emoji-fontti valmisteltu" ;;
         bridge_header)      echo "Ulkoinen moduulisilta" ;;
-        vbh_imported)       echo "VerifiedBootHash tuotu" ;;
         susfs_enhanced)     echo "SUSFS +laajennettu (hallintaintegraatio)" ;;
         susfs_detected)     echo "SUSFS havaittu ytimessä" ;;
         susfs_missing)      echo "SUSFS:ää ei havaittu ytimessä" ;;
@@ -1071,7 +1018,6 @@ _msg() {
         config_stash_restored)  echo "Asetukset palautettu edellisestä asennuksesta" ;;
         vol_up_preserve)        echo "🔊 Äänenvoimakkuus+ = Säilytä nykyiset asetukset" ;;
         vol_down_reset)         echo "🔉 Äänenvoimakkuus- = Palauta oletusasetukset" ;;
-        vbh_kept)               echo "VerifiedBootHash säilytetty" ;;
     esac ;;
     he) case "$1" in
         installing)         echo "מתקין..." ;;
@@ -1096,7 +1042,6 @@ _msg() {
         upgrade_ok)         echo "שדרוג: הקשרי מודולים שוחזרו" ;;
         emoji_staged)       echo "גופן אימוג'י הוכן" ;;
         bridge_header)      echo "גשר מודולים חיצוניים" ;;
-        vbh_imported)       echo "VerifiedBootHash יובא" ;;
         susfs_enhanced)     echo "SUSFS +משופר (משולב עם המנהל)" ;;
         susfs_detected)     echo "SUSFS זוהה בגרעין" ;;
         susfs_missing)      echo "SUSFS לא זוהה בגרעין" ;;
@@ -1110,7 +1055,6 @@ _msg() {
         config_stash_restored)  echo "התצורה שוחזרה מההתקנה הקודמת" ;;
         vol_up_preserve)        echo "🔊 עוצמה+ = שמור על התצורה הקיימת" ;;
         vol_down_reset)         echo "🔉 עוצמה- = אפס להגדרות ברירת מחדל" ;;
-        vbh_kept)               echo "VerifiedBootHash נשמר" ;;
     esac ;;
     hi) case "$1" in
         installing)         echo "इंस्टॉल हो रहा है..." ;;
@@ -1135,7 +1079,6 @@ _msg() {
         upgrade_ok)         echo "अपग्रेड: मॉड्यूल संदर्भ पुनर्स्थापित" ;;
         emoji_staged)       echo "इमोजी फ़ॉन्ट तैयार" ;;
         bridge_header)      echo "बाहरी मॉड्यूल ब्रिज" ;;
-        vbh_imported)       echo "VerifiedBootHash आयातित" ;;
         susfs_enhanced)     echo "SUSFS +उन्नत (प्रबंधक-एकीकृत)" ;;
         susfs_detected)     echo "कर्नेल में SUSFS का पता चला" ;;
         susfs_missing)      echo "कर्नेल में SUSFS का पता नहीं चला" ;;
@@ -1149,7 +1092,6 @@ _msg() {
         config_stash_restored)  echo "पिछली स्थापना से कॉन्फ़िगरेशन पुनर्स्थापित" ;;
         vol_up_preserve)        echo "🔊 वॉल्यूम+ = मौजूदा कॉन्फ़िगरेशन रखें" ;;
         vol_down_reset)         echo "🔉 वॉल्यूम- = डिफ़ॉल्ट पर रीसेट करें" ;;
-        vbh_kept)               echo "VerifiedBootHash संरक्षित" ;;
     esac ;;
     hu) case "$1" in
         installing)         echo "Telepítés..." ;;
@@ -1174,7 +1116,6 @@ _msg() {
         upgrade_ok)         echo "Frissítés: modul-kontextusok visszaállítva" ;;
         emoji_staged)       echo "Emoji betűtípus előkészítve" ;;
         bridge_header)      echo "Külső modul híd" ;;
-        vbh_imported)       echo "VerifiedBootHash importálva" ;;
         susfs_enhanced)     echo "SUSFS +fejlett (kezelővel integrált)" ;;
         susfs_detected)     echo "SUSFS felismerve a kernelben" ;;
         susfs_missing)      echo "SUSFS nem található a kernelben" ;;
@@ -1188,7 +1129,6 @@ _msg() {
         config_stash_restored)  echo "Konfiguráció visszaállítva az előző telepítésből" ;;
         vol_up_preserve)        echo "🔊 Hangerő+ = Meglévő konfiguráció megtartása" ;;
         vol_down_reset)         echo "🔉 Hangerő- = Alapértelmezés visszaállítása" ;;
-        vbh_kept)               echo "VerifiedBootHash megőrizve" ;;
     esac ;;
     nl) case "$1" in
         installing)         echo "Installeren..." ;;
@@ -1213,7 +1153,6 @@ _msg() {
         upgrade_ok)         echo "Upgrade: modulecontexten hersteld" ;;
         emoji_staged)       echo "Emoji-lettertype voorbereid" ;;
         bridge_header)      echo "Externe modulebrug" ;;
-        vbh_imported)       echo "VerifiedBootHash geïmporteerd" ;;
         susfs_enhanced)     echo "SUSFS +verbeterd (geïntegreerd met beheerder)" ;;
         susfs_detected)     echo "SUSFS gedetecteerd in kernel" ;;
         susfs_missing)      echo "SUSFS niet gedetecteerd in kernel" ;;
@@ -1227,7 +1166,6 @@ _msg() {
         config_stash_restored)  echo "Configuratie hersteld van vorige installatie" ;;
         vol_up_preserve)        echo "🔊 Volume+ = Bestaande configuratie behouden" ;;
         vol_down_reset)         echo "🔉 Volume- = Terugzetten naar standaard" ;;
-        vbh_kept)               echo "VerifiedBootHash behouden" ;;
     esac ;;
     no) case "$1" in
         installing)         echo "Installerer..." ;;
@@ -1252,7 +1190,6 @@ _msg() {
         upgrade_ok)         echo "Oppgradering: modulkontekster gjenopprettet" ;;
         emoji_staged)       echo "Emoji-skrift klargjort" ;;
         bridge_header)      echo "Ekstern modulbro" ;;
-        vbh_imported)       echo "VerifiedBootHash importert" ;;
         susfs_enhanced)     echo "SUSFS +utvidet (managerintegrasjon)" ;;
         susfs_detected)     echo "SUSFS oppdaget i kjernen" ;;
         susfs_missing)      echo "SUSFS ikke oppdaget i kjernen" ;;
@@ -1266,7 +1203,6 @@ _msg() {
         config_stash_restored)  echo "Konfigurasjon gjenopprettet fra forrige installasjon" ;;
         vol_up_preserve)        echo "🔊 Volum+ = Behold eksisterende konfigurasjon" ;;
         vol_down_reset)         echo "🔉 Volum- = Tilbakestill til standard" ;;
-        vbh_kept)               echo "VerifiedBootHash beholdt" ;;
     esac ;;
     ro) case "$1" in
         installing)         echo "Se instalează..." ;;
@@ -1291,7 +1227,6 @@ _msg() {
         upgrade_ok)         echo "Actualizare: contextele modulelor restaurate" ;;
         emoji_staged)       echo "Font emoji pregătit" ;;
         bridge_header)      echo "Punte module externe" ;;
-        vbh_imported)       echo "VerifiedBootHash importat" ;;
         susfs_enhanced)     echo "SUSFS +avansat (integrat cu managerul)" ;;
         susfs_detected)     echo "SUSFS detectat în kernel" ;;
         susfs_missing)      echo "SUSFS nedetectat în kernel" ;;
@@ -1305,7 +1240,6 @@ _msg() {
         config_stash_restored)  echo "Configurația restaurată din instalarea anterioară" ;;
         vol_up_preserve)        echo "🔊 Volum+ = Păstrează configurația existentă" ;;
         vol_down_reset)         echo "🔉 Volum- = Resetează la valorile implicite" ;;
-        vbh_kept)               echo "VerifiedBootHash păstrat" ;;
     esac ;;
     sr) case "$1" in
         installing)         echo "Инсталирање..." ;;
@@ -1330,7 +1264,6 @@ _msg() {
         upgrade_ok)         echo "Надоградња: контексти модула обновљени" ;;
         emoji_staged)       echo "Емоџи фонт припремљен" ;;
         bridge_header)      echo "Мост спољних модула" ;;
-        vbh_imported)       echo "VerifiedBootHash увезен" ;;
         susfs_enhanced)     echo "SUSFS +побољшан (интегрисан са менаџером)" ;;
         susfs_detected)     echo "SUSFS детектован у кернелу" ;;
         susfs_missing)      echo "SUSFS није детектован у кернелу" ;;
@@ -1344,7 +1277,6 @@ _msg() {
         config_stash_restored)  echo "Конфигурација враћена из претходне инсталације" ;;
         vol_up_preserve)        echo "🔊 Јачина+ = Задржи постојећу конфигурацију" ;;
         vol_down_reset)         echo "🔉 Јачина- = Врати на подразумевано" ;;
-        vbh_kept)               echo "VerifiedBootHash сачуван" ;;
     esac ;;
     sv) case "$1" in
         installing)         echo "Installerar..." ;;
@@ -1369,7 +1301,6 @@ _msg() {
         upgrade_ok)         echo "Uppgradering: modulkontexter återställda" ;;
         emoji_staged)       echo "Emoji-typsnitt förberett" ;;
         bridge_header)      echo "Extern modulbrygga" ;;
-        vbh_imported)       echo "VerifiedBootHash importerad" ;;
         susfs_enhanced)     echo "SUSFS +utökad (managerintegration)" ;;
         susfs_detected)     echo "SUSFS upptäckt i kärnan" ;;
         susfs_missing)      echo "SUSFS inte upptäckt i kärnan" ;;
@@ -1383,7 +1314,6 @@ _msg() {
         config_stash_restored)  echo "Konfiguration återställd från tidigare installation" ;;
         vol_up_preserve)        echo "🔊 Volym+ = Behåll befintlig konfiguration" ;;
         vol_down_reset)         echo "🔉 Volym- = Återställ till standard" ;;
-        vbh_kept)               echo "VerifiedBootHash bevarad" ;;
     esac ;;
     *) case "$1" in
         installing)         echo "Installing..." ;;
@@ -1408,7 +1338,6 @@ _msg() {
         upgrade_ok)         echo "Upgrade: peer module contexts restored" ;;
         emoji_staged)       echo "Emoji font staged" ;;
         bridge_header)      echo "External Module Bridge" ;;
-        vbh_imported)       echo "VerifiedBootHash imported" ;;
         susfs_enhanced)     echo "SUSFS +enhanced (manager-integrated)" ;;
         susfs_detected)     echo "SUSFS detected in kernel" ;;
         susfs_missing)      echo "SUSFS not detected in kernel" ;;
@@ -1422,7 +1351,6 @@ _msg() {
         config_stash_restored)  echo "Config restored from previous install" ;;
         vol_up_preserve)        echo "🔊 Vol UP = Keep existing config" ;;
         vol_down_reset)         echo "🔉 Vol DOWN = Reset to defaults" ;;
-        vbh_kept)               echo "VerifiedBootHash preserved" ;;
     esac ;;
     esac
 }

@@ -147,17 +147,11 @@ if [ "$PROP_SPOOF" = "true" ]; then
             "$RP" -st "$_name" "$_val" 2>/dev/null || true
         done
 
-        # Phase 3: vbmeta config props (mod.rs:44-52)
+        # Phase 3: vbmeta config props
         _vbsize=$("$BIN" config get brene.vbmeta_size 2>/dev/null)
         if [ -n "$_vbsize" ]; then
             _cur=$(getprop ro.boot.vbmeta.size 2>/dev/null)
             [ "$_cur" != "$_vbsize" ] && "$RP" -st ro.boot.vbmeta.size "$_vbsize" 2>/dev/null || true
-        fi
-
-        _vbhash=$("$BIN" config get brene.verified_boot_hash 2>/dev/null)
-        if [ -n "$_vbhash" ]; then
-            _cur=$(getprop ro.boot.vbmeta.digest 2>/dev/null)
-            [ "$_cur" != "$_vbhash" ] && "$RP" -st ro.boot.vbmeta.digest "$_vbhash" 2>/dev/null || true
         fi
 
         echo "zeromount: prop spoofing applied (shell, stealth)" > /dev/kmsg 2>/dev/null

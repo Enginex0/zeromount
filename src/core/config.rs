@@ -211,8 +211,6 @@ pub struct BreneConfig {
     pub custom_sus_maps: Vec<String>,
     #[serde(default)]
     pub custom_sus_path_loops: Vec<String>,
-    #[serde(default)]
-    pub verified_boot_hash: String,
     #[serde(default = "default_vbmeta_size")]
     pub vbmeta_size: u32,
     #[serde(default = "default_true")]
@@ -241,7 +239,6 @@ impl Default for BreneConfig {
             custom_sus_paths: Vec::new(),
             custom_sus_maps: Vec::new(),
             custom_sus_path_loops: Vec::new(),
-            verified_boot_hash: String::new(),
             vbmeta_size: default_vbmeta_size(),
             emulate_vold_app_data: true,
         }
@@ -627,7 +624,6 @@ impl ZeroMountConfig {
             "brene.custom_sus_paths" => Some(self.brene.custom_sus_paths.join(",")),
             "brene.custom_sus_maps" => Some(self.brene.custom_sus_maps.join(",")),
             "brene.custom_sus_path_loops" => Some(self.brene.custom_sus_path_loops.join(",")),
-            "brene.verified_boot_hash" => Some(self.brene.verified_boot_hash.clone()),
             "brene.vbmeta_size" => Some(self.brene.vbmeta_size.to_string()),
             "brene.emulate_vold_app_data" => Some(self.brene.emulate_vold_app_data.to_string()),
 
@@ -721,7 +717,6 @@ impl ZeroMountConfig {
             "brene.custom_sus_paths" => self.brene.custom_sus_paths = parse_csv(value),
             "brene.custom_sus_maps" => self.brene.custom_sus_maps = parse_csv(value),
             "brene.custom_sus_path_loops" => self.brene.custom_sus_path_loops = parse_csv(value),
-            "brene.verified_boot_hash" => self.brene.verified_boot_hash = value.to_string(),
             "brene.vbmeta_size" => self.brene.vbmeta_size = value.parse()?,
             "brene.emulate_vold_app_data" => self.brene.emulate_vold_app_data = value.parse()?,
 

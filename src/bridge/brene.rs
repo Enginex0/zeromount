@@ -76,19 +76,6 @@ pub(super) fn merge_config(
             | "hide_sus_mnts_for_non_su_procs" => {
                 our_val.clone()
             }
-            // vbmeta_size not in BRENE config but verified_boot_hash is a string
-            "verified_boot_hash" => {
-                if let Some(ext) = existing.get(key.as_str()) {
-                    let normalized = translate::normalize_string_value(ext);
-                    if normalized.is_empty() {
-                        our_val.clone()
-                    } else {
-                        ext.clone()
-                    }
-                } else {
-                    our_val.clone()
-                }
-            }
             // String keys: preserve external non-empty/non-default
             "custom_uname_kernel_release" | "custom_uname_kernel_version" => {
                 if let Some(ext) = existing.get(key.as_str()) {
@@ -176,7 +163,6 @@ fn config_to_keys(config: &ZeroMountConfig) -> HashMap<String, String> {
     m.insert("developer_options".into(), translate::bool_to_int(config.adb.developer_options).to_string());
     m.insert("enable_log".into(), translate::bool_to_int(config.brene.susfs_log).to_string());
     m.insert("hide_modules_img".into(), translate::bool_to_int(config.brene.hide_ksu_loops).to_string());
-    m.insert("verified_boot_hash".into(), translate::string_to_external(&config.brene.verified_boot_hash));
     m.insert("custom_uname_kernel_release".into(), translate::string_to_external(&config.uname.release));
     m.insert("custom_uname_kernel_version".into(), translate::string_to_external(&config.uname.version));
 
@@ -313,14 +299,6 @@ pub(super) fn apply_keys_to_config(keys: &HashMap<String, String>, config: &mut 
         }
     }
 
-    if let Some(v) = keys.get("verified_boot_hash") {
-        let val = translate::normalize_string_value(v);
-        if config.brene.verified_boot_hash != val {
-            config.brene.verified_boot_hash = val;
-            changed = true;
-        }
-    }
-
     if let Some(v) = keys.get("custom_uname_kernel_release") {
         let val = translate::normalize_string_value(v);
         if config.uname.release != val {
@@ -359,7 +337,6 @@ const BRIDGED_KEY_ORDER: &[&str] = &[
     "developer_options",
     "enable_log",
     "hide_modules_img",
-    "verified_boot_hash",
     "custom_uname_kernel_release",
     "custom_uname_kernel_version",
 ];
@@ -386,7 +363,6 @@ mod tests {
         c.adb.developer_options = true;
         c.brene.susfs_log = false;
         c.brene.hide_ksu_loops = true;
-        c.brene.verified_boot_hash = "abc123".into();
         c.uname.mode = UnameMode::Static;
         c.uname.release = "5.10.0-gki".into();
         c.uname.version = "#1 SMP".into();
@@ -413,7 +389,6 @@ mod tests {
         assert_eq!(keys["developer_options"], "1");
         assert_eq!(keys["enable_log"], "0");
         assert_eq!(keys["hide_modules_img"], "1");
-        assert_eq!(keys["verified_boot_hash"], "'abc123'");
         assert_eq!(keys["custom_uname_kernel_release"], "'5.10.0-gki'");
         assert_eq!(keys["custom_uname_kernel_version"], "'#1 SMP'");
         assert_eq!(keys["try_umount"], "0");
@@ -456,7 +431,6 @@ mod tests {
 
         assert_eq!(read["enable_avc_log_spoofing"], "1");
         assert_eq!(read["uname2_spoofing"], "1");
-        assert_eq!(read["verified_boot_hash"], "'abc123'");
         assert_eq!(read["custom_uname_kernel_release"], "'5.10.0-gki'");
     }
 
@@ -468,14 +442,12 @@ mod tests {
         keys.insert("custom_uname_spoofing".into(), "1".into());
         keys.insert("uname_spoofing".into(), "0".into());
         keys.insert("uname2_spoofing".into(), "0".into());
-        keys.insert("verified_boot_hash".into(), "'deadbeef'".into());
         keys.insert("kernel_umount".into(), "0".into());
 
         let changed = apply_keys_to_config(&keys, &mut config);
         assert!(changed);
         assert!(config.brene.susfs_log);
         assert_eq!(config.uname.mode, UnameMode::Dynamic);
-        assert_eq!(config.brene.verified_boot_hash, "deadbeef");
         assert!(!config.brene.kernel_umount);
     }
 
@@ -518,13 +490,11 @@ mod tests {
 
         let mut existing = HashMap::new();
         existing.insert("custom_uname_kernel_release".into(), "'6.1.0-custom'".into());
-        existing.insert("verified_boot_hash".into(), "'user-hash'".into());
 
         merge_config(dir.path(), &config, &existing).unwrap();
         let result = read_config(dir.path()).unwrap();
 
         assert_eq!(result["custom_uname_kernel_release"], "'6.1.0-custom'");
-        assert_eq!(result["verified_boot_hash"], "'user-hash'");
     }
 
     #[test]
