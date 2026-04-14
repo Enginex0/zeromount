@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook इमोजी",
   "settings.facebookEmojisDesc": "सिस्टम इमोजी को Facebook 15.0 स्टाइल से बदलें",
   "settings.emojiConflict": "विरोधी फ़ॉन्ट मॉड्यूल: {module}",
+  "settings.more": "और",
   "modal.clearAllRulesTitle": "सभी नियम साफ़ करें?",
   "modal.clearAllRulesText": "यह सभी {count} VFS नियम स्थायी रूप से हटा देगा। यह क्रिया पूर्ववत नहीं की जा सकती।",
   "modal.cancel": "रद्द करें",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook-emoji's",
   "settings.facebookEmojisDesc": "Systeememoji's vervangen door Facebook 15.0-stijl",
   "settings.emojiConflict": "Conflicterend lettertypemodule: {module}",
+  "settings.more": "Meer",
   "modal.clearAllRulesTitle": "Alle Regels Wissen?",
   "modal.clearAllRulesText": "Dit verwijdert permanent alle {count} VFS-regels. Deze actie kan niet ongedaan worden gemaakt.",
   "modal.cancel": "Annuleren",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook ইমোজি",
   "settings.facebookEmojisDesc": "সিস্টেম ইমোজি Facebook 15.0 স্টাইলে পরিবর্তন করুন",
   "settings.emojiConflict": "বিরোধপূর্ণ ফন্ট মডিউল: {module}",
+  "settings.more": "আরও",
   "modal.clearAllRulesTitle": "সব নিয়ম মুছবেন?",
   "modal.clearAllRulesText": "এটি সমস্ত {count} VFS নিয়ম স্থায়ীভাবে মুছে দেবে। এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।",
   "modal.cancel": "বাতিল করুন",

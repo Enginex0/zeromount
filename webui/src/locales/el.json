@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emoji Facebook",
   "settings.facebookEmojisDesc": "Αντικατάσταση emoji συστήματος με στυλ Facebook 15.0",
   "settings.emojiConflict": "Ενότητα γραμματοσειράς σε σύγκρουση: {module}",
+  "settings.more": "Περισσότερα",
   "modal.clearAllRulesTitle": "Εκκαθάριση Όλων των Κανόνων;",
   "modal.clearAllRulesText": "Αυτό θα διαγράψει οριστικά όλους τους {count} κανόνες VFS. Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
   "modal.cancel": "Ακύρωση",

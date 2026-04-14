@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emoji Facebooku",
   "settings.facebookEmojisDesc": "Nahradit systémové emoji stylem Facebook 15.0",
   "settings.emojiConflict": "Konfliktní modul písem: {module}",
+  "settings.more": "Více",
   "modal.clearAllRulesTitle": "Vymazat všechna pravidla?",
   "modal.clearAllRulesText": "Toto trvale odstraní všech {count} pravidel VFS. Tuto akci nelze vrátit zpět.",
   "modal.cancel": "Zrušit",

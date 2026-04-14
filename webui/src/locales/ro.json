@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emoji Facebook",
   "settings.facebookEmojisDesc": "Înlocuiește emoji-urile de sistem cu stilul Facebook 15.0",
   "settings.emojiConflict": "Modul de font în conflict: {module}",
+  "settings.more": "Mai multe",
   "modal.clearAllRulesTitle": "Ștergi toate regulile?",
   "modal.clearAllRulesText": "Aceasta va șterge permanent toate cele {count} reguli VFS. Această acțiune nu poate fi anulată.",
   "modal.cancel": "Anulează",

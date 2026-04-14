@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "אמוג'י של Facebook",
   "settings.facebookEmojisDesc": "החלף את אמוג'י המערכת בסגנון Facebook 15.0",
   "settings.emojiConflict": "מודול גופן מתנגש: {module}",
+  "settings.more": "עוד",
   "modal.clearAllRulesTitle": "לנקות את כל הכללים?",
   "modal.clearAllRulesText": "פעולה זו תמחק לצמיתות את כל {count} כללי VFS. לא ניתן לבטל פעולה זו.",
   "modal.cancel": "ביטול",

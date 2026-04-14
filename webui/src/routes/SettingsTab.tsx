@@ -139,52 +139,59 @@ export function SettingsTab() {
         />
       </Card>
 
-      <Card>
-        <h3 class="settings__section-title">
-          <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44z"/>
-            <path d="M10.59 15.41a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/>
-          </svg>
-          {t('settings.performance')}
-        </h3>
-        <div class="settings__item">
-          <div class="settings__item-content">
-            <div class="settings__item-label">{t('settings.perfTweak')}</div>
-            <div class="settings__item-desc">{t('settings.perfTweakDesc')}</div>
-          </div>
-          <Toggle
-            checked={store.settings.perf.enabled}
-            onChange={(v) => store.setPerfToggle('enabled', v)}
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <h3 class="settings__section-title">
-          <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="8.5" cy="9.5" r="1.5"/>
-            <circle cx="15.5" cy="9.5" r="1.5"/>
-            <path d="M12 18c-3.31 0-6-2.69-6-6h1.5c0 2.76 2.24 5 4.5 5s4.5-2.24 4.5-5H18c0 3.31-2.69 6-6 6z"/>
-            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
-          </svg>
-          {t('settings.emoji')}
-        </h3>
-        <div class={`settings__item${store.emojiConflict() ? ' settings__item--disabled' : ''}`}>
-          <div class="settings__item-content">
-            <div class="settings__item-label">{t('settings.facebookEmojis')}</div>
-            <div class="settings__item-desc">
-              {store.emojiConflict()
-                ? t('settings.emojiConflict', { module: store.emojiConflict()! })
-                : t('settings.facebookEmojisDesc')}
+      <CollapsibleSubgroup
+        label={t('settings.more')}
+        hiddenCount={2}
+        defaultItems={<></>}
+        expandedItems={<>
+          <Card>
+            <h3 class="settings__section-title">
+              <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44z"/>
+                <path d="M10.59 15.41a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/>
+              </svg>
+              {t('settings.performance')}
+            </h3>
+            <div class="settings__item">
+              <div class="settings__item-content">
+                <div class="settings__item-label">{t('settings.perfTweak')}</div>
+                <div class="settings__item-desc">{t('settings.perfTweakDesc')}</div>
+              </div>
+              <Toggle
+                checked={store.settings.perf.enabled}
+                onChange={(v) => store.setPerfToggle('enabled', v)}
+              />
             </div>
-          </div>
-          <Toggle
-            checked={store.settings.emoji.enabled}
-            onChange={(v) => store.setEmojiToggle('enabled', v)}
-            disabled={!!store.emojiConflict()}
-          />
-        </div>
-      </Card>
+          </Card>
+
+          <Card>
+            <h3 class="settings__section-title">
+              <svg class="settings__section-icon" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="8.5" cy="9.5" r="1.5"/>
+                <circle cx="15.5" cy="9.5" r="1.5"/>
+                <path d="M12 18c-3.31 0-6-2.69-6-6h1.5c0 2.76 2.24 5 4.5 5s4.5-2.24 4.5-5H18c0 3.31-2.69 6-6 6z"/>
+                <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+              </svg>
+              {t('settings.emoji')}
+            </h3>
+            <div class={`settings__item${store.emojiConflict() ? ' settings__item--disabled' : ''}`}>
+              <div class="settings__item-content">
+                <div class="settings__item-label">{t('settings.facebookEmojis')}</div>
+                <div class="settings__item-desc">
+                  {store.emojiConflict()
+                    ? t('settings.emojiConflict', { module: store.emojiConflict()! })
+                    : t('settings.facebookEmojisDesc')}
+                </div>
+              </div>
+              <Toggle
+                checked={store.settings.emoji.enabled}
+                onChange={(v) => store.setEmojiToggle('enabled', v)}
+                disabled={!!store.emojiConflict()}
+              />
+            </div>
+          </Card>
+        </>}
+      />
 
       <AboutSection />
 

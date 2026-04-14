@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emojis Facebook",
   "settings.facebookEmojisDesc": "Remplacer les emojis système par le style Facebook 15.0",
   "settings.emojiConflict": "Module de police conflictuel : {module}",
+  "settings.more": "Plus",
   "modal.clearAllRulesTitle": "Supprimer Toutes les Règles ?",
   "modal.clearAllRulesText": "Cela supprimera définitivement les {count} règles VFS. Cette action est irréversible.",
   "modal.cancel": "Annuler",

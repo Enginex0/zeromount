@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Емодзі Facebook",
   "settings.facebookEmojisDesc": "Замінити системні емодзі на стиль Facebook 15.0",
   "settings.emojiConflict": "Конфліктуючий модуль шрифту: {module}",
+  "settings.more": "Більше",
   "modal.clearAllRulesTitle": "Очистити всі правила?",
   "modal.clearAllRulesText": "Це остаточно видалить усі {count} правил VFS. Цю дію неможливо скасувати.",
   "modal.cancel": "Скасувати",

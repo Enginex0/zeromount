@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook-emojit",
   "settings.facebookEmojisDesc": "Korvaa järjestelmän emojit Facebook 15.0 -tyylillä",
   "settings.emojiConflict": "Ristiriitainen fonttimoduuli: {module}",
+  "settings.more": "Lisää",
   "modal.clearAllRulesTitle": "Tyhjennetäänkö kaikki säännöt?",
   "modal.clearAllRulesText": "Tämä poistaa pysyvästi kaikki {count} VFS-sääntöä. Tätä toimintoa ei voi perua.",
   "modal.cancel": "Peruuta",

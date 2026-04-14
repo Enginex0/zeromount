@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook Emoji",
   "settings.facebookEmojisDesc": "將系統 Emoji 替換為 Facebook 15.0 風格",
   "settings.emojiConflict": "字體模組衝突：{module}",
+  "settings.more": "更多",
   "modal.clearAllRulesTitle": "清除所有規則？",
   "modal.clearAllRulesText": "這將永久刪除全部 {count} 條 VFS 規則，此操作無法復原。",
   "modal.cancel": "取消",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "ایموجی‌های Facebook",
   "settings.facebookEmojisDesc": "جایگزینی ایموجی‌های سیستم با سبک Facebook 15.0",
   "settings.emojiConflict": "ماژول فونت متعارض: {module}",
+  "settings.more": "بیشتر",
   "modal.clearAllRulesTitle": "پاک کردن همه قوانین؟",
   "modal.clearAllRulesText": "این کار {count} قانون VFS را به طور دائم حذف خواهد کرد. این عملیات قابل بازگشت نیست.",
   "modal.cancel": "لغو",

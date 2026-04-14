@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook-emojier",
   "settings.facebookEmojisDesc": "Erstatt systemets emojier med Facebook 15.0-stil",
   "settings.emojiConflict": "Konflikterende skriftmodul: {module}",
+  "settings.more": "Mer",
   "modal.clearAllRulesTitle": "Tøm alle regler?",
   "modal.clearAllRulesText": "Dette vil permanent slette alle {count} VFS-regler. Denne handlingen kan ikke angres.",
   "modal.cancel": "Avbryt",

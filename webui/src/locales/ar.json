@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "رموز Facebook التعبيرية",
   "settings.facebookEmojisDesc": "استبدال رموز النظام التعبيرية بأسلوب Facebook 15.0",
   "settings.emojiConflict": "وحدة خط متعارضة: {module}",
+  "settings.more": "المزيد",
   "modal.clearAllRulesTitle": "مسح كل القواعد؟",
   "modal.clearAllRulesText": "سيؤدي هذا إلى حذف جميع قواعد VFS البالغة {count} نهائياً. لا يمكن التراجع عن هذا الإجراء.",
   "modal.cancel": "إلغاء",

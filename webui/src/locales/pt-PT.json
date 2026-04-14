@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emojis do Facebook",
   "settings.facebookEmojisDesc": "Substituir os emojis do sistema pelo estilo Facebook 15.0",
   "settings.emojiConflict": "Módulo de tipo de letra em conflito: {module}",
+  "settings.more": "Mais",
   "modal.clearAllRulesTitle": "Limpar Todas as Regras?",
   "modal.clearAllRulesText": "Isto eliminará permanentemente todas as {count} regras VFS. Esta ação não pode ser revertida.",
   "modal.cancel": "Cancelar",

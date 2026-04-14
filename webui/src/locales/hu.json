@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook-emojik",
   "settings.facebookEmojisDesc": "A rendszer emojik cseréje Facebook 15.0 stílusúra",
   "settings.emojiConflict": "Ütköző betűtípus-modul: {module}",
+  "settings.more": "Több",
   "modal.clearAllRulesTitle": "Töröljük az összes szabályt?",
   "modal.clearAllRulesText": "Ez véglegesen törli az összes {count} VFS-szabályt. Ez a művelet nem vonható vissza.",
   "modal.cancel": "Mégse",

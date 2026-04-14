@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook-emojis",
   "settings.facebookEmojisDesc": "Vervang stelselemojis met Facebook 15.0-styl",
   "settings.emojiConflict": "Botsende lettertipe-module: {module}",
+  "settings.more": "Meer",
   "modal.clearAllRulesTitle": "Alle Reëls Uitvee?",
   "modal.clearAllRulesText": "Dit sal alle {count} VFS-reëls permanent uitvee. Hierdie handeling kan nie ongedaan gemaak word nie.",
   "modal.cancel": "Kanselleer",

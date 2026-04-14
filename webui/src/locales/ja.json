@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook 絵文字",
   "settings.facebookEmojisDesc": "システム絵文字を Facebook 15.0 スタイルに置換",
   "settings.emojiConflict": "フォントモジュールの競合: {module}",
+  "settings.more": "その他",
   "modal.clearAllRulesTitle": "ルールをすべて削除しますか？",
   "modal.clearAllRulesText": "{count} 件の VFS ルールをすべて完全に削除します。この操作は取り消せません。",
   "modal.cancel": "キャンセル",

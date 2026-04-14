@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook อีโมจิ",
   "settings.facebookEmojisDesc": "แทนที่อีโมจิระบบด้วยสไตล์ Facebook 15.0",
   "settings.emojiConflict": "โมดูลฟอนต์ขัดแย้ง: {module}",
+  "settings.more": "เพิ่มเติม",
   "modal.clearAllRulesTitle": "ลบกฎทั้งหมด?",
   "modal.clearAllRulesText": "การดำเนินการนี้จะลบกฎ VFS ทั้งหมด {count} รายการอย่างถาวร ไม่สามารถยกเลิกได้",
   "modal.cancel": "ยกเลิก",

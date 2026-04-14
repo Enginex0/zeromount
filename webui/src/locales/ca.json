@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emojis de Facebook",
   "settings.facebookEmojisDesc": "Reemplaçar emojis del sistema amb l'estil Facebook 15.0",
   "settings.emojiConflict": "Mòdul de tipus de lletra en conflicte: {module}",
+  "settings.more": "Més",
   "modal.clearAllRulesTitle": "Esborrar Totes les Regles?",
   "modal.clearAllRulesText": "Això esborrarà permanentment totes les {count} regles VFS. Aquesta acció no es pot desfer.",
   "modal.cancel": "Cancel·lar",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook емоџи",
   "settings.facebookEmojisDesc": "Замени системске емоџи стилом Facebook 15.0",
   "settings.emojiConflict": "Конфликтни модул фонта: {module}",
+  "settings.more": "Више",
   "modal.clearAllRulesTitle": "Обрисати сва правила?",
   "modal.clearAllRulesText": "Ово ће трајно обрисати свих {count} VFS правила. Ова радња се не може поништити.",
   "modal.cancel": "Откажи",

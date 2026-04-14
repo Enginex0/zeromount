@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emoji Facebook",
   "settings.facebookEmojisDesc": "Thay thế emoji hệ thống bằng phong cách Facebook 15.0",
   "settings.emojiConflict": "Mô-đun phông chữ xung đột: {module}",
+  "settings.more": "Thêm",
   "modal.clearAllRulesTitle": "Xóa tất cả quy tắc?",
   "modal.clearAllRulesText": "Thao tác này sẽ xóa vĩnh viễn tất cả {count} quy tắc VFS. Không thể hoàn tác.",
   "modal.cancel": "Hủy",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook Emojileri",
   "settings.facebookEmojisDesc": "Sistem emojilerini Facebook 15.0 tarzıyla değiştir",
   "settings.emojiConflict": "Çakışan yazı tipi modülü: {module}",
+  "settings.more": "Daha fazla",
   "modal.clearAllRulesTitle": "Tüm Kurallar Temizlensin mi?",
   "modal.clearAllRulesText": "Bu işlem {count} VFS kuralını kalıcı olarak silecektir. Bu işlem geri alınamaz.",
   "modal.cancel": "İptal",

@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Facebook 이모지",
   "settings.facebookEmojisDesc": "시스템 이모지를 Facebook 15.0 스타일로 교체",
   "settings.emojiConflict": "폰트 모듈 충돌: {module}",
+  "settings.more": "더보기",
   "modal.clearAllRulesTitle": "모든 규칙을 삭제하시겠습니까?",
   "modal.clearAllRulesText": "{count}개의 VFS 규칙이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
   "modal.cancel": "취소",

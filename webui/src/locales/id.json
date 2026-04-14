@@ -132,6 +132,7 @@
   "settings.facebookEmojis": "Emoji Facebook",
   "settings.facebookEmojisDesc": "Ganti emoji sistem dengan gaya Facebook 15.0",
   "settings.emojiConflict": "Modul font yang konflik: {module}",
+  "settings.more": "Lainnya",
   "modal.clearAllRulesTitle": "Hapus Semua Aturan?",
   "modal.clearAllRulesText": "Ini akan menghapus semua {count} aturan VFS secara permanen. Tindakan ini tidak dapat dibatalkan.",
   "modal.cancel": "Batal",
