@@ -6,6 +6,7 @@ import { ScenarioIndicator } from '../components/core/ScenarioIndicator';
 import { Badge } from '../components/core/Badge';
 import { CollapsibleSubgroup } from '../components/ui/CollapsibleSubgroup';
 import { GuardSection } from '../components/settings/GuardSection';
+import { ModuleExclusionsSection } from '../components/settings/ModuleExclusionsSection';
 import { store } from '../lib/store';
 import { t } from '../lib/i18n';
 import type { MountStrategy } from '../lib/types';
@@ -678,6 +679,8 @@ export function StatusTab() {
       </Card>
 
       <GuardSection />
+
+      <ModuleExclusionsSection />
 
       {/* Recent Activity */}
       <Card>

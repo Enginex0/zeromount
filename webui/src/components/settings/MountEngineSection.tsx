@@ -218,7 +218,7 @@ export function MountEngineSection() {
 
         <CollapsibleSubgroup
           label={t('engine.advancedMounting')}
-          hiddenCount={1 + (store.settings.mount.storage_mode === 'ext4' ? 1 : 0)}
+          hiddenCount={store.settings.mount.storage_mode === 'ext4' ? 1 : 0}
           defaultItems={
             <div class="settings__item">
               <div class="settings__item-content">
@@ -232,18 +232,6 @@ export function MountEngineSection() {
             </div>
           }
           expandedItems={<>
-            <div class="settings__item" style={{ "flex-direction": "column", "align-items": "stretch" }}>
-              <div class="settings__item-content">
-                <div class="settings__item-label">{t('engine.moduleBlacklist')}</div>
-                <div class="settings__item-desc">{t('engine.moduleBlacklistDesc')}</div>
-              </div>
-              <Input
-                fullWidth
-                value={store.settings.mount.module_blacklist}
-                placeholder={t('engine.moduleBlacklistPlaceholder')}
-                onBlur={(e) => store.setMountField('module_blacklist', e.currentTarget.value)}
-              />
-            </div>
             <Show when={store.settings.mount.storage_mode === 'ext4'}>
               <div class="settings__item" style={{ "flex-direction": "column", "align-items": "stretch" }}>
                 <div class="settings__item-content">
