@@ -7,12 +7,10 @@ import { t } from '../../lib/i18n';
 import { LANGUAGES, locale } from '../../lib/i18n';
 
 const accentColors = [
-  { name: 'Orange', color: '#FF8E53' },
   { name: 'Emerald', color: '#00D68F' },
   { name: 'Beige', color: '#D4A574' },
   { name: 'Amethyst', color: '#A855F7' },
   { name: 'Fuchsia', color: '#D946EF' },
-  { name: 'Lime', color: '#84CC16' },
   { name: 'Indigo', color: '#6366F1' },
   { name: 'Coral', color: '#FF6B6B' },
 ];
