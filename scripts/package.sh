@@ -15,6 +15,7 @@ BUILD=false
 CLEAN=false
 DEPLOY=false
 REBOOT=false
+DEPLOY_PROFILE="debug"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -23,6 +24,8 @@ while [[ $# -gt 0 ]]; do
         --clean)   CLEAN=true; shift ;;
         --deploy)  DEPLOY=true; shift ;;
         --reboot)  REBOOT=true; shift ;;
+        --release) DEPLOY_PROFILE="release"; shift ;;
+        --debug)   DEPLOY_PROFILE="debug"; shift ;;
         *)         echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
@@ -373,9 +376,13 @@ echo "    Debug:   $RELEASE_DIR/debug/zeromount-${VERSION}-debug.zip"
 echo "    Release: $RELEASE_DIR/release/zeromount-${VERSION}.zip"
 
 if [ "$DEPLOY" = true ]; then
-    ZIP="$RELEASE_DIR/debug/zeromount-${VERSION}-debug.zip"
+    if [ "$DEPLOY_PROFILE" = "release" ]; then
+        ZIP="$RELEASE_DIR/release/zeromount-${VERSION}.zip"
+    else
+        ZIP="$RELEASE_DIR/debug/zeromount-${VERSION}-debug.zip"
+    fi
     if [ ! -f "$ZIP" ]; then
-        echo "FATAL: debug zip not found at $ZIP" >&2
+        echo "FATAL: ${DEPLOY_PROFILE} zip not found at $ZIP" >&2
         exit 1
     fi
 
