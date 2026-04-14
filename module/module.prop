@@ -1,7 +1,7 @@
 id=meta-zeromount
 name=ZeroMount
-version=v2.0.212-dev
-versionCode=20212
+version=v2.0.214-dev
+versionCode=20214
 author=Enginex0
 description=Mountless module loading via VFS redirection with SUSFS integration. Supports OverlayFS and magic mount fallback. GHOST👻
 updateJson=https://raw.githubusercontent.com/Enginex0/zeromount/master/update.json
