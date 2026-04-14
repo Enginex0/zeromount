@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store';
 import type { Tab, Scenario, VfsRule, ExcludedUid, ActivityItem, EngineStats, SystemInfo, Settings, InstalledApp, KsuModule, CapabilityFlags, ModuleStatus, BreneSettings, SusfsSettings, PerfSettings, EmojiSettings, AdbSettings, GuardSettings, GuardStatus, UnameSettings, UnameMode, MountSettings, StorageMode, MountStrategy, WebUiInitResponse, SusfsOwnership, BridgeValues } from './types';
 import { api, shouldUseMock, invalidateCache, readFromCache } from './api';
 import { PATHS, MODULE_ID_RE } from './constants';
-import { listPackages, getPackagesInfo, getAppLabelViaAapt, runShell } from './ksuApi';
+import { listPackages, getPackagesInfo, getAppLabelViaAapt, runShell, type ExecResult } from './ksuApi';
 import { darkTheme, lightTheme, amoledTheme, applyTheme, getAccentStyles, accentPresets, accentNames } from './theme';
 import { readCache, writeCache, type HydratableState } from './cache';
 import { t, loadLocale, detectLocale, LANGUAGES } from './i18n';
@@ -320,7 +320,9 @@ function createAppStore() {
       setSettings('susfs', prev => ({ ...prev, ...cached.susfs }));
       setSettings('uname', prev => ({ ...prev, ...cached.uname }));
       setSettings('mount', prev => ({ ...prev, ...cached.mount }));
-      setSettings('adb', prev => ({ ...prev, ...cached.adb }));
+      if (cached.adb && typeof cached.adb.adb_root === 'boolean') {
+        setSettings('adb', 'adb_root', cached.adb.adb_root);
+      }
       setSettings({ verboseLogging: cached.verboseLogging });
       if (cached.externalSusfsModule !== undefined) setExternalSusfsModule(cached.externalSusfsModule);
       if (cached.bridgeValues !== undefined) setBridgeValues(cached.bridgeValues);
@@ -446,13 +448,8 @@ function createAppStore() {
         enabled: typeof cfg.emoji.enabled === 'boolean' ? cfg.emoji.enabled : prev.enabled,
       }));
     }
-    if (cfg.adb) {
-      setSettings('adb', prev => ({
-        ...prev,
-        usb_debugging: typeof cfg.adb.usb_debugging === 'boolean' ? cfg.adb.usb_debugging : prev.usb_debugging,
-        developer_options: typeof cfg.adb.developer_options === 'boolean' ? cfg.adb.developer_options : prev.developer_options,
-        adb_root: typeof cfg.adb.adb_root === 'boolean' ? cfg.adb.adb_root : prev.adb_root,
-      }));
+    if (cfg.adb && typeof cfg.adb.adb_root === 'boolean') {
+      setSettings('adb', 'adb_root', cfg.adb.adb_root);
     }
     setEmojiConflict(data.emoji_conflict || null);
 
@@ -618,6 +615,8 @@ function createAppStore() {
         if (settings.autoAccentColor && typeof inlinedAccent === 'string' && inlinedAccent) {
           setSettings({ accentColor: inlinedAccent });
         }
+        // Android owns developer_options + usb_debugging — always read live
+        await loadAdbSettings(cached);
       } else {
         // Fallback: live ksu.exec (first install before reboot, or cache invalidated)
         const [batchedData, systemColor] = await Promise.all([
@@ -629,6 +628,7 @@ function createAppStore() {
 
         if (batchedData) {
           applyBatchedResponse(batchedData);
+          await loadAdbSettings(batchedData);
         } else {
           await loadInitialDataLegacy();
         }
@@ -926,8 +926,14 @@ function createAppStore() {
     }
   };
 
+  // Only adb_root persists to config; developer_options + usb_debugging are
+  // written to Android directly by the toggle handler (Android owns the truth).
   const setAdbToggle = async (key: keyof AdbSettings, value: boolean) => {
     setSettings('adb', key, value);
+    if (key !== 'adb_root') {
+      pushActivity('setting_changed', t('activity.settingChanged', { key: `adb.${key}`, value: value ? t('activity.on') : t('activity.off') }));
+      return;
+    }
     try {
       await api.configSet(`adb.${key}`, String(value));
       pushActivity('setting_changed', t('activity.settingChanged', { key: `adb.${key}`, value: value ? t('activity.on') : t('activity.off') }));
@@ -1066,53 +1072,42 @@ function createAppStore() {
     }
   };
 
+  // adb_root: ZeroMount behavior, config is source of truth (consumed by post-fs-data.sh).
+  // developer_options + usb_debugging: Android owns the truth, always read live.
   const loadAdbSettings = async (dump?: Record<string, any> | null) => {
-    if (dump?.adb) {
-      const a = dump.adb;
-      const adb: Partial<AdbSettings> = {};
-      if ('usb_debugging' in a) {
-        adb.usb_debugging = typeof a.usb_debugging === 'boolean' ? a.usb_debugging : String(a.usb_debugging) === 'true';
-      }
-      for (const key of ['developer_options', 'adb_root'] as (keyof AdbSettings)[]) {
-        if (key in a) {
-          const v = a[key];
-          adb[key] = typeof v === 'boolean' ? v : String(v) === 'true';
-        }
-      }
-      setSettings('adb', prev => ({ ...prev, ...adb }));
+    if (dump?.adb && 'adb_root' in dump.adb) {
+      const v = dump.adb.adb_root;
+      setSettings('adb', 'adb_root', typeof v === 'boolean' ? v : String(v) === 'true');
     } else {
-      const keys: (keyof AdbSettings)[] = ['usb_debugging', 'developer_options', 'adb_root'];
-      const results = await Promise.allSettled(keys.map(k => api.configGet(`adb.${k}`)));
-      const adb: Partial<AdbSettings> = {};
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled' && r.value !== null) {
-          adb[keys[i]] = r.value === 'true';
-        }
-      });
-      setSettings('adb', prev => ({ ...prev, ...adb }));
+      const r = await api.configGet('adb.adb_root');
+      if (r !== null) setSettings('adb', 'adb_root', r === 'true');
     }
 
-    // developer_options and usb_debugging: read live device state
-    // so toggles reflect reality, not stale config
     const [devResult, usbResult] = await Promise.allSettled([
-      runShell('settings get global development_settings_enabled'),
-      runShell('settings get global adb_enabled'),
+      runShell('/system/bin/settings get global development_settings_enabled'),
+      runShell('/system/bin/settings get global adb_enabled'),
     ]);
-    const live: Partial<AdbSettings> = {};
-    if (devResult.status === 'fulfilled') {
-      const val = devResult.value.stdout?.trim();
-      if (val === '1' || val === '0') live.developer_options = val === '1';
-    }
-    if (usbResult.status === 'fulfilled') {
-      const val = usbResult.value.stdout?.trim();
-      if (val === '1' || val === '0') live.usb_debugging = val === '1';
-    }
-    if (Object.keys(live).length) {
-      setSettings('adb', prev => ({ ...prev, ...live }));
-      for (const [key, val] of Object.entries(live)) {
-        api.configSet(`adb.${key}`, String(val)).catch(() => {});
+    const parseFlag = (label: string, r: PromiseSettledResult<ExecResult>): boolean => {
+      if (r.status !== 'fulfilled') {
+        console.warn(`[adb] ${label}: exec rejected`, r.reason);
+        return false;
       }
-    }
+      const { errno, stdout, stderr } = r.value;
+      const trimmed = (stdout ?? '').trim();
+      if (errno !== 0) {
+        console.warn(`[adb] ${label}: errno=${errno} stderr=${stderr} stdout="${trimmed}"`);
+        return false;
+      }
+      if (trimmed === '1' || trimmed === 'true') return true;
+      if (trimmed === '0' || trimmed === 'null' || trimmed === '') return false;
+      console.warn(`[adb] ${label}: unexpected stdout="${trimmed}"`);
+      return trimmed.startsWith('1');
+    };
+    setSettings('adb', prev => ({
+      ...prev,
+      developer_options: parseFlag('developer_options', devResult),
+      usb_debugging: parseFlag('usb_debugging', usbResult),
+    }));
   };
 
   const loadMountSettings = async (dump?: Record<string, any> | null) => {
