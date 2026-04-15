@@ -659,15 +659,25 @@ fn build_dynamic_uname() -> Result<(String, String)> {
 const SUSFS_PERSISTENT_CONFIG: &str = "/data/adb/susfs4ksu/config.sh";
 const SUSFS_CONFIG_DIR: &str = "/data/adb/susfs4ksu";
 
-const SUSFS_SHARED_KEYS: [(&str, fn(&crate::core::config::BreneConfig) -> bool); 8] = [
-    ("susfs_log", |b| b.susfs_log),
-    ("avc_log_spoofing", |b| b.avc_log_spoofing),
-    ("hide_sus_mnts_for_all_or_non_su_procs", |b| b.hide_sus_mounts),
-    ("emulate_vold_app_data", |b| b.emulate_vold_app_data),
-    ("force_hide_lsposed", |b| b.force_hide_lsposed),
-    ("spoof_cmdline", |b| b.spoof_cmdline),
-    ("hide_loops", |b| b.hide_ksu_loops),
-    ("auto_try_umount", |b| b.try_umount),
+const SUSFS_SHARED_KEYS: [(&str, fn(&crate::core::config::BreneConfig) -> u8); 10] = [
+    ("susfs_log", |b| u8::from(b.susfs_log)),
+    ("avc_log_spoofing", |b| u8::from(b.avc_log_spoofing)),
+    ("hide_sus_mnts_for_all_or_non_su_procs", |b| match (b.hide_sus_mounts, b.hide_sus_mounts_off_after_boot) {
+        (true, true) => 2,
+        (true, false) => 1,
+        _ => 0,
+    }),
+    ("emulate_vold_app_data", |b| match (b.emulate_vold_app_data, b.vold_use_path_loop) {
+        (true, true) => 2,
+        (true, false) => 1,
+        _ => 0,
+    }),
+    ("force_hide_lsposed", |b| u8::from(b.force_hide_lsposed)),
+    ("spoof_cmdline", |b| u8::from(b.spoof_cmdline)),
+    ("hide_loops", |b| u8::from(b.hide_ksu_loops)),
+    ("auto_try_umount", |b| u8::from(b.try_umount)),
+    ("skip_legit_mounts", |b| u8::from(b.skip_legit_mounts)),
+    ("hide_cusrom", |b| b.hide_cusrom),
 ];
 
 // Sync our BRENE toggles to SUSFS config.sh so SUSFS boot scripts stay in sync
@@ -680,18 +690,18 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
         if Path::new(SUSFS_CONFIG_DIR).is_dir() {
             let mut content = String::new();
             for &(key, getter) in &SUSFS_SHARED_KEYS {
-                let val = if getter(brene) { "1" } else { "0" };
+                let val = getter(brene);
                 content.push_str(&format!("{key}={val}\n"));
             }
             fs::write(config_path, &content).context("creating SUSFS config.sh")?;
-            info!("BRENE: created SUSFS config.sh with 8 settings");
+            info!("BRENE: created SUSFS config.sh with {} settings", SUSFS_SHARED_KEYS.len());
         } else {
             debug!("SUSFS not installed, skipping config sync");
         }
         return Ok(());
     }
 
-    let pairs: Vec<(&str, bool)> = SUSFS_SHARED_KEYS
+    let pairs: Vec<(&str, u8)> = SUSFS_SHARED_KEYS
         .iter()
         .map(|&(key, getter)| (key, getter(brene)))
         .collect();
@@ -700,20 +710,19 @@ pub fn sync_susfs_config(config: &ZeroMountConfig) -> Result<()> {
         .context("reading SUSFS config.sh")?;
 
     for (key, value) in &pairs {
-        let val_str = if *value { "1" } else { "0" };
         let pattern = format!("{key}=");
         if let Some(pos) = content.find(&pattern) {
             let line_end = content[pos..].find('\n').map(|i| pos + i).unwrap_or(content.len());
-            content.replace_range(pos..line_end, &format!("{key}={val_str}"));
+            content.replace_range(pos..line_end, &format!("{key}={value}"));
         }
     }
 
     fs::write(config_path, &content).context("writing SUSFS config.sh")?;
-    info!("BRENE: synced 8 settings to SUSFS config.sh");
+    info!("BRENE: synced {} settings to SUSFS config.sh", SUSFS_SHARED_KEYS.len());
     Ok(())
 }
 
-pub fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
+pub fn emulate_vold_app_data(client: &SusfsClient, use_path_loop: bool) -> u32 {
     let output = match run_command_with_timeout(
         Command::new("pm").args(["list", "packages", "-3"]),
         CMD_TIMEOUT,
@@ -742,13 +751,14 @@ pub fn emulate_vold_app_data(client: &SusfsClient) -> u32 {
         }
 
         let path = format!("/sdcard/Android/data/{pkg}");
-        match client.add_sus_path(&path) {
+        let result = if use_path_loop {
+            client.add_sus_path_loop(&path)
+        } else {
+            client.add_sus_path(&path)
+        };
+        match result {
             Ok(()) => count += 1,
             Err(e) => debug!("vold_app_data: hide failed for {pkg}: {e}"),
-        }
-        match client.add_sus_path_loop(&path) {
-            Ok(()) => count += 1,
-            Err(e) => debug!("vold_app_data: loop hide failed for {pkg}: {e}"),
         }
     }
 

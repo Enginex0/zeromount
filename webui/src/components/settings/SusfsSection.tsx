@@ -77,6 +77,15 @@ export function SusfsSection() {
             </div>
             <Toggle checked={store.settings.brene.hide_sus_mounts} onChange={(v) => handleBreneToggle('hide_sus_mounts', v)} disabled={!susfsEnabled()} />
           </div>
+          <Show when={store.settings.brene.hide_sus_mounts}>
+            <div class={`settings__item settings__item--sub settings__item--nested${!susfsEnabled() ? ' settings__item--disabled' : ''}`}>
+              <div class="settings__item-content">
+                <div class="settings__item-label">{t('susfs.keepMountsAfterBoot')}</div>
+                <div class="settings__item-desc">{t('susfs.keepMountsAfterBootDesc')}</div>
+              </div>
+              <Toggle checked={!store.settings.brene.hide_sus_mounts_off_after_boot} onChange={(v) => handleBreneToggle('hide_sus_mounts_off_after_boot', !v)} disabled={!susfsEnabled()} />
+            </div>
+          </Show>
           <div class={`settings__item settings__item--sub${!susfsEnabled() ? ' settings__item--disabled' : ''}`}>
             <div class="settings__item-content">
               <div class="settings__item-label">{t('susfs.pathHiding')}</div>
@@ -105,7 +114,7 @@ export function SusfsSection() {
             <path d="M7 10l5 5 5-5z"/>
           </svg>
           <span>{t('susfs.advancedSettings')}</span>
-          <span class="settings__advanced-badge">16</span>
+          <span class="settings__advanced-badge">20</span>
         </button>
 
         <Show when={showAdvanced()}>
@@ -113,7 +122,7 @@ export function SusfsSection() {
             <CollapsibleSubgroup
               label={t('susfs.controlLabel')}
               hiddenCount={5}
-              defaultItems={
+              defaultItems={<>
                 <div class="settings__item">
                   <div class="settings__item-content">
                     <div class="settings__item-label">{t('susfs.emulateVoldAppData')}</div>
@@ -121,7 +130,16 @@ export function SusfsSection() {
                   </div>
                   <Toggle checked={store.settings.brene.emulate_vold_app_data} onChange={(v) => handleBreneToggle('emulate_vold_app_data', v)} />
                 </div>
-              }
+                <Show when={store.settings.brene.emulate_vold_app_data}>
+                  <div class="settings__item settings__item--nested">
+                    <div class="settings__item-content">
+                      <div class="settings__item-label">{t('susfs.voldUsePathLoop')}</div>
+                      <div class="settings__item-desc">{t('susfs.voldUsePathLoopDesc')}</div>
+                    </div>
+                    <Toggle checked={store.settings.brene.vold_use_path_loop} onChange={(v) => handleBreneToggle('vold_use_path_loop', v)} />
+                  </div>
+                </Show>
+              </>}
               expandedItems={<>
                 <div class="settings__item">
                   <div class="settings__item-content">
@@ -230,6 +248,57 @@ export function SusfsSection() {
                   </div>
                   <Toggle checked={store.settings.brene.try_umount} onChange={(v) => handleBreneToggle('try_umount', v)} />
                 </div>
+                <Show when={store.settings.brene.try_umount}>
+                  <div class="settings__item settings__item--nested">
+                    <div class="settings__item-content">
+                      <div class="settings__item-label">{t('susfs.skipLegitMounts')}</div>
+                      <div class="settings__item-desc">{t('susfs.skipLegitMountsDesc')}</div>
+                    </div>
+                    <Toggle checked={store.settings.brene.skip_legit_mounts} onChange={(v) => handleBreneToggle('skip_legit_mounts', v)} />
+                  </div>
+                </Show>
+              </>}
+            />
+
+            <CollapsibleSubgroup
+              label={t('susfs.customRomLabel')}
+              hiddenCount={0}
+              defaultItems={<>
+                <div class="settings__item">
+                  <div class="settings__item-content">
+                    <div class="settings__item-label">{t('susfs.hideCusrom')}</div>
+                    <div class="settings__item-desc">{t('susfs.hideCusromDesc')}</div>
+                  </div>
+                  <Toggle checked={store.settings.brene.hide_cusrom > 0} onChange={(v) => store.setBreneNumeric('hide_cusrom', v ? 1 : 0)} />
+                </div>
+                <Show when={store.settings.brene.hide_cusrom > 0}>
+                  <div class="settings__item settings__item--nested" style={{ "flex-direction": "column", "align-items": "stretch" }}>
+                    <div class="settings__item-content">
+                      <div class="settings__item-label">{t('susfs.hideCusromLevel')} {store.settings.brene.hide_cusrom}</div>
+                      <div class="settings__item-desc">
+                        {store.settings.brene.hide_cusrom === 1 ? t('susfs.hideCusromLevel1')
+                          : store.settings.brene.hide_cusrom === 2 ? t('susfs.hideCusromLevel2')
+                          : store.settings.brene.hide_cusrom === 3 ? t('susfs.hideCusromLevel3')
+                          : store.settings.brene.hide_cusrom === 4 ? t('susfs.hideCusromLevel4')
+                          : t('susfs.hideCusromLevel5')}
+                      </div>
+                    </div>
+                    <div class="settings__slider-row">
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        step="1"
+                        value={store.settings.brene.hide_cusrom}
+                        onInput={(e) => store.setBreneNumeric('hide_cusrom', parseInt(e.currentTarget.value))}
+                        class="settings__slider"
+                      />
+                      <div class="settings__slider-labels">
+                        <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
               </>}
             />
 
@@ -244,7 +313,7 @@ export function SusfsSection() {
                   </div>
                   <button class="settings__select-trigger">
                     <span>{store.settings.uname.mode === 'disabled' ? t('susfs.unameModeDisabled') : store.settings.uname.mode === 'static' ? t('susfs.unameModeStatic') : t('susfs.unameModeDynamic')}</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
                   </button>
                 </div>
               </>}

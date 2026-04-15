@@ -18,6 +18,8 @@ pub(super) const TXT_FILES: &[&str] = &[
     "sus_path_loop.txt",
     "sus_mount.txt",
     "try_umount.txt",
+    "legit_mounts.txt",
+    "sus_open_redirect.txt",
 ];
 
 pub(super) fn read_config(dir: &Path) -> Result<HashMap<String, String>> {
@@ -75,7 +77,8 @@ pub(super) fn merge_config(
         let final_val = match key.as_str() {
             // true-default keys: always overwrite with zeromount's value
             "avc_log_spoofing" | "force_hide_lsposed" | "hide_loops"
-            | "emulate_vold_app_data" | "hide_sus_mnts_for_all_or_non_su_procs" => {
+            | "emulate_vold_app_data" | "hide_sus_mnts_for_all_or_non_su_procs"
+            | "skip_legit_mounts" => {
                 our_val.clone()
             }
             // vbmeta_size: always write zeromount's randomized value
@@ -93,14 +96,12 @@ pub(super) fn merge_config(
                     our_val.clone()
                 }
             }
-            // false-default keys: preserve external value if set to 1
-            "susfs_log" | "spoof_cmdline" | "spoof_uname" | "auto_try_umount" => {
+            // false-default keys: preserve external value if non-zero
+            "susfs_log" | "spoof_cmdline" | "spoof_uname" | "auto_try_umount"
+            | "hide_cusrom" => {
                 if let Some(ext) = existing.get(key.as_str()) {
-                    if ext == "1" || ext == "2" {
-                        ext.clone()
-                    } else {
-                        our_val.clone()
-                    }
+                    let non_zero = ext.parse::<u8>().unwrap_or(0) > 0;
+                    if non_zero { ext.clone() } else { our_val.clone() }
                 } else {
                     our_val.clone()
                 }
@@ -131,6 +132,8 @@ pub(super) fn merge_config(
     Ok(())
 }
 
+const KSTAT_JSON_FILE: &str = "sus_kstat_statically.json";
+
 pub(super) fn ensure_txt_files(dir: &Path) -> Result<()> {
     for name in TXT_FILES {
         let path = dir.join(name);
@@ -139,6 +142,12 @@ pub(super) fn ensure_txt_files(dir: &Path) -> Result<()> {
                 .with_context(|| format!("creating {}", path.display()))?;
             tracing::debug!(file = name, "created empty txt file");
         }
+    }
+    let json_path = dir.join(KSTAT_JSON_FILE);
+    if !json_path.exists() {
+        fs::write(&json_path, "[]")
+            .with_context(|| format!("creating {}", json_path.display()))?;
+        tracing::debug!("created empty sus_kstat_statically.json");
     }
     Ok(())
 }
@@ -149,7 +158,12 @@ fn config_to_keys(config: &ZeroMountConfig) -> HashMap<String, String> {
     // 12 bridged keys per spec Section 3a
     m.insert("susfs_log".into(), translate::bool_to_int(config.brene.susfs_log).to_string());
     m.insert("avc_log_spoofing".into(), translate::bool_to_int(config.brene.avc_log_spoofing).to_string());
-    m.insert("hide_sus_mnts_for_all_or_non_su_procs".into(), translate::bool_to_int(config.brene.hide_sus_mounts).to_string());
+    let hide_sus_mnts_val = match (config.brene.hide_sus_mounts, config.brene.hide_sus_mounts_off_after_boot) {
+        (true, true) => 2,
+        (true, false) => 1,
+        _ => 0,
+    };
+    m.insert("hide_sus_mnts_for_all_or_non_su_procs".into(), hide_sus_mnts_val.to_string());
     m.insert("spoof_uname".into(), translate::uname_mode_to_susfs4ksu(&config.uname.mode).to_string());
     m.insert("kernel_version".into(), translate::string_to_external(&config.uname.release));
     m.insert("kernel_build".into(), translate::string_to_external(&config.uname.version));
@@ -157,8 +171,15 @@ fn config_to_keys(config: &ZeroMountConfig) -> HashMap<String, String> {
     m.insert("hide_loops".into(), translate::bool_to_int(config.brene.hide_ksu_loops).to_string());
     m.insert("force_hide_lsposed".into(), translate::bool_to_int(config.brene.force_hide_lsposed).to_string());
     m.insert("vbmeta_size".into(), config.brene.vbmeta_size.to_string());
-    m.insert("emulate_vold_app_data".into(), translate::bool_to_int(config.brene.emulate_vold_app_data).to_string());
+    let vold_val = match (config.brene.emulate_vold_app_data, config.brene.vold_use_path_loop) {
+        (true, true) => 2,
+        (true, false) => 1,
+        _ => 0,
+    };
+    m.insert("emulate_vold_app_data".into(), vold_val.to_string());
     m.insert("auto_try_umount".into(), translate::bool_to_int(config.brene.try_umount).to_string());
+    m.insert("skip_legit_mounts".into(), translate::bool_to_int(config.brene.skip_legit_mounts).to_string());
+    m.insert("hide_cusrom".into(), config.brene.hide_cusrom.to_string());
     m.insert("disable_webui_bin_update".into(), "1".into());
 
     // Hardcoded non-bridged defaults
@@ -189,9 +210,15 @@ pub(super) fn apply_keys_to_config(keys: &HashMap<String, String>, config: &mut 
     }
 
     if let Some(v) = keys.get("hide_sus_mnts_for_all_or_non_su_procs") {
-        let val = translate::int_to_bool(v.parse().unwrap_or(0));
-        if config.brene.hide_sus_mounts != val {
-            config.brene.hide_sus_mounts = val;
+        let raw: u8 = v.parse().unwrap_or(0);
+        let enabled = raw >= 1;
+        let off_after_boot = raw == 2;
+        if config.brene.hide_sus_mounts != enabled {
+            config.brene.hide_sus_mounts = enabled;
+            changed = true;
+        }
+        if config.brene.hide_sus_mounts_off_after_boot != off_after_boot {
+            config.brene.hide_sus_mounts_off_after_boot = off_after_boot;
             changed = true;
         }
     }
@@ -254,9 +281,15 @@ pub(super) fn apply_keys_to_config(keys: &HashMap<String, String>, config: &mut 
     }
 
     if let Some(v) = keys.get("emulate_vold_app_data") {
-        let val = translate::int_to_bool(v.parse().unwrap_or(0));
-        if config.brene.emulate_vold_app_data != val {
-            config.brene.emulate_vold_app_data = val;
+        let raw: u8 = v.parse().unwrap_or(0);
+        let enabled = raw >= 1;
+        let use_loop = raw == 2;
+        if config.brene.emulate_vold_app_data != enabled {
+            config.brene.emulate_vold_app_data = enabled;
+            changed = true;
+        }
+        if config.brene.vold_use_path_loop != use_loop {
+            config.brene.vold_use_path_loop = use_loop;
             changed = true;
         }
     }
@@ -266,6 +299,24 @@ pub(super) fn apply_keys_to_config(keys: &HashMap<String, String>, config: &mut 
         if config.brene.try_umount != val {
             config.brene.try_umount = val;
             changed = true;
+        }
+    }
+
+    if let Some(v) = keys.get("skip_legit_mounts") {
+        let val = translate::int_to_bool(v.parse().unwrap_or(0));
+        if config.brene.skip_legit_mounts != val {
+            config.brene.skip_legit_mounts = val;
+            changed = true;
+        }
+    }
+
+    if let Some(v) = keys.get("hide_cusrom") {
+        if let Ok(val) = v.parse::<u8>() {
+            let clamped = val.min(5);
+            if config.brene.hide_cusrom != clamped {
+                config.brene.hide_cusrom = clamped;
+                changed = true;
+            }
         }
     }
 
@@ -286,19 +337,19 @@ const BRIDGED_KEY_ORDER: &[&str] = &[
     "vbmeta_size",
     "emulate_vold_app_data",
     "auto_try_umount",
+    "skip_legit_mounts",
+    "hide_cusrom",
     "disable_webui_bin_update",
 ];
 
 const HARDCODED_DEFAULTS: &[(&str, &str)] = &[
     ("sus_su", "2"),
     ("sus_su_active", "2"),
-    ("hide_cusrom", "0"),
     ("hide_vendor_sepolicy", "0"),
     ("hide_compat_matrix", "0"),
     ("hide_gapps", "0"),
     ("hide_revanced", "0"),
     ("umount_for_zygote_iso_service", "0"),
-    ("skip_legit_mounts", "0"),
 ];
 
 #[cfg(test)]
@@ -337,7 +388,10 @@ mod tests {
         assert_eq!(keys["hide_loops"], "1");
         assert_eq!(keys["force_hide_lsposed"], "1");
         assert_eq!(keys["vbmeta_size"], "8192");
-        assert_eq!(keys["emulate_vold_app_data"], "1");
+        assert_eq!(keys["emulate_vold_app_data"], "2"); // vold_use_path_loop defaults true
+        assert_eq!(keys["auto_try_umount"], "0");
+        assert_eq!(keys["skip_legit_mounts"], "1"); // defaults true
+        assert_eq!(keys["hide_cusrom"], "0");
         assert_eq!(keys["disable_webui_bin_update"], "1");
         // Hardcoded
         assert_eq!(keys["sus_su"], "2");

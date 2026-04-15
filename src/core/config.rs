@@ -191,6 +191,8 @@ pub struct BreneConfig {
     pub susfs_log: bool,
     #[serde(default = "default_true")]
     pub hide_sus_mounts: bool,
+    #[serde(default)]
+    pub hide_sus_mounts_off_after_boot: bool,
     #[serde(default = "default_true")]
     pub force_hide_lsposed: bool,
     #[serde(default)]
@@ -201,6 +203,8 @@ pub struct BreneConfig {
     pub kernel_umount: bool,
     #[serde(default)]
     pub try_umount: bool,
+    #[serde(default = "default_true")]
+    pub skip_legit_mounts: bool,
     #[serde(default = "default_true")]
     pub prop_spoofing: bool,
     #[serde(default = "default_true")]
@@ -215,6 +219,10 @@ pub struct BreneConfig {
     pub vbmeta_size: u32,
     #[serde(default = "default_true")]
     pub emulate_vold_app_data: bool,
+    #[serde(default = "default_true")]
+    pub vold_use_path_loop: bool,
+    #[serde(default)]
+    pub hide_cusrom: u8,
 }
 
 impl Default for BreneConfig {
@@ -229,11 +237,13 @@ impl Default for BreneConfig {
             avc_log_spoofing: true,
             susfs_log: false,
             hide_sus_mounts: true,
+            hide_sus_mounts_off_after_boot: false,
             force_hide_lsposed: true,
             spoof_cmdline: false,
             hide_ksu_loops: true,
             kernel_umount: false,
             try_umount: false,
+            skip_legit_mounts: true,
             prop_spoofing: true,
             auto_hide_injections: true,
             custom_sus_paths: Vec::new(),
@@ -241,6 +251,8 @@ impl Default for BreneConfig {
             custom_sus_path_loops: Vec::new(),
             vbmeta_size: default_vbmeta_size(),
             emulate_vold_app_data: true,
+            vold_use_path_loop: true,
+            hide_cusrom: 0,
         }
     }
 }
@@ -613,12 +625,15 @@ impl ZeroMountConfig {
             "brene.avc_log_spoofing" => Some(self.brene.avc_log_spoofing.to_string()),
             "brene.susfs_log" => Some(self.brene.susfs_log.to_string()),
             "brene.hide_sus_mounts" => Some(self.brene.hide_sus_mounts.to_string()),
-
+            "brene.hide_sus_mounts_off_after_boot" => {
+                Some(self.brene.hide_sus_mounts_off_after_boot.to_string())
+            }
             "brene.force_hide_lsposed" => Some(self.brene.force_hide_lsposed.to_string()),
             "brene.spoof_cmdline" => Some(self.brene.spoof_cmdline.to_string()),
             "brene.hide_ksu_loops" => Some(self.brene.hide_ksu_loops.to_string()),
             "brene.kernel_umount" => Some(self.brene.kernel_umount.to_string()),
             "brene.try_umount" => Some(self.brene.try_umount.to_string()),
+            "brene.skip_legit_mounts" => Some(self.brene.skip_legit_mounts.to_string()),
             "brene.prop_spoofing" => Some(self.brene.prop_spoofing.to_string()),
             "brene.auto_hide_injections" => Some(self.brene.auto_hide_injections.to_string()),
             "brene.custom_sus_paths" => Some(self.brene.custom_sus_paths.join(",")),
@@ -626,6 +641,8 @@ impl ZeroMountConfig {
             "brene.custom_sus_path_loops" => Some(self.brene.custom_sus_path_loops.join(",")),
             "brene.vbmeta_size" => Some(self.brene.vbmeta_size.to_string()),
             "brene.emulate_vold_app_data" => Some(self.brene.emulate_vold_app_data.to_string()),
+            "brene.vold_use_path_loop" => Some(self.brene.vold_use_path_loop.to_string()),
+            "brene.hide_cusrom" => Some(self.brene.hide_cusrom.to_string()),
 
             // uname.*
             "uname.mode" => Some(uname_mode_str(self.uname.mode).to_string()),
@@ -706,12 +723,15 @@ impl ZeroMountConfig {
             "brene.avc_log_spoofing" => self.brene.avc_log_spoofing = value.parse()?,
             "brene.susfs_log" => self.brene.susfs_log = value.parse()?,
             "brene.hide_sus_mounts" => self.brene.hide_sus_mounts = value.parse()?,
-
+            "brene.hide_sus_mounts_off_after_boot" => {
+                self.brene.hide_sus_mounts_off_after_boot = value.parse()?
+            }
             "brene.force_hide_lsposed" => self.brene.force_hide_lsposed = value.parse()?,
             "brene.spoof_cmdline" => self.brene.spoof_cmdline = value.parse()?,
             "brene.hide_ksu_loops" => self.brene.hide_ksu_loops = value.parse()?,
             "brene.kernel_umount" => self.brene.kernel_umount = value.parse()?,
             "brene.try_umount" => self.brene.try_umount = value.parse()?,
+            "brene.skip_legit_mounts" => self.brene.skip_legit_mounts = value.parse()?,
             "brene.prop_spoofing" => self.brene.prop_spoofing = value.parse()?,
             "brene.auto_hide_injections" => self.brene.auto_hide_injections = value.parse()?,
             "brene.custom_sus_paths" => self.brene.custom_sus_paths = parse_csv(value),
@@ -719,6 +739,8 @@ impl ZeroMountConfig {
             "brene.custom_sus_path_loops" => self.brene.custom_sus_path_loops = parse_csv(value),
             "brene.vbmeta_size" => self.brene.vbmeta_size = value.parse()?,
             "brene.emulate_vold_app_data" => self.brene.emulate_vold_app_data = value.parse()?,
+            "brene.vold_use_path_loop" => self.brene.vold_use_path_loop = value.parse()?,
+            "brene.hide_cusrom" => self.brene.hide_cusrom = value.parse::<u8>()?.min(5),
 
             // uname.*
             "uname.mode" => self.uname.mode = parse_uname_mode(value)?,

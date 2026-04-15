@@ -490,7 +490,7 @@ pub fn handle_vold_app_data() -> Result<()> {
     if let Err(e) = client.set_android_data_root_path("/sdcard/Android/data") {
         tracing::warn!("vold_app_data: set_android_data_root_path failed: {e}");
     }
-    let count = crate::susfs::brene::emulate_vold_app_data(&client);
+    let count = crate::susfs::brene::emulate_vold_app_data(&client, config.brene.vold_use_path_loop);
     tracing::info!("vold_app_data: {count} paths hidden");
     Ok(())
 }

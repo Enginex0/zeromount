@@ -392,7 +392,7 @@ mod tests {
         assert_eq!(keys["custom_uname_kernel_release"], "'5.10.0-gki'");
         assert_eq!(keys["custom_uname_kernel_version"], "'#1 SMP'");
         assert_eq!(keys["try_umount"], "0");
-        assert_eq!(keys.len(), 20);
+        assert_eq!(keys.len(), 19);
     }
 
     #[test]

@@ -124,14 +124,18 @@ function createAppStore() {
     avc_log_spoofing: true,
     susfs_log: false,
     hide_sus_mounts: true,
+    hide_sus_mounts_off_after_boot: false,
     emulate_vold_app_data: true,
+    vold_use_path_loop: true,
     force_hide_lsposed: true,
     spoof_cmdline: false,
     hide_ksu_loops: true,
     kernel_umount: true,
     try_umount: false,
+    skip_legit_mounts: true,
     prop_spoofing: true,
     auto_hide_injections: true,
+    hide_cusrom: 0,
   };
 
   const defaultSusfs: SusfsSettings = {
@@ -868,6 +872,17 @@ function createAppStore() {
     }
   };
 
+  const setBreneNumeric = async (key: keyof BreneSettings, value: number) => {
+    setSettings('brene', key, value as never);
+    try {
+      await api.configSet(`brene.${key}`, String(value));
+      await api.bridgeWrite(`brene.${key}`, String(value));
+      pushActivity('brene_toggle', t('activity.settingChanged', { key, value: String(value) }));
+    } catch (e) {
+      showToast(t('toast.failedSaveKey', { key }), 'error');
+    }
+  };
+
   const setSusfsToggle = async (key: keyof SusfsSettings, value: boolean) => {
     setSettings('susfs', key, value);
     try {
@@ -1560,6 +1575,7 @@ function createAppStore() {
     loadRuntimeStatus,
     loadBreneSettings,
     setBreneToggle,
+    setBreneNumeric,
     setSusfsToggle,
     setPerfToggle,
     setEmojiToggle,

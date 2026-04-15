@@ -124,14 +124,18 @@ export interface BreneSettings {
   avc_log_spoofing: boolean;
   susfs_log: boolean;
   hide_sus_mounts: boolean;
+  hide_sus_mounts_off_after_boot: boolean;
   emulate_vold_app_data: boolean;
+  vold_use_path_loop: boolean;
   force_hide_lsposed: boolean;
   spoof_cmdline: boolean;
   hide_ksu_loops: boolean;
   kernel_umount: boolean;
   try_umount: boolean;
+  skip_legit_mounts: boolean;
   prop_spoofing: boolean;
   auto_hide_injections: boolean;
+  hide_cusrom: number;
 }
 
 export interface SusfsSettings {
