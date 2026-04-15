@@ -15,125 +15,105 @@
 ---
 
 > [!WARNING]
-> **ZeroMount is currently in beta and under heavy active development.**
->
-> Features are being added, tested, and refined continuously. The core functionality has been tested end-to-end on personal devices, but edge cases are expected — different devices, ROMs, and kernel configurations behave differently across brands and models.
->
-> If something breaks, [open an issue](https://github.com/Enginex0/zeromount/issues). Response times may vary as development is the priority.
+> **ZeroMount is in beta.** Core functionality is tested end-to-end, but edge cases are expected across different devices, ROMs, and kernels. If something breaks, [open an issue](https://github.com/Enginex0/zeromount/issues).
 
 ---
 
-## 🧬 What is ZeroMount?
+## What is ZeroMount?
 
-ZeroMount is a **ground-up reimplementation** of mountless module loading for rooted Android. Instead of bind mounts or overlayfs — which leave traces in `/proc/mounts` and `/proc/self/mountinfo` — ZeroMount intercepts the kernel's VFS layer directly, redirecting file paths at the `getname()` level before the filesystem even knows something changed.
+ZeroMount is a **mount orchestration engine** for rooted Android. It takes over your entire module loading pipeline — detecting kernel capabilities, scanning modules, planning mount strategies, executing with automatic fallback, applying stealth protections, and monitoring system health — all in a single coordinated boot sequence. The goal: load every module with zero trace.
 
-The result: **module files appear at their stock system paths with absolutely zero mount table pollution**. Detection apps that scan mount tables, stat file metadata, or inspect `/proc/PID/maps` see a completely stock device.
+Traditional root modules use bind mounts or OverlayFS, which leave entries in `/proc/mounts` and `/proc/self/mountinfo` that detection apps find. ZeroMount's primary engine works at a lower level: it intercepts the kernel's VFS layer at `getname()`, redirecting file paths *before* the filesystem even processes them. Module files appear at stock system paths. Mount tables stay clean. Detection apps see a stock device.
+
+When the VFS driver isn't available, ZeroMount doesn't stop — it cascades through OverlayFS and MagicMount automatically, applying SUSFS stealth layers on top to hide whatever traces remain. It coordinates with peer modules, reconciles external SUSFS configurations, and guards against bootloops with multi-stage health monitoring. Every phase is orchestrated, every fallback is planned.
 
 > **This is not a port of NoMount.** ZeroMount shares the same goal — kernel-level VFS redirection without mount pollution — but the architecture is entirely different in every layer: a custom kernel driver, a Rust userspace binary, SUSFS integration, a WebUI, and a multi-phase boot pipeline. Built from scratch.
 
 ---
 
-## 📸 Screenshots
+## Features
 
-<table>
-  <tr>
-    <td align="center"><img src="screenshots/status.jpg" width="250"><br><b>Status Dashboard</b><br>Engine status, live stats, activity log</td>
-    <td align="center"><img src="screenshots/modules.jpg" width="250"><br><b>Module Manager</b><br>Scan, hot-load, and manage modules</td>
-    <td align="center"><img src="screenshots/ksu-ghost.jpg" width="250"><br><b>GHOST Mode 👻</b><br>ZeroMount active in KSU manager</td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/config.jpg" width="250"><br><b>App Exclusions</b><br>Per-app VFS bypass with search</td>
-    <td align="center"><img src="screenshots/settings.jpg" width="250"><br><b>Settings</b><br>SUSFS toggles, mount engine, themes</td>
-    <td align="center"><img src="screenshots/ksu-idle.jpg" width="250"><br><b>KSU Manager</b><br>ZeroMount module status</td>
-  </tr>
-</table>
+### Mount Engine
+- **VFS path redirection** — module files load at stock system paths, zero mount table entries
+- **3 mount strategies** — VFS (primary) → OverlayFS (fallback) → MagicMount (last resort), auto-selected based on kernel capabilities
+- **Per-module override** — force a specific mount strategy for individual modules
+- **Directory entry injection** — module files appear in `ls` and `readdir` as stock
+- **SELinux context injection** — redirected files carry correct labels, no AVC denials
+- **statfs spoofing** — system partitions report expected EROFS/ext4 magic
 
----
+### Stealth & Anti-Detection
+- **SUSFS integration** — path hiding, kstat spoofing, mount hiding, `/proc/maps` hiding, AVC log spoofing — all toggleable from the WebUI
+- **Property spoofing** — nukes or spoofs `ro.debuggable`, verified boot state, build fingerprint, serial number, and custom ROM markers via stealth `resetprop`
+- **Uname & cmdline spoofing** — kernel release, version, and `/proc/cmdline` can match stock values
+- **Process camouflage** — the ZeroMount binary appears as `[kworker/0:2]` in process listings
+- **d_path & mmap clean** — `/proc/PID/maps` and fd symlinks show unmodified metadata
 
-## 🔥 Why ZeroMount?
+### Module Management
+- **Auto-scan** — discovers and loads all active modules from `/data/adb/modules/` at boot
+- **Hot load / unload** — add or remove module VFS rules at runtime without rebooting
+- **Module exclusions** — blacklist specific modules from loading entirely
+- **App exclusions** — exclude specific apps (by UID) from seeing redirected files
+- **Conflict resolution** — detects overlapping files across modules, last-installed wins
+- **Peer orchestration** — intercepts installs and uninstalls of other modules to maintain VFS compatibility
 
-🛡️ **Bootloop Protection** — Volume keys trigger safe mode. Three failed boots auto-rollback your config. You can always recover.
+### Safety & Recovery
+- **Bootloop guard** — monitors boot timeout, zygote stability, and SystemUI health; auto-disables the module and reboots on crash loops
+- **Volume-key safe mode** — hold both volume keys during boot for immediate recovery
+- **Config backup & rollback** — config is backed up before every boot pipeline and auto-restored on failure
+- **Recovery lockout** — after a guard trigger, ZeroMount stays disabled until explicitly re-enabled
 
-👻 **Truly Invisible** — No mount table entries, no metadata leaks. Detection apps see a stock device.
+### WebUI
+- **Dashboard** — engine status, active rule count, hidden paths/maps count, capabilities, activity log
+- **Module manager** — scan, hot-load, and hot-unload modules
+- **App exclusions** — searchable per-app VFS bypass with one-tap exclude/include
+- **Module exclusions** — prevent specific modules from loading
+- **SUSFS panel** — 20+ toggles for path hiding, kstat, maps, mounts, uname, cmdline, and more
+- **Settings** — mount strategy, storage backend, property spoofing, guard thresholds, performance tuner
+- **Theming** — dark, light, AMOLED, system-auto; 6 accent colors or system color; adjustable glass effect
+- **Config export / import** — full backup and restore of your configuration
 
-🎛️ **Full WebUI** — Configure everything from your KSU manager. No terminal needed.
-
-🔄 **Works Without a Custom Kernel** — VFS is the primary engine, but ZeroMount falls back to OverlayFS or MagicMount if needed.
-
-📦 **Manages All Your Modules** — Install and uninstall modules normally. ZeroMount intercepts and loads everything mountlessly.
-
----
-
-## ✨ Features
-
-**Core VFS Engine**
-- [x] **VFS path redirection** — module files load at stock system paths, zero mount table entries
-- [x] **Directory entry injection** — module files appear in `ls` and `readdir` like they're stock
-- [x] **d_path & mmap spoofing** — `/proc/PID/maps` and fd symlinks show clean metadata
-- [x] **SELinux context injection** — redirected files carry correct labels, no AVC denials
-- [x] **statfs spoofing** — system partitions report expected EROFS magic
-- [x] **3 mount strategies** — VFS (preferred) → OverlayFS (fallback) → MagicMount (last resort)
-
-**SUSFS Integration**
-- [x] **Deep SUSFS integration** — path hiding, kstat spoofing, mount hiding, maps hiding, uname/cmdline spoofing, and more — all toggleable from the WebUI
-
-**WebUI**
-- [x] **Full WebUI dashboard** — real-time status, module manager with hot load/unload, app exclusion by UID, and a complete settings panel
-- [x] **Themeable** — dark, light, AMOLED, custom accent colors, glass effects
-
-**Safety & Reliability**
-- [x] **Bootloop guard** — boot counter + marker thresholds with automatic config rollback and recovery
-- [x] **Vol-combo safe mode** — hold both volume keys during boot as a hardware escape hatch
-- [x] **Peer module orchestration** — intercepts other module installs/uninstalls for VFS compatibility
-- [x] **Config backup** — automatic backup before every pipeline run, restored on boot failures
-
-**Extras**
-- [x] **Custom emoji fonts** — replace system emoji with your own NotoColorEmoji
-- [x] **Property spoofing** — build props, verified boot state, cmdline, uname
-- [x] **Process camouflage** — ZeroMount process appears as `[kworker/...]` in `ps`
-- [x] **Performance tuner** — optional CPU/IO governor optimization daemon
-- [x] **OTA updates** — in-manager update support via `updateJson`
-- [x] **ADB root** — root shell access in ADB without modifying global system properties
+### Extras
+- **Custom emoji fonts** — replace system emoji with NotoColorEmoji, with per-app injection for Facebook, GBoard, and GMS
+- **Performance tuner** — optional CPU governor tuning with input-boost daemon
+- **ADB root** — root shell in ADB via Axon injection, no global property changes
+- **OTA updates** — in-manager updates via `updateJson`
 
 ---
 
-## ⚙️ Kernel Interface
+## How It Works
 
-ZeroMount communicates with the kernel through two interfaces: a custom miscdevice for VFS control and SUSFS supercalls for hiding features.
+ZeroMount runs a multi-phase pipeline on every boot:
 
-### ZeroMount VFS — `/dev/zeromount`
+1. **Detect** — probes the kernel for VFS driver, SUSFS capabilities, OverlayFS support, and storage backends. Writes a capability snapshot used by every phase that follows.
+2. **Scan & Plan** — discovers all modules in `/data/adb/modules/`, classifies every file, resolves cross-module conflicts, and generates a per-partition mount plan.
+3. **Execute** — selects the optimal mount strategy based on detected capabilities and applies it. Falls back automatically if a strategy fails — even per-module.
+4. **Stealth** — applies SUSFS protections: path hiding, kstat spoofing, maps hiding, mount hiding, AVC log spoofing, property spoofing, uname/cmdline spoofing. Layers stack based on what the kernel supports.
+5. **Guard** — spawns health monitors for boot timeout, zygote stability, and SystemUI. If any crash-loops, ZeroMount auto-disables itself and reboots to a safe state.
 
-Ioctl commands issued to the ZeroMount miscdevice (magic `0x5A`):
+### Mount Strategies
 
-| Ioctl | Code | Description |
-|---|---|---|
-| `ADD_RULE` | `0x5A01` | Register a VFS path redirection rule |
-| `DEL_RULE` | `0x5A02` | Remove a VFS redirection rule |
-| `CLEAR_ALL` | `0x5A03` | Clear all active redirection rules |
-| `GET_VERSION` | `0x5A04` | Query the driver version |
-| `ADD_UID` | `0x5A05` | Exclude a UID from VFS redirection |
-| `DEL_UID` | `0x5A06` | Re-include a UID in VFS redirection |
-| `GET_LIST` | `0x5A07` | List all active redirection rules |
-| `ENABLE` | `0x5A08` | Enable the VFS engine |
-| `DISABLE` | `0x5A09` | Disable the VFS engine |
-| `REFRESH` | `0x5A0A` | Flush dcache to apply rule changes |
-| `GET_STATUS` | `0x5A0B` | Query whether the engine is active |
+| Strategy | Method | Mount table trace | Requires |
+|---|---|---|---|
+| **VFS** | Per-file redirection rules injected into a custom kernel driver (`/dev/zeromount`). Paths resolve before the filesystem sees them. | **None** | ZeroMount kernel driver |
+| **OverlayFS** | Per-partition overlay mounts with staged lower directories. | Visible (SUSFS can hide) | OverlayFS kernel support |
+| **MagicMount** | Individual bind mounts per file. | Visible | Nothing (always available) |
+
+The cascade is automatic: VFS if the driver exists → OverlayFS if not → MagicMount as last resort. You can override the strategy globally or per-module from the WebUI.
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 > [!IMPORTANT]
-> ZeroMount's VFS engine requires a **custom kernel** with the ZeroMount driver and SUSFS patches compiled in. Without the patched kernel, the module still works using OverlayFS or MagicMount fallback — but you won't get the mountless VFS redirection that makes ZeroMount special.
+> The VFS engine requires a **custom kernel** with the ZeroMount driver and SUSFS patches. Without it, ZeroMount still works via OverlayFS or MagicMount — but you won't get mountless redirection.
 
-**You need:**
-1. A rooted Android device with an unlocked bootloader
-2. A supported root manager (see compatibility below)
-3. A kernel built with ZeroMount + SUSFS patches → **[Super-Builders](https://github.com/Enginex0/Super-Builders)**
+1. Rooted Android device with an unlocked bootloader
+2. A supported root manager (KernelSU, APatch, or Magisk)
+3. A kernel with ZeroMount + SUSFS patches → **[Super-Builders](https://github.com/Enginex0/Super-Builders)**
 
 ---
 
-## 📱 Compatibility
+## Compatibility
 
 ### Tested Kernels
 
@@ -147,26 +127,26 @@ Ioctl commands issued to the ZeroMount miscdevice (magic `0x5A`):
 | Manager | Status | Notes |
 |---|---|---|
 | KernelSU | ✅ Tested | Full metamodule support |
-| APatch | ⚠️ Untested | Should work — metamodule hooks present but not verified |
-| Magisk | ⚠️ Untested | Fallback mount pipeline exists but not verified on device |
+| APatch | ⚠️ Untested | Metamodule hooks present but not verified |
+| Magisk | ⚠️ Untested | Fallback pipeline exists but not verified on device |
 
-> More kernels and devices will be tested as development continues. If you test on an unlisted combo, let us know!
+> Tested on an unlisted combo? Let us know.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Build or download a kernel** with ZeroMount + SUSFS patches from [Super-Builders](https://github.com/Enginex0/Super-Builders)
 2. **Flash the kernel** to your device
-3. **Install ZeroMount** — download the module ZIP and install via your root manager
-4. **Reboot** your device
-5. **Open the WebUI** from KSU Manager → ZeroMount → ⚙️
+3. **Install ZeroMount** — download the ZIP and install via your root manager
+4. **Reboot**
+5. **Open the WebUI** — root manager → ZeroMount → ⚙️
 
-The WebUI will show your engine status, detected kernel capabilities, and loaded modules.
+The dashboard shows engine status, detected capabilities, loaded modules, and everything is configurable from the Settings tab.
 
 ---
 
-## 💬 Community
+## Community
 
 ```bash
 $ zeromount --connect
@@ -179,13 +159,18 @@ $ zeromount --connect
  ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═╝
 
  [✓] SIGNAL    ──→  t.me/superpowers9
+ [✓] CHANNEL   ──→  t.me/superpowers99
  [✓] UPLINK    ──→  kernel builds · bug triage · feature drops
  [✓] STATUS    ──→  OPEN — all operators welcome
 ```
 
 <p align="center">
   <a href="https://t.me/superpowers9">
-    <img src="https://img.shields.io/badge/⚡_JOIN_THE_GRID-SuperPowers_Telegram-black?style=for-the-badge&logo=telegram&logoColor=cyan&labelColor=0d1117&color=00d4ff" alt="Telegram">
+    <img src="https://img.shields.io/badge/⚡_GROUP-SuperPowers_Telegram-black?style=for-the-badge&logo=telegram&logoColor=cyan&labelColor=0d1117&color=00d4ff" alt="Telegram Group">
+  </a>
+  &nbsp;
+  <a href="https://t.me/superpowers99">
+    <img src="https://img.shields.io/badge/📢_CHANNEL-SuperPowers_Updates-black?style=for-the-badge&logo=telegram&logoColor=cyan&labelColor=0d1117&color=00d4ff" alt="Telegram Channel">
   </a>
 </p>
 
