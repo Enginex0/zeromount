@@ -27,7 +27,7 @@ export function CollapsibleSubgroup(props: CollapsibleSubgroupProps) {
             </Show>
             <svg
               class={`subgroup__chevron${expanded() ? ' subgroup__chevron--open' : ''}`}
-              width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
+              width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
             >
               <path d="M7 10l5 5 5-5z" />
             </svg>

@@ -28,15 +28,16 @@
 }
 
 .exclusion__chevron {
-  width: 20px;
-  height: 20px;
-  color: var(--text-tertiary);
+  width: 24px;
+  height: 24px;
+  color: #A855F7;
+  transform: rotate(180deg);
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
 
 .exclusion__chevron--open {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .exclusion__body {

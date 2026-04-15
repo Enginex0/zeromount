@@ -98,9 +98,9 @@ export function AppearanceSection() {
 
       <div class="settings__group">
         <div class="settings__label">{t('appearance.language')}</div>
-        <button class="settings__source-btn" onClick={() => setShowLangSheet(true)}>
-          {currentLangName()}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        <button class="settings__select-trigger" onClick={() => setShowLangSheet(true)}>
+          <span>{currentLangName()}</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
         </button>
       </div>
 
@@ -162,7 +162,7 @@ export function AppearanceSection() {
         </div>
         <div class="settings__glass-badge">
           <span>{Math.round(store.bgOpacity() * 100)}%</span>
-          <svg class={`settings__glass-chevron${glassOpen() ? ' settings__glass-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <svg class={`settings__glass-chevron${glassOpen() ? ' settings__glass-chevron--open' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="M7 10l5 5 5-5z"/>
           </svg>
         </div>

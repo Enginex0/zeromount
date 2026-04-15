@@ -145,7 +145,7 @@ export function MountEngineSection() {
             </div>
             <button class="settings__select-trigger" onClick={() => setShowOverlaySheet(true)}>
               <span>{['auto', 'KSU', 'magisk', 'overlay'].includes(store.settings.mount.overlay_source) ? store.settings.mount.overlay_source : t('engine.customLabel')}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
             </button>
           </div>
           <BottomSheet
@@ -185,7 +185,7 @@ export function MountEngineSection() {
           </div>
           <button class="settings__select-trigger" onClick={() => setShowStagingSheet(true)}>
             <span>{['auto', 'tmpfs', 'none', 'shmem', 'shm'].includes(store.settings.mount.mount_source) ? store.settings.mount.mount_source : t('engine.customLabel')}</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
           </button>
         </div>
         <BottomSheet

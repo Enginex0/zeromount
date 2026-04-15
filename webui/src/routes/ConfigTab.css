@@ -67,11 +67,16 @@
 }
 
 .config__chevron {
+  width: 24px;
+  height: 24px;
+  color: #A855F7;
+  transform: rotate(180deg);
   transition: transform 0.2s ease;
+  flex-shrink: 0;
 }
 
 .config__chevron--expanded {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .config__section-title {

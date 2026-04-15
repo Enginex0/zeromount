@@ -439,6 +439,7 @@ export function StatusTab() {
                   style={{ color: store.currentTheme().textAccent }}
                 >
                   {showAllModules() ? t('status.showLess') : t('status.showMore', { count: store.moduleStatuses().length - 3 })}
+                  <svg class={`status-activity__chevron${showAllModules() ? ' status-activity__chevron--open' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
                 </button>
               </Show>
             </div>
@@ -509,6 +510,7 @@ export function StatusTab() {
               style={{ color: store.currentTheme().textAccent }}
             >
               {showAllPaths() ? t('status.showLess') : t('status.showMore', { count: pathChips().length - 5 })}
+              <svg class={`status-activity__chevron${showAllPaths() ? ' status-activity__chevron--open' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
             </button>
           </Show>
         </div>
@@ -693,6 +695,7 @@ export function StatusTab() {
             class="status-activity__toggle color-text-accent"
           >
             {showAllActivity() ? t('status.showLess') : t('status.viewAll')}
+            <svg class={`status-activity__chevron${showAllActivity() ? ' status-activity__chevron--open' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
           </button>
         </div>
 

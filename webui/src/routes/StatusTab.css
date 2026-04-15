@@ -375,11 +375,27 @@
 }
 
 .status-activity__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: none;
   border: none;
   font-family: var(--font-body, 'Inter', system-ui, sans-serif);
   font-size: 12px;
   cursor: pointer;
+}
+
+.status-activity__chevron {
+  width: 24px;
+  height: 24px;
+  color: #A855F7;
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.status-activity__chevron--open {
+  transform: rotate(0deg);
 }
 
 .status-activity__list {

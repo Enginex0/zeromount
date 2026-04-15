@@ -51,14 +51,15 @@
 }
 
 .subgroup__chevron {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
+  transform: rotate(180deg);
   transition: transform 0.2s ease;
-  color: var(--text-accent);
+  color: #A855F7;
 }
 
 .subgroup__chevron--open {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .subgroup__expanded {
